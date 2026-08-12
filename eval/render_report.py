@@ -220,6 +220,7 @@ TEMPLATE = """<title>Decision Graph — Evaluation Worksheet</title>
   --inferred:     #A6742E;
   --held:     #2E7D5B;
   --violated: #B04A3E;
+  --halt-soft: #FBEDEA;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
@@ -240,13 +241,14 @@ TEMPLATE = """<title>Decision Graph — Evaluation Worksheet</title>
     --inferred:     #D2A055;
     --held:     #5DB98C;
     --violated: #D97A6C;
+    --halt-soft: #2A1C1A;
   }}
 }}
 :root[data-theme="dark"] {{
   --ground:#101317; --surface:#171B21; --sunk:#1D222A; --ink:#E4E8ED;
   --muted:#98A2AE; --faint:#6B7683; --rule:#272E37; --accent:#58B5A8;
   --accent-soft:#16302E; --explicit:#7FA3C2; --corroborated:#5DB98C;
-  --inferred:#D2A055; --held:#5DB98C; --violated:#D97A6C;
+  --inferred:#D2A055; --held:#5DB98C; --violated:#D97A6C; --halt-soft:#2A1C1A;
 }}
 
 * {{ box-sizing: border-box; }}
@@ -281,6 +283,8 @@ code, .mono {{ font-family: var(--mono); font-size: .86em; }}
 }}
 .note p {{ margin: 0; font-size: .93rem; }}
 .note strong {{ color: var(--accent); }}
+.note.fixed {{ background: var(--sunk); border-left-color: var(--held); }}
+.note.fixed strong {{ color: var(--held); }}
 
 .stats {{ display: flex; flex-wrap: wrap; gap: 1px; background: var(--rule);
   border: 1px solid var(--rule); margin: 2rem 0 .75rem; }}
@@ -402,6 +406,18 @@ button:hover {{ opacity: .9; }}
     <h1>Evaluation worksheet</h1>
     <p class="sub">Decision Graph against <code>pallets/flask</code> — PRD v3.1 §9.
     18 queries: 2 flagship plus 16 harder cases. Generated {generated}.</p>
+
+    <div class="note fixed">
+      <p><strong>Regenerated after a defect found in adjudication.</strong>
+      A spot-check of issue 5912 against GitHub found it <em>closed as not planned</em>
+      with no linked pull requests. The extraction was correct — all five sources really
+      do contain <code>fixes #5912</code> — but the §5.1 rubric never checked whether the
+      work <em>landed</em>, and a closing keyword survives rejection intact.
+      <strong>12 of 20 Decisions rested on pull requests that were never merged.</strong>
+      Validation now requires a merged pull request; 7 Decisions were retracted and 13
+      remain, every one with a merged implementer. Issues #16 and #17.
+      Query H1 is now the regression guard for that defect.</p>
+    </div>
 
     <div class="note">
       <p><strong>Nothing here is graded.</strong> §9 requires answers checked against the

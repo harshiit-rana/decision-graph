@@ -172,6 +172,25 @@ Formal precision/recall evaluation at scale is out of scope for v1 given the eff
 - **Phase 4:** Explainability Mode; evaluation set and accuracy reporting.
 - **Phase 5 (future, out of scope here):** Webhook-driven ingestion, additional sources (Slack, Jira), permission modeling, Bus Factor / Architecture View / Expert Finder, ranked/embedding-based retrieval.
 
+> **Roadmap note — rejected decisions as a first-class outcome (Phase 5+).**
+> Implementation surfaced a category the current model cannot express. A cluster where
+> maintainers *declined* to act — an issue closed as `not_planned`, with closing PRs left
+> unmerged — is a real decision, and against one real repository window they are not rare:
+> 28 of 54 closed issues, and 7 of the 20 clusters that initially qualified as Decisions.
+>
+> v1 handles these by exclusion. §5.1 Validation requires that work landed, so a declined
+> cluster produces no Decision node and its artifacts stay queryable as plain artifacts.
+> That is correct for v1 and prevents the system asserting a change was made when it was
+> refused — but it means the graph is silent about a decision that demonstrably occurred,
+> and the answer to "why doesn't Flask do X?" is often more valuable than "why does it?".
+>
+> Modelling these properly is not a rubric tweak. It needs rejection-rationale extraction
+> that does not exist yet: the *why* of a refusal lives in closing comments and review
+> discussion, not in the structured signals (`closes`, `implements`, `reviewed`) the
+> extraction-first design currently reads. Adding a `rejected` outcome without that would
+> reintroduce exactly the failure §5.1 exists to prevent — asserting a decision whose
+> rationale the system cannot evidence.
+
 ## 12. Success Criteria
 
 - Why Engine and Impact Analysis both return correct, evidence-tiered answers against a real repository's history.

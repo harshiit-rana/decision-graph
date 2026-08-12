@@ -59,7 +59,13 @@ WHERE e.edge_type = 'closes'
   AND src.thread_key IS NOT NULL
   AND src.thread_key = dst.thread_key
 ORDER BY src.thread_key,
-         (src.node_type = 'pull_request') DESC,  -- a PR is a better implementer than a bare commit
+         -- A MERGED pull request is the implementer. Ordering by node id first (as this
+         -- did originally) picked whichever artifact happened to be written earliest,
+         -- which named an unmerged PR in 5 threads that contained a merged one --
+         -- including flagship F2, where PR 5794 (never merged) was credited over PR 5777
+         -- (merged 2025-08-18). Attribution has to follow what landed, not insertion order.
+         (pr.merged_at IS NOT NULL) DESC,
+         (src.node_type = 'pull_request') DESC,  -- then a PR over a bare commit
          dst.id,
          src.id
 """
@@ -75,6 +81,23 @@ class SynthesisResult:
     def __post_init__(self) -> None:
         if self.refusals is None:
             self.refusals = []
+
+
+def retract_unsupported(conn: psycopg.Connection) -> tuple[int, list[str]]:
+    """Withdraw Decisions that no longer satisfy the rubric (issue #17).
+
+    Must run BEFORE synthesis. The deferred guard only re-validates rows something
+    touches, so a Decision asserted under an older, looser rule survives indefinitely
+    unless it is explicitly revisited. A claim the graph no longer supports has to go.
+    """
+    row = conn.execute("SELECT * FROM retract_unsupported_decisions()").fetchone()
+    count = int(row["retracted"]) if row else 0
+    threads = list(row["thread_keys"]) if row and row["thread_keys"] else []
+    if count:
+        log.warning("retracted %s Decision(s) no longer supported by evidence", count)
+        for t in threads:
+            log.warning("  retracted %s", t)
+    return count, threads
 
 
 def synthesize(conn: psycopg.Connection, repo_node_id: int) -> SynthesisResult:
@@ -226,6 +249,36 @@ def _promote(conn: psycopg.Connection, repo_node_id: int, row: dict) -> bool:
         extractor="synthesis_closes_cluster",
         source_ref=thread_key,
         observed_at=row["decided_at"],
+    )
+
+    # Withdraw rubric edges this Decision used to claim but no longer selects.
+    #
+    # Upserting the correct edge is not enough: a DIFFERENT destination is a different
+    # row, so the old edge simply survives alongside the new one. When the implementer
+    # tie-break changed to prefer merged PRs, every re-pointed Decision ended up
+    # asserting two implementers at once -- F2 credited both PR 5794 (never merged) and
+    # PR 5777 (merged). Idempotent for an unchanged selection is not the same as
+    # idempotent for a changed one.
+    #
+    # Superseded edges are time-versioned rather than deleted, so the graph keeps a
+    # record of what it used to claim. valid_from < now() excludes edges created in this
+    # same transaction, which cannot be closed (the 0001 CHECK requires valid_to >
+    # valid_from, and now() is frozen per transaction).
+    conn.execute(
+        """
+        UPDATE edge
+        SET valid_to = now()
+        WHERE src_node_id = %(decision)s
+          AND edge_type IN ('motivated_by', 'implemented_by')
+          AND valid_to IS NULL
+          AND valid_from < now()
+          AND dst_node_id NOT IN (%(motivator)s, %(implementer)s)
+        """,
+        {
+            "decision": decision_node_id,
+            "motivator": row["motivator_id"],
+            "implementer": row["implementer_id"],
+        },
     )
 
     return existing is None

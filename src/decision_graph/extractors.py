@@ -152,6 +152,11 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
     )
 
     if is_pr:
+        # Merge state is nested under the `pull_request` sub-object on this endpoint,
+        # NOT at the top level. Reading payload["merged_at"] silently yields None, which
+        # is how 27 real merges were discarded for the whole of Phase 1-3 (issue #16).
+        # merged_at is what distinguishes work that landed from work that was refused,
+        # and the §5.1 rubric depends on it.
         db.upsert_detail(
             ctx.conn,
             "pull_request",
@@ -160,8 +165,12 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
             state=payload.get("state") or "unknown",
             body=body,
             closed_at=parse_ts(payload.get("closed_at")),
+            merged_at=parse_ts((payload.get("pull_request") or {}).get("merged_at")),
         )
     else:
+        # state_reason separates an issue that was resolved (`completed`) from one the
+        # maintainers declined (`not_planned`). Without it, a refusal is indistinguishable
+        # from a fix.
         db.upsert_detail(
             ctx.conn,
             "issue",
@@ -170,6 +179,7 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
             state=payload.get("state") or "unknown",
             body=body,
             closed_at=parse_ts(payload.get("closed_at")),
+            state_reason=payload.get("state_reason"),
         )
 
     # created: author -> artifact
