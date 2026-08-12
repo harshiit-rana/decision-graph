@@ -1,0 +1,3033 @@
+<title>Decision Graph — Evaluation Worksheet</title>
+<style>
+:root {
+  --ground:   #F6F7F9;
+  --surface:  #FFFFFF;
+  --sunk:     #EEF1F4;
+  --ink:      #171A1F;
+  --muted:    #5C6672;
+  --faint:    #8A939E;
+  --rule:     #DCE1E7;
+  --accent:   #1B6B63;
+  --accent-soft: #E4F0EE;
+  --explicit:     #4A6C88;
+  --corroborated: #2E7D5B;
+  --inferred:     #A6742E;
+  --held:     #2E7D5B;
+  --violated: #B04A3E;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:   #101317;
+    --surface:  #171B21;
+    --sunk:     #1D222A;
+    --ink:      #E4E8ED;
+    --muted:    #98A2AE;
+    --faint:    #6B7683;
+    --rule:     #272E37;
+    --accent:   #58B5A8;
+    --accent-soft: #16302E;
+    --explicit:     #7FA3C2;
+    --corroborated: #5DB98C;
+    --inferred:     #D2A055;
+    --held:     #5DB98C;
+    --violated: #D97A6C;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#101317; --surface:#171B21; --sunk:#1D222A; --ink:#E4E8ED;
+  --muted:#98A2AE; --faint:#6B7683; --rule:#272E37; --accent:#58B5A8;
+  --accent-soft:#16302E; --explicit:#7FA3C2; --corroborated:#5DB98C;
+  --inferred:#D2A055; --held:#5DB98C; --violated:#D97A6C;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 62rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+.lede { max-width: 38rem; }
+
+h1 {
+  font-family: var(--serif); font-size: clamp(1.9rem, 4vw, 2.6rem);
+  line-height: 1.15; margin: 0 0 .4rem; text-wrap: balance; font-weight: 600;
+}
+.sub { color: var(--muted); margin: 0 0 2rem; font-size: 1.02rem; }
+h2 {
+  font-family: var(--serif); font-size: 1.35rem; font-weight: 600;
+  margin: 3.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--rule);
+}
+h4 {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--faint); margin: 0 0 .55rem; font-weight: 600;
+}
+h4 .count { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; }
+p { margin: 0 0 .9rem; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+
+.note {
+  background: var(--accent-soft); border-left: 3px solid var(--accent);
+  padding: 1rem 1.15rem; margin: 1.5rem 0 0; max-width: 38rem;
+}
+.note p { margin: 0; font-size: .93rem; }
+.note strong { color: var(--accent); }
+
+.stats { display: flex; flex-wrap: wrap; gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); margin: 2rem 0 .75rem; }
+.stat { background: var(--surface); padding: .9rem 1.15rem; flex: 1 1 8rem; }
+.stat .n { font-size: 1.6rem; font-family: var(--serif); font-variant-numeric: tabular-nums;
+  line-height: 1.1; display: block; }
+.stat .l { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); }
+.stat.good .n { color: var(--held); }
+
+.tiers { display: flex; height: 2rem; border: 1px solid var(--rule); overflow: hidden; }
+.tb { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.tb span { font-size: .7rem; color: #fff; letter-spacing: .04em; white-space: nowrap;
+  padding: 0 .4rem; overflow: hidden; text-overflow: ellipsis; }
+.tb.tier-explicit { background: var(--explicit); }
+.tb.tier-corroborated { background: var(--corroborated); }
+.tb.tier-inferred { background: var(--inferred); }
+.caption { font-size: .82rem; color: var(--faint); margin: .5rem 0 0; }
+
+.q {
+  background: var(--surface); border: 1px solid var(--rule);
+  padding: 1.5rem 1.6rem 1.1rem; margin: 0 0 1.25rem;
+}
+.q-head { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+  padding-bottom: .85rem; margin-bottom: .95rem; border-bottom: 1px solid var(--rule); }
+.q-id { font-family: var(--mono); font-size: 1.05rem; font-weight: 700; color: var(--accent); }
+.q-meta { display: flex; gap: .45rem; flex-wrap: wrap; align-items: center; margin-left: auto; }
+.cat { font-size: .82rem; color: var(--muted); }
+.meta-chip {
+  font-family: var(--mono); font-size: .7rem; padding: .16rem .5rem;
+  background: var(--sunk); color: var(--muted); border-radius: 2px; white-space: nowrap;
+}
+.meta-chip.mode-why { color: var(--accent); }
+.meta-chip.mode-impact { color: var(--explicit); }
+.meta-chip.ans { color: var(--held); }
+.meta-chip.noans { color: var(--muted); }
+
+.query { margin-bottom: .45rem; }
+.q-label, .v-label, .verify-label, .contract-label {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--faint); font-weight: 600; margin-right: .5rem;
+}
+.query code { background: var(--sunk); padding: .18rem .45rem; border-radius: 2px; }
+.intent { color: var(--muted); font-size: .93rem; max-width: 46rem; }
+
+.contract { background: var(--sunk); padding: .75rem .95rem; margin: 0 0 1.1rem;
+  border-left: 3px solid var(--faint); }
+.contract.held { border-left-color: var(--held); }
+.contract.violated { border-left-color: var(--violated); }
+.contract p { margin: .3rem 0 0; font-size: .88rem; color: var(--muted); }
+.contract-state { font-family: var(--mono); font-size: .74rem; font-weight: 700; }
+.contract.held .contract-state { color: var(--held); }
+.contract.violated .contract-state { color: var(--violated); }
+
+.block { margin: 0 0 1.15rem; }
+table.cands { width: 100%; border-collapse: collapse; font-size: .86rem; }
+table.cands th { text-align: left; font-weight: 600; font-size: .7rem;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--faint);
+  padding: .25rem .5rem .25rem 0; border-bottom: 1px solid var(--rule); }
+table.cands td { padding: .32rem .5rem .32rem 0; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+table.cands tr.chosen td { font-weight: 600; }
+table.cands tr.chosen td:first-child { box-shadow: inset 2px 0 0 var(--accent); padding-left: .5rem; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+ul.paths { list-style: none; margin: 0; padding: 0; display: flex;
+  flex-direction: column; gap: .75rem; }
+.path-head { display: flex; gap: .5rem; align-items: center; margin-bottom: .3rem; }
+.path-n { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); }
+.depth { font-size: .74rem; color: var(--faint); font-family: var(--mono); }
+.trace { font-family: var(--mono); font-size: .8rem; background: var(--sunk);
+  padding: .7rem .85rem; overflow-x: auto; border-radius: 2px; }
+.node { white-space: nowrap; padding: .1rem 0; }
+.node-start { font-weight: 700; }
+.step { display: flex; gap: .5rem; align-items: center; padding: .12rem 0 .12rem 1.1rem;
+  border-left: 1px solid var(--rule); margin-left: .35rem; white-space: nowrap; }
+.conn { color: var(--faint); }
+.etype { color: var(--ink); font-weight: 600; }
+.extractor { color: var(--faint); font-size: .92em; }
+.ref { color: var(--faint); font-size: .88em; opacity: .75; }
+
+.tier { font-size: .66rem; text-transform: uppercase; letter-spacing: .05em;
+  padding: .08rem .4rem; border-radius: 2px; color: #fff; font-weight: 600;
+  font-family: var(--mono); }
+.tier-explicit { background: var(--explicit); }
+.tier-corroborated { background: var(--corroborated); }
+.tier-inferred { background: var(--inferred); }
+
+.empty { color: var(--muted); font-size: .89rem; font-style: italic; list-style: none; }
+.more summary { cursor: pointer; font-size: .82rem; color: var(--accent); padding: .2rem 0; }
+.more ul { margin-top: .7rem; }
+
+.verify { border-top: 1px solid var(--rule); padding-top: .8rem; margin-top: .3rem; }
+.verify p { margin: .25rem 0 0; font-size: .9rem; color: var(--muted); max-width: 46rem; }
+
+.verdict { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap;
+  margin-top: 1rem; padding-top: .85rem; border-top: 2px solid var(--rule); }
+.verdict label { font-size: .87rem; display: flex; align-items: center; gap: .3rem;
+  cursor: pointer; color: var(--muted); }
+.verdict input[type=radio] { accent-color: var(--accent); }
+.verdict.done { border-top-color: var(--accent); }
+.v-note { flex: 1 1 12rem; min-width: 8rem; font-family: var(--sans); font-size: .85rem;
+  padding: .3rem .5rem; border: 1px solid var(--rule); background: var(--ground);
+  color: var(--ink); border-radius: 2px; }
+input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.bar { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--rule);
+  padding: .8rem 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+  margin: 2rem -1.5rem -6rem; }
+.bar .prog { font-size: .88rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+button { font-family: var(--sans); font-size: .86rem; padding: .42rem .9rem;
+  background: var(--accent); color: #fff; border: none; border-radius: 2px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--rule); }
+button:hover { opacity: .9; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Evaluation worksheet</h1>
+    <p class="sub">Decision Graph against <code>pallets/flask</code> — PRD v3.1 §9.
+    18 queries: 2 flagship plus 16 harder cases. Generated 2026-08-12 19:52.</p>
+
+    <div class="note">
+      <p><strong>Nothing here is graded.</strong> §9 requires answers checked against the
+      repository's real history, and a system scoring its own output against its own graph
+      would be measuring self-consistency, not correctness. Every verdict below is blank
+      and waiting for you. The one thing the runner does assert is the
+      <em>engine contract</em> — mechanical properties like “must return no answer for an
+      artifact outside the window” — because those are claims about the code, not about flask.</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="n">18</span><span class="l">queries</span></div>
+    <div class="stat"><span class="n">12</span><span class="l">answered</span></div>
+    <div class="stat"><span class="n">6</span><span class="l">returned nothing</span></div>
+    <div class="stat good"><span class="n">4/4</span><span class="l">contracts held</span></div>
+  </div>
+
+  <div class="tiers"><span class="tb tier-explicit" style="flex:41"><span>explicit 41</span></span><span class="tb tier-corroborated" style="flex:30"><span>corroborated 30</span></span></div>
+  <p class="caption">Evidence tier across every path returned. No path used the inferred
+  fallback — the graph holds no inferred edges, so that branch is exercised only by the
+  seeded fixture in the test suite.</p>
+
+  <h2>Point-in-time control</h2>
+  <p>T1 and T2 re-run the two flagship queries through the <code>valid_from</code>/<code>valid_to</code>
+  window. If the time filter were silently ignored, both would be unchanged.</p>
+  <div class="stats">
+    <div class="stat"><span class="n">1 → 0</span><span class="l">F1 → T1, as of 2025-06</span></div>
+    <div class="stat"><span class="n">17 → 17</span><span class="l">F2 → T2, as of 2026-12</span></div>
+  </div>
+  <p class="caption">The past query collapses to nothing; the future query is unchanged.
+  The filter restricts in one direction only, which is the expected behaviour.</p>
+
+  <h2>Queries</h2>
+  
+  <article class="q" id="q-F1">
+    <header class="q-head">
+      <div class="q-id">F1</div>
+      <div class="q-meta">
+        <span class="cat">Flagship</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>change default redirect code to 303</code></p>
+    <p class="intent">Why did Flask change its default redirect status code?</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:485</td>
+              <td>change default redirect code to 303</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:930</td>
+              <td>change default redirect code to 303</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:530</td>
+              <td>redirect defaults to 303</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.62</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">1 path</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:485 — change default redirect code to 303</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">motivated_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5898</span>
+      </div>
+      <div class="node">decision:930 — change default redirect code to 303</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Does the reconstructed chain (issue -&gt; decision -&gt; implementing PR/commit) match how this actually happened in flask? Is the motivating issue genuinely the &#x27;why&#x27;?</p></div>
+
+    <footer class="verdict" data-q="F1">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-F1" value="correct"> correct</label>
+      <label><input type="radio" name="v-F1" value="partial"> partial</label>
+      <label><input type="radio" name="v-F1" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="F1">
+    </footer>
+  </article>
+  <article class="q" id="q-F2">
+    <header class="q-head">
+      <div class="q-id">F2</div>
+      <div class="q-meta">
+        <span class="cat">Flagship</span>
+        <span class="meta-chip mode-impact">impact</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>Looser type annotations for send_file() path_or_file argument</code></p>
+    <p class="intent">If this change were reverted, what is affected?</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:51</td>
+              <td>Looser type annotations for send_file() path_or_file argument</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:920</td>
+              <td>Looser type annotations for send_file() path_or_file argument</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:41</td>
+              <td>Loosen send_file type annotation to include typing.IO[bytes]</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.40</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">17 paths</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 2</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
+      </div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 3</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 4</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">45eb69f8bac0e4905c8f511a86b8c6705d33ff74</span>
+      </div>
+      <div class="node">commit:43 — Update helpers.pyLoosen send_file type annotation to include t.IO[bytes]  Include typing.IO[bytes] to align with Werkzeug and resolve issue #5776.</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 5</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:53 — Session is not updated on redirect target endpoint in tests</div>
+      </div>
+    </li>
+        <li class="more">
+          <details>
+            <summary>12 further paths</summary>
+            <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 6</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
+      </div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">d44f1c65239c3e33509224aa1931631243dbfa7f</span>
+      </div>
+      <div class="node">commit:66 — relax type hint for bytes io</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 7</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:104 — `stream_with_context` does not work with async routes</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 8</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 9</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 10</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5786</span>
+      </div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 11</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5774</span>
+      </div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 12</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 13</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:53 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5797</span>
+      </div>
+      <div class="node">pull_request:76 — push preserved contexts in correct order</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 14</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5786</span>
+      </div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5797</span>
+      </div>
+      <div class="node">pull_request:76 — push preserved contexts in correct order</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 15</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:104 — `stream_with_context` does not work with async routes</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 16</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5774</span>
+      </div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5799</span>
+      </div>
+      <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 17</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      </div>
+    </li></ul>
+          </details>
+        </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Are the reached artifacts (PR, commits, release 3.1.2) genuinely downstream of this change? Is release 3.1.2 the correct shipping vehicle?</p></div>
+
+    <footer class="verdict" data-q="F2">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-F2" value="correct"> correct</label>
+      <label><input type="radio" name="v-F2" value="partial"> partial</label>
+      <label><input type="radio" name="v-F2" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="F2">
+    </footer>
+  </article>
+  <article class="q" id="q-H1">
+    <header class="q-head">
+      <div class="q-id">H1</div>
+      <div class="q-meta">
+        <span class="cat">Causal reconstruction</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>Config.from_file() missing ENOTDIR in silent error handling</code></p>
+    <p class="intent">Hardest clustering case: this issue was closed by FIVE distinct sources (3 PRs + 2 commits), all merged into one thread.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:576</td>
+              <td>Config.from_file() missing ENOTDIR in silent error handling</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:932</td>
+              <td>Config.from_file() missing ENOTDIR in silent error handling</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:704</td>
+              <td>Fix Config.from_file silent error handling to include ENOTDIR</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.72</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">1 path</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">motivated_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5913</span>
+      </div>
+      <div class="node">decision:932 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Should all five sources belong to one decision? Did flask really resolve this across multiple PRs, or are some unrelated?</p></div>
+
+    <footer class="verdict" data-q="H1">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H1" value="correct"> correct</label>
+      <label><input type="radio" name="v-H1" value="partial"> partial</label>
+      <label><input type="radio" name="v-H1" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H1">
+    </footer>
+  </article>
+  <article class="q" id="q-H2">
+    <header class="q-head">
+      <div class="q-id">H2</div>
+      <div class="q-meta">
+        <span class="cat">Causal reconstruction</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>merge app and request contexts into a single context</code></p>
+    <p class="intent">A genuine architectural decision, not a bug fix.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:198</td>
+              <td>merge app and request contexts into a single context</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:923</td>
+              <td>merge app and request contexts into a single context</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:786</td>
+              <td>merge app and request context</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.66</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">1 path</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:198 — merge app and request contexts into a single context</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">motivated_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5812</span>
+      </div>
+      <div class="node">decision:923 — merge app and request contexts into a single context</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Is the causal chain right? This is the kind of decision the system exists to reconstruct.</p></div>
+
+    <footer class="verdict" data-q="H2">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H2" value="correct"> correct</label>
+      <label><input type="radio" name="v-H2" value="partial"> partial</label>
+      <label><input type="radio" name="v-H2" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H2">
+    </footer>
+  </article>
+  <article class="q" id="q-H3">
+    <header class="q-head">
+      <div class="q-id">H3</div>
+      <div class="q-meta">
+        <span class="cat">Causal reconstruction</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>Recommend Warning and Safer Defaults for url_for(..., _external=True)</code></p>
+    <p class="intent">A CORROBORATED thread (3 of 4 categories, via ATTESTED). Tier should read corroborated, not explicit.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:49</td>
+              <td>Recommend Warning and Safer Defaults for url_for(..., _external=True)</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:918</td>
+              <td>Recommend Warning and Safer Defaults for url_for(..., _external=True)</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:55</td>
+              <td>docs: add warning and best practices for url_for(..., _external=True)…</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.44</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">1 path</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:49 — Recommend Warning and Safer Defaults for url_for(..., _external=True)</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">motivated_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5722</span>
+      </div>
+      <div class="node">decision:918 — Recommend Warning and Safer Defaults for url_for(..., _external=True)</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Is the chain correct, AND does the corroborated tier feel justified by the underlying evidence?</p></div>
+
+    <footer class="verdict" data-q="H3">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H3" value="correct"> correct</label>
+      <label><input type="radio" name="v-H3" value="partial"> partial</label>
+      <label><input type="radio" name="v-H3" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H3">
+    </footer>
+  </article>
+  <article class="q" id="q-H4">
+    <header class="q-head">
+      <div class="q-id">H4</div>
+      <div class="q-meta">
+        <span class="cat">Causal reconstruction</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>deprecate `should_ignore_error`</code></p>
+    <p class="intent">A deprecation decision spanning 2 PRs and 3 commits.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:481</td>
+              <td>deprecate `should_ignore_error`</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:491</td>
+              <td>deprecate `should_ignore_error`</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">commit:493</td>
+              <td>deprecate should_ignore_error</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">1 path</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:481 — deprecate `should_ignore_error`</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">motivated_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5867</span>
+      </div>
+      <div class="node">decision:928 — deprecate `should_ignore_error`</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Does the reconstruction capture the deprecation rationale?</p></div>
+
+    <footer class="verdict" data-q="H4">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H4" value="correct"> correct</label>
+      <label><input type="radio" name="v-H4" value="partial"> partial</label>
+      <label><input type="radio" name="v-H4" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H4">
+    </footer>
+  </article>
+  <article class="q" id="q-H5">
+    <header class="q-head">
+      <div class="q-id">H5</div>
+      <div class="q-meta">
+        <span class="cat">Retrieval</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>#5898</code></p>
+    <p class="intent">Bare identifier retrieval — the form an impact query normally arrives in.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">pull_request:530</td>
+              <td>redirect defaults to 303</td>
+              <td class="mono">identifier</td>
+              <td class="num">0.95</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">1 path</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">pull_request:530 — redirect defaults to 303</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5898</span>
+      </div>
+      <div class="node">decision:930 — change default redirect code to 303</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Did retrieval resolve #5898 to the right artifact? Same answer as F1 reached by a different route?</p></div>
+
+    <footer class="verdict" data-q="H5">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H5" value="correct"> correct</label>
+      <label><input type="radio" name="v-H5" value="partial"> partial</label>
+      <label><input type="radio" name="v-H5" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H5">
+    </footer>
+  </article>
+  <article class="q" id="q-H6">
+    <header class="q-head">
+      <div class="q-id">H6</div>
+      <div class="q-meta">
+        <span class="cat">Retrieval</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip noans">no answer</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>c8ecf241e3605c48ac84ab863c206f1072888668</code></p>
+    <p class="intent">Retrieval by full commit SHA.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">commit:574</td>
+              <td>Fix Config.from_file() silent mode not handling ENOTDIR</td>
+              <td class="mono">identifier</td>
+              <td class="num">0.95</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">no path found, explicit or inferred</span></li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Does the commit resolve, and does its Why chain reach the right decision?</p></div>
+
+    <footer class="verdict" data-q="H6">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H6" value="correct"> correct</label>
+      <label><input type="radio" name="v-H6" value="partial"> partial</label>
+      <label><input type="radio" name="v-H6" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H6">
+    </footer>
+  </article>
+  <article class="q" id="q-H7">
+    <header class="q-head">
+      <div class="q-id">H7</div>
+      <div class="q-meta">
+        <span class="cat">Retrieval</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>template_filter decorator broken</code></p>
+    <p class="intent">Fuzzy retrieval — the query wording does not match the issue title, which is &#x27;The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument&#x27;.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:80</td>
+              <td>The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.36</td>
+            </tr><tr>
+              <td class="mono">decision:919</td>
+              <td>The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.36</td>
+            </tr><tr>
+              <td class="mono">commit:94</td>
+              <td>rewrite docs, clean up typing for template decorators</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.32</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">1 path</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:80 — The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">motivated_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5735</span>
+      </div>
+      <div class="node">decision:919 — The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Did trigram matching find the right entity despite the paraphrase? Would a reasonable user consider this the right hit?</p></div>
+
+    <footer class="verdict" data-q="H7">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H7" value="correct"> correct</label>
+      <label><input type="radio" name="v-H7" value="partial"> partial</label>
+      <label><input type="radio" name="v-H7" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H7">
+    </footer>
+  </article>
+  <article class="q" id="q-H8">
+    <header class="q-head">
+      <div class="q-id">H8</div>
+      <div class="q-meta">
+        <span class="cat">Impact analysis</span>
+        <span class="meta-chip mode-impact">impact</span>
+        <span class="meta-chip">depth 2</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>3.1.2</code></p>
+    <p class="intent">Impact from a release — what shipped in it?</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">release:961</td>
+              <td>3.1.2</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">release:971</td>
+              <td>2.3.1</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">release:978</td>
+              <td>2.1.3</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">13 paths</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 2</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:53 — Session is not updated on redirect target endpoint in tests</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 3</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:104 — `stream_with_context` does not work with async routes</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 4</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 5</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5786</span>
+      </div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      </div>
+    </li>
+        <li class="more">
+          <details>
+            <summary>8 further paths</summary>
+            <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 6</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5774</span>
+      </div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 7</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 8</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 9</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
+      </div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 10</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:53 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5797</span>
+      </div>
+      <div class="node">pull_request:76 — push preserved contexts in correct order</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 11</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5786</span>
+      </div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5797</span>
+      </div>
+      <div class="node">pull_request:76 — push preserved contexts in correct order</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 12</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:104 — `stream_with_context` does not work with async routes</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 13</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5774</span>
+      </div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5799</span>
+      </div>
+      <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
+      </div>
+    </li></ul>
+          </details>
+        </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Are the reached issues genuinely the contents of 3.1.2, per flask&#x27;s actual release notes?</p></div>
+
+    <footer class="verdict" data-q="H8">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H8" value="correct"> correct</label>
+      <label><input type="radio" name="v-H8" value="partial"> partial</label>
+      <label><input type="radio" name="v-H8" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H8">
+    </footer>
+  </article>
+  <article class="q" id="q-H9">
+    <header class="q-head">
+      <div class="q-id">H9</div>
+      <div class="q-meta">
+        <span class="cat">Impact analysis</span>
+        <span class="meta-chip mode-impact">impact</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>Config.from_file() missing ENOTDIR in silent error handling</code></p>
+    <p class="intent">Forward traversal over the 5-source cluster.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:576</td>
+              <td>Config.from_file() missing ENOTDIR in silent error handling</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:932</td>
+              <td>Config.from_file() missing ENOTDIR in silent error handling</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:704</td>
+              <td>Fix Config.from_file silent error handling to include ENOTDIR</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.72</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">12 paths</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:572 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 2</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">commit:574 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 3</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5914</span>
+      </div>
+      <div class="node">pull_request:578 — add ENOTDIR to from_file silent error handling</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 4</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5944</span>
+      </div>
+      <div class="node">pull_request:651 — Add ENOTDIR handling to Config.from_file with silent=True</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 5</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">6422bf669e29db4dccebb17becf1f22f1a1634bf</span>
+      </div>
+      <div class="node">commit:706 — Fix Config.from_file silent error handling to include ENOTDIR</div>
+      </div>
+    </li>
+        <li class="more">
+          <details>
+            <summary>7 further paths</summary>
+            <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 6</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">commit:574 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">c8ecf241e3605c48ac84ab863c206f1072888668</span>
+      </div>
+      <div class="node">pull_request:572 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 7</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:572 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">c8ecf241e3605c48ac84ab863c206f1072888668</span>
+      </div>
+      <div class="node">commit:574 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 8</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5914</span>
+      </div>
+      <div class="node">pull_request:578 — add ENOTDIR to from_file silent error handling</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">560ea7fd409c839bc85382a05b6e1bd1d7ca8795</span>
+      </div>
+      <div class="node">commit:580 — add ENOTDIR to from_file silent error handling</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 9</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5944</span>
+      </div>
+      <div class="node">pull_request:651 — Add ENOTDIR handling to Config.from_file with silent=True</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">14c80085434894d5a26a4e1cee7f4f4f3b97d9ce</span>
+      </div>
+      <div class="node">commit:653 — Add ENOTDIR handling to Config.from_file with silent=True</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 10</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">6422bf669e29db4dccebb17becf1f22f1a1634bf</span>
+      </div>
+      <div class="node">commit:706 — Fix Config.from_file silent error handling to include ENOTDIR</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">6422bf669e29db4dccebb17becf1f22f1a1634bf</span>
+      </div>
+      <div class="node">pull_request:704 — Fix Config.from_file silent error handling to include ENOTDIR</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 11</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:572 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5913</span>
+      </div>
+      <div class="node">decision:932 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 12</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">commit:574 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">c8ecf241e3605c48ac84ab863c206f1072888668</span>
+      </div>
+      <div class="node">pull_request:572 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5913</span>
+      </div>
+      <div class="node">decision:932 — Config.from_file() missing ENOTDIR in silent error handling</div>
+      </div>
+    </li></ul>
+          </details>
+        </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Does the blast radius look right, or does thread-merging over-connect unrelated work?</p></div>
+
+    <footer class="verdict" data-q="H9">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H9" value="correct"> correct</label>
+      <label><input type="radio" name="v-H9" value="partial"> partial</label>
+      <label><input type="radio" name="v-H9" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H9">
+    </footer>
+  </article>
+  <article class="q" id="q-H10">
+    <header class="q-head">
+      <div class="q-id">H10</div>
+      <div class="q-meta">
+        <span class="cat">Impact analysis</span>
+        <span class="meta-chip mode-impact">impact</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>asgiref fails with gevent patching</code></p>
+    <p class="intent">Impact across a 2-PR / 2-commit thread.</p>
+
+    
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:477</td>
+              <td>asgiref fails with gevent patching</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:929</td>
+              <td>asgiref fails with gevent patching</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:439</td>
+              <td>clarify async view incompatibility with gevent monkey patching</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.31</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">5 paths</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:477 — asgiref fails with gevent patching</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:439 — clarify async view incompatibility with gevent monkey patching</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 2</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:477 — asgiref fails with gevent patching</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5900</span>
+      </div>
+      <div class="node">pull_request:487 — document using gevent for async</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 3</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:477 — asgiref fails with gevent patching</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:439 — clarify async view incompatibility with gevent monkey patching</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">bec6b5ba460c0d0af9daf1707219ded5eb11f321</span>
+      </div>
+      <div class="node">commit:441 — clarify async view incompatibility with gevent monkey patching</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 4</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:477 — asgiref fails with gevent patching</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5900</span>
+      </div>
+      <div class="node">pull_request:487 — document using gevent for async</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">ac5664d2281533eacafd64f5cc7d5edcdaccab60</span>
+      </div>
+      <div class="node">commit:489 — document using gevent for async</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 5</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:477 — asgiref fails with gevent patching</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:439 — clarify async view incompatibility with gevent monkey patching</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5885</span>
+      </div>
+      <div class="node">decision:929 — asgiref fails with gevent patching</div>
+      </div>
+    </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Are all reached artifacts genuinely affected by a revert?</p></div>
+
+    <footer class="verdict" data-q="H10">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-H10" value="correct"> correct</label>
+      <label><input type="radio" name="v-H10" value="partial"> partial</label>
+      <label><input type="radio" name="v-H10" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="H10">
+    </footer>
+  </article>
+  <article class="q" id="q-N1">
+    <header class="q-head">
+      <div class="q-id">N1</div>
+      <div class="q-meta">
+        <span class="cat">Correct refusal</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip noans">no answer</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>package detection fails with namespace package in project layout</code></p>
+    <p class="intent">An issue in a thread with NO Decision — it did not meet the §5.1 rubric.</p>
+
+    
+        <div class="contract held">
+          <span class="contract-label">Engine contract</span>
+          <span class="contract-state">HELD</span>
+          <p>Must return no answer. The system must not invent a decision where the rubric declined to assert one.</p>
+        </div>
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:536</td>
+              <td>package detection fails with namespace package in editable mode</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.60</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">no path found, explicit or inferred</span></li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Confirm flask genuinely has no recorded decision resolving this, i.e. the refusal is correct rather than a miss.</p></div>
+
+    <footer class="verdict" data-q="N1">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-N1" value="correct"> correct</label>
+      <label><input type="radio" name="v-N1" value="partial"> partial</label>
+      <label><input type="radio" name="v-N1" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="N1">
+    </footer>
+  </article>
+  <article class="q" id="q-N2">
+    <header class="q-head">
+      <div class="q-id">N2</div>
+      <div class="q-meta">
+        <span class="cat">Correct refusal</span>
+        <span class="meta-chip mode-impact">impact</span>
+        <span class="meta-chip">depth 2</span>
+        
+        <span class="meta-chip noans">no answer</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>davidism</code></p>
+    <p class="intent">Impact from a person. Authorship edges (`created`) are deliberately excluded from the impact edge set.</p>
+
+    
+        <div class="contract held">
+          <span class="contract-label">Engine contract</span>
+          <span class="contract-state">HELD</span>
+          <p>Must return no answer. &#x27;Everything this person touched&#x27; is a Bus Factor / Expert Finder query, explicitly out of scope for v1 (§6).</p>
+        </div>
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">person:57</td>
+              <td>davidism</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">no path found, explicit or inferred</span></li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Confirm the empty answer is the right behaviour rather than a gap worth closing.</p></div>
+
+    <footer class="verdict" data-q="N2">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-N2" value="correct"> correct</label>
+      <label><input type="radio" name="v-N2" value="partial"> partial</label>
+      <label><input type="radio" name="v-N2" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="N2">
+    </footer>
+  </article>
+  <article class="q" id="q-N3">
+    <header class="q-head">
+      <div class="q-id">N3</div>
+      <div class="q-meta">
+        <span class="cat">Correct refusal</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip noans">no answer</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>quantum entanglement middleware autoscaler</code></p>
+    <p class="intent">Retrieval finds nothing at all.</p>
+
+    
+        <div class="contract held">
+          <span class="contract-label">Engine contract</span>
+          <span class="contract-state">HELD</span>
+          <p>Must return no candidates and say so, rather than fuzzy-matching to an unrelated entity.</p>
+        </div>
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      <p class="empty">No candidate start node matched.</p>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">retrieval returned no candidate start node</span></li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Confirm no spurious candidate was returned above the 0.25 trigram floor.</p></div>
+
+    <footer class="verdict" data-q="N3">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-N3" value="correct"> correct</label>
+      <label><input type="radio" name="v-N3" value="partial"> partial</label>
+      <label><input type="radio" name="v-N3" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="N3">
+    </footer>
+  </article>
+  <article class="q" id="q-N4">
+    <header class="q-head">
+      <div class="q-id">N4</div>
+      <div class="q-meta">
+        <span class="cat">Correct refusal</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        
+        <span class="meta-chip noans">no answer</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>#2581</code></p>
+    <p class="intent">An issue referenced by in-window artifacts but itself OUTSIDE the 12-month window. It sits unresolved in pending_reference with 7 attempts.</p>
+
+    
+        <div class="contract held">
+          <span class="contract-label">Engine contract</span>
+          <span class="contract-state">HELD</span>
+          <p>Must return no answer. The bounded window is a deliberate limit; the system must not fabricate a chain for an artifact it never ingested.</p>
+        </div>
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      <p class="empty">No candidate start node matched.</p>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">retrieval returned no candidate start node</span></li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Confirm the honest &#x27;not in graph&#x27; outcome, and that the pending queue records it rather than silently dropping it.</p></div>
+
+    <footer class="verdict" data-q="N4">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-N4" value="correct"> correct</label>
+      <label><input type="radio" name="v-N4" value="partial"> partial</label>
+      <label><input type="radio" name="v-N4" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="N4">
+    </footer>
+  </article>
+  <article class="q" id="q-T1">
+    <header class="q-head">
+      <div class="q-id">T1</div>
+      <div class="q-meta">
+        <span class="cat">Point-in-time</span>
+        <span class="meta-chip mode-why">why</span>
+        <span class="meta-chip">depth 3</span>
+        <span class="meta-chip">as of 2025-06-01</span>
+        <span class="meta-chip noans">no answer</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>change default redirect code to 303</code></p>
+    <p class="intent">Point-in-time query BEFORE this decision existed, using the valid_from/valid_to window.</p>
+
+    
+        <div class="contract compare">
+          <span class="contract-label">Engine contract</span>
+          <span class="contract-state">COMPARE</span>
+          <p>Must return fewer paths than F1 — ideally none. Edges whose valid_from postdates the as-of instant must not be traversed.</p>
+        </div>
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:485</td>
+              <td>change default redirect code to 303</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:930</td>
+              <td>change default redirect code to 303</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:530</td>
+              <td>redirect defaults to 303</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.62</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">no path found, explicit or inferred</span></li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Confirm the time filter genuinely restricts the answer rather than being ignored.</p></div>
+
+    <footer class="verdict" data-q="T1">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-T1" value="correct"> correct</label>
+      <label><input type="radio" name="v-T1" value="partial"> partial</label>
+      <label><input type="radio" name="v-T1" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="T1">
+    </footer>
+  </article>
+  <article class="q" id="q-T2">
+    <header class="q-head">
+      <div class="q-id">T2</div>
+      <div class="q-meta">
+        <span class="cat">Point-in-time</span>
+        <span class="meta-chip mode-impact">impact</span>
+        <span class="meta-chip">depth 3</span>
+        <span class="meta-chip">as of 2026-12-31</span>
+        <span class="meta-chip ans">answered</span>
+      </div>
+    </header>
+
+    <p class="query"><span class="q-label">Query</span> <code>Looser type annotations for send_file() path_or_file argument</code></p>
+    <p class="intent">Point-in-time query AFTER everything — control for T1.</p>
+
+    
+        <div class="contract compare">
+          <span class="contract-label">Engine contract</span>
+          <span class="contract-state">COMPARE</span>
+          <p>Must return the same paths as F2. If T1 shrinks and T2 does not, the time filter is working in both directions.</p>
+        </div>
+
+    <section class="block">
+      <h4>Retrieval candidates</h4>
+      
+      <table class="cands">
+        <thead><tr><th>node</th><th>title</th><th>match</th><th>score</th></tr></thead>
+        <tbody><tr class="chosen">
+              <td class="mono">issue:51</td>
+              <td>Looser type annotations for send_file() path_or_file argument</td>
+              <td class="mono">exact</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">decision:920</td>
+              <td>Looser type annotations for send_file() path_or_file argument</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">1.00</td>
+            </tr><tr>
+              <td class="mono">pull_request:41</td>
+              <td>Loosen send_file type annotation to include typing.IO[bytes]</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.40</td>
+            </tr></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h4>Traversal <span class="count">17 paths</span></h4>
+      <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 1</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 2</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
+      </div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 3</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">1 hop</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 4</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">45eb69f8bac0e4905c8f511a86b8c6705d33ff74</span>
+      </div>
+      <div class="node">commit:43 — Update helpers.pyLoosen send_file type annotation to include t.IO[bytes]  Include typing.IO[bytes] to align with Werkzeug and resolve issue #5776.</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 5</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:53 — Session is not updated on redirect target endpoint in tests</div>
+      </div>
+    </li>
+        <li class="more">
+          <details>
+            <summary>12 further paths</summary>
+            <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 6</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
+      </div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">d44f1c65239c3e33509224aa1931631243dbfa7f</span>
+      </div>
+      <div class="node">commit:66 — relax type hint for bytes io</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 7</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:104 — `stream_with_context` does not work with async routes</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 8</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 9</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 10</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5786</span>
+      </div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 11</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">2 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5774</span>
+      </div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 12</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 13</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:53 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5797</span>
+      </div>
+      <div class="node">pull_request:76 — push preserved contexts in correct order</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 14</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5786</span>
+      </div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5797</span>
+      </div>
+      <div class="node">pull_request:76 — push preserved contexts in correct order</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 15</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">issue:104 — `stream_with_context` does not work with async routes</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 16</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5774</span>
+      </div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5799</span>
+      </div>
+      <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 17</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">body_closing_keyword</span>
+        
+      </div>
+      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">implemented_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
+      </div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">deployed_by</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
+      </div>
+      <div class="node">release:961 — 3.1.2</div>
+      </div>
+    </li></ul>
+          </details>
+        </li></ul>
+    </section>
+
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Compare against F2; they should match.</p></div>
+
+    <footer class="verdict" data-q="T2">
+      <span class="v-label">Verdict</span>
+      <label><input type="radio" name="v-T2" value="correct"> correct</label>
+      <label><input type="radio" name="v-T2" value="partial"> partial</label>
+      <label><input type="radio" name="v-T2" value="incorrect"> incorrect</label>
+      <input class="v-note" type="text" placeholder="note (optional)" data-note="T2">
+    </footer>
+  </article>
+
+  <div class="bar">
+    <span class="prog" id="prog">0 of 18 adjudicated</span>
+    <button id="export">Copy verdicts</button>
+    <button class="ghost" id="clear">Clear all</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = "dg-eval-verdicts-v1";
+  var store = {};
+  try { store = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (err) { store = {}; }
+
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (err) { /* private mode */ }
+  }
+
+  function refresh() {
+    var ids = Object.keys(store).filter(function (k) { return store[k] && store[k].v; });
+    document.querySelectorAll(".verdict").forEach(function (f) {
+      var rec = store[f.dataset.q];
+      f.classList.toggle("done", !!(rec && rec.v));
+    });
+    document.getElementById("prog").textContent =
+      ids.length + " of " + document.querySelectorAll(".verdict").length + " adjudicated";
+  }
+
+  document.querySelectorAll(".verdict").forEach(function (f) {
+    var id = f.dataset.q;
+    var rec = store[id] || {};
+    if (rec.v) {
+      var hit = f.querySelector('input[value="' + rec.v + '"]');
+      if (hit) hit.checked = true;
+    }
+    var note = f.querySelector(".v-note");
+    if (rec.n) note.value = rec.n;
+
+    f.addEventListener("change", function (ev) {
+      if (ev.target.type !== "radio") return;
+      store[id] = Object.assign({}, store[id], { v: ev.target.value });
+      persist(); refresh();
+    });
+    note.addEventListener("input", function () {
+      store[id] = Object.assign({}, store[id], { n: note.value });
+      persist();
+    });
+  });
+
+  document.getElementById("export").addEventListener("click", function () {
+    var lines = ["Decision Graph — §9 adjudication", ""];
+    document.querySelectorAll(".verdict").forEach(function (f) {
+      var id = f.dataset.q, rec = store[id] || {};
+      lines.push(id + ": " + (rec.v || "—") + (rec.n ? "  // " + rec.n : ""));
+    });
+    var text = lines.join("\n");
+    var btn = document.getElementById("export");
+    function done() { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy verdicts"; }, 1600); }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(done, function () { window.prompt("Copy:", text); });
+    } else { window.prompt("Copy:", text); }
+  });
+
+  document.getElementById("clear").addEventListener("click", function () {
+    store = {}; persist();
+    document.querySelectorAll(".verdict input[type=radio]").forEach(function (r) { r.checked = false; });
+    document.querySelectorAll(".v-note").forEach(function (n) { n.value = ""; });
+    refresh();
+  });
+
+  refresh();
+})();
+</script>
