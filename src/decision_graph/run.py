@@ -73,11 +73,16 @@ def ingest(
             log.info("--- decision synthesis ---")
             outcome = synthesis.synthesize(conn, repo_node_id)
             conn.commit()
+            # Runs after promotion so a Decision created this run can be upgraded in the
+            # same pass rather than waiting for the next one.
+            upgraded = synthesis.upgrade_explicit(conn, repo_node_id)
+            conn.commit()
             log.info(
-                "decisions: %s created, %s refreshed, %s refused",
+                "decisions: %s created, %s refreshed, %s refused, %s upgraded to explicit",
                 outcome.created,
                 outcome.refreshed,
                 outcome.refused,
+                upgraded,
             )
             for refusal in outcome.refusals:
                 log.warning("  refused %s", refusal)
