@@ -2,10 +2,9 @@
 
 Organizational Intelligence Engine — implementation of `PRD_v3.1_Organizational_Intelligence_Engine.md`.
 
-**Phases 1–3 built.** Time-versioned graph schema, extraction-first GitHub ingestion,
-Decision synthesis, candidate retrieval, the Why/Impact traversal engine, and evidence
-tiering. Phase 4 (Explainability Mode presentation, the §9 evaluation set) is not built;
-Engine 2 already returns the path data it will present.
+**Phases 1–4 built.** Time-versioned graph schema, extraction-first GitHub ingestion,
+Decision synthesis, candidate retrieval, the Why/Impact traversal engine, evidence
+tiering, and the §9 evaluation set.
 
 - **Code repo:** this repository.
 - **Ingestion target:** `pallets/flask`.
@@ -207,6 +206,30 @@ dg-ingest --resources issues --max-pages 1   # smoke test; leaves cursor mid-win
 
 `GITHUB_TOKEN` is required — unauthenticated access is capped at 60 req/hour, which
 cannot complete a backfill.
+
+## Tests
+
+## Evaluation (§9)
+
+```bash
+DATABASE_URL=... python -m decision_graph.evaluation   # runs eval/query_set.json
+python eval/render_report.py                            # -> eval/report.html
+```
+
+18 queries — 2 flagship plus 16 harder cases spanning causal reconstruction, impact,
+retrieval by identifier and paraphrase, point-in-time, and four **correct-refusal** cases.
+
+**The runner grades nothing.** §9 requires answers checked against the repository's real
+history; a system scoring its own output against its own graph measures self-consistency,
+not correctness. `verdict` is emitted null for every query and filled in by a human. The
+only automatic assertion is `contract` — mechanical properties of the engine such as
+"must return no answer for an artifact outside the window" — which are claims about the
+code rather than about flask.
+
+Current run: 12 answered, 6 returned nothing, 4/4 engine contracts held. The point-in-time
+control is the load-bearing one: F1 returns 1 path and drops to 0 when asked as of
+2025-06, while F2 returns 17 both now and as of 2026-12 — so the time filter restricts in
+one direction only, rather than being silently ignored.
 
 ## Tests
 
