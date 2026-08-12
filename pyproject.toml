@@ -10,6 +10,7 @@ dependencies = [
 
 [project.scripts]
 dg-ingest = "decision_graph.run:main"
+dg-query = "decision_graph.query:main"
 
 [build-system]
 requires = ["setuptools>=68"]
