@@ -1,0 +1,19 @@
+[project]
+name = "decision-graph"
+version = "0.1.0"
+description = "Organizational Intelligence Engine — Phase 1 (knowledge graph + GitHub ingestion)"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg[binary]>=3.1",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+dg-ingest = "decision_graph.run:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
