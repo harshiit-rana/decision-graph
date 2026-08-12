@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 import psycopg
 
-from . import cursors, db, extractors, inference, threads
+from . import cursors, db, extractors, inference, synthesis, threads
 from .config import Settings
 from .cursors import Strategy
 from .extractors import Context
@@ -33,6 +33,7 @@ def ingest(
     resources: list[str],
     max_pages: int | None,
     reconcile: bool = False,
+    synthesize: bool = True,
 ) -> int:
     conn = db.connect(settings.database_url)
     client = GitHubClient(
@@ -67,6 +68,19 @@ def ingest(
         log.info("--- pending references ---")
         extractors.drain_pending_references(ctx)
         conn.commit()
+
+        if synthesize:
+            log.info("--- decision synthesis ---")
+            outcome = synthesis.synthesize(conn, repo_node_id)
+            conn.commit()
+            log.info(
+                "decisions: %s created, %s refreshed, %s refused",
+                outcome.created,
+                outcome.refreshed,
+                outcome.refused,
+            )
+            for refusal in outcome.refusals:
+                log.warning("  refused %s", refusal)
 
         # Gated inference runs last: it may only bridge gaps that explicit extraction
         # left behind, so it must not run before extraction has had its say (§5.1).
@@ -233,6 +247,11 @@ def main(argv: list[str] | None = None) -> int:
         "edge, before polling. Costs no API calls. Recovers references dropped before "
         "the pending queue existed (issue #3).",
     )
+    parser.add_argument(
+        "--no-synthesis",
+        action="store_true",
+        help="skip promoting qualifying clusters to Decision nodes",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -258,6 +277,7 @@ def main(argv: list[str] | None = None) -> int:
         resources=args.resources,
         max_pages=args.max_pages,
         reconcile=args.reconcile,
+        synthesize=not args.no_synthesis,
     )
 
 
