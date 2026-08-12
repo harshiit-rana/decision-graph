@@ -27,7 +27,13 @@ from .github import GitHubClient, RateLimitExhausted, parse_ts
 log = logging.getLogger("decision_graph")
 
 
-def ingest(settings: Settings, *, resources: list[str], max_pages: int | None) -> int:
+def ingest(
+    settings: Settings,
+    *,
+    resources: list[str],
+    max_pages: int | None,
+    reconcile: bool = False,
+) -> int:
     conn = db.connect(settings.database_url)
     client = GitHubClient(
         token=settings.github_token,
@@ -45,9 +51,22 @@ def ingest(settings: Settings, *, resources: list[str], max_pages: int | None) -
     status, error = "succeeded", None
 
     try:
+        if reconcile:
+            log.info("--- reconcile stored bodies ---")
+            extractors.reconcile_stored_bodies(ctx)
+            conn.commit()
+
         for resource in resources:
             log.info("--- %s ---", resource)
             _ingest_resource(ctx, resource, run_id, max_pages)
+
+        # Drain queued forward references before inference (issue #3). Order matters:
+        # these are explicit edges, and §5.3 only lets inference bridge gaps that
+        # explicit extraction could not fill. Draining afterwards would let inference
+        # propose an edge for a pair the queue was about to link explicitly.
+        log.info("--- pending references ---")
+        extractors.drain_pending_references(ctx)
+        conn.commit()
 
         # Gated inference runs last: it may only bridge gaps that explicit extraction
         # left behind, so it must not run before extraction has had its say (§5.1).
@@ -207,6 +226,13 @@ def main(argv: list[str] | None = None) -> int:
         help="stop each resource after N pages. For smoke tests — leaves the cursor "
         "mid-window on purpose so the next run demonstrates resume.",
     )
+    parser.add_argument(
+        "--reconcile",
+        action="store_true",
+        help="re-parse already-stored bodies and queue/link any reference lacking an "
+        "edge, before polling. Costs no API calls. Recovers references dropped before "
+        "the pending queue existed (issue #3).",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -227,7 +253,12 @@ def main(argv: list[str] | None = None) -> int:
     log.info("target repo    : %s", settings.target_repo)
     log.info("backfill window: %s months", settings.backfill_months)
 
-    return ingest(settings, resources=args.resources, max_pages=args.max_pages)
+    return ingest(
+        settings,
+        resources=args.resources,
+        max_pages=args.max_pages,
+        reconcile=args.reconcile,
+    )
 
 
 if __name__ == "__main__":

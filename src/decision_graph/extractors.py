@@ -49,9 +49,11 @@ class Context:
         self.stats.nodes += 1
         return node_id
 
-    def edge(self, **kwargs: Any) -> None:
-        if db.upsert_explicit_edge(self.conn, **kwargs):
+    def edge(self, **kwargs: Any) -> int | None:
+        edge_id, created = db.upsert_explicit_edge(self.conn, **kwargs)
+        if created:
             self.stats.edges += 1
+        return edge_id
 
 
 # ---------------------------------------------------------------------------
@@ -201,45 +203,206 @@ def _link_body_refs(
     A bare mention yields `references` and deliberately does NOT union: mentioning a
     neighbouring issue is not the same conversation, and merging on it would let
     clause 3 pass on unrelated work.
-    """
-    for number in refs.closing_refs(text):
-        target = _lookup_by_number(ctx, number)
-        if target is None:
-            ctx.stats.note_skip("closes_ref_target_not_ingested")
-            continue
-        ctx.edge(
-            src=src_node_id,
-            dst=target,
-            edge_type="closes",
-            extractor="body_closing_keyword",
-            source_ref=source_ref,
-            observed_at=observed_at,
-        )
-        threads.union(ctx.conn, src_node_id, target)
 
-    for number in refs.mentioned_refs(text):
+    A reference whose target is not in the graph yet is QUEUED, not dropped (issue #3).
+    """
+    for number, edge_type, extractor in [
+        *((n, "closes", "body_closing_keyword") for n in refs.closing_refs(text)),
+        *((n, "references", "body_issue_mention") for n in refs.mentioned_refs(text)),
+    ]:
         target = _lookup_by_number(ctx, number)
         if target is None:
-            ctx.stats.note_skip("mention_ref_target_not_ingested")
+            _enqueue_reference(
+                ctx,
+                src_node_id=src_node_id,
+                number=number,
+                edge_type=edge_type,
+                extractor=extractor,
+                source_ref=source_ref,
+                observed_at=observed_at,
+            )
             continue
-        ctx.edge(
-            src=src_node_id,
-            dst=target,
-            edge_type="references",
-            extractor="body_issue_mention",
-            source_ref=source_ref,
-            observed_at=observed_at,
+        _link(ctx, src_node_id, target, edge_type, extractor, source_ref, observed_at)
+
+
+def _link(
+    ctx: Context,
+    src: int,
+    dst: int,
+    edge_type: str,
+    extractor: str,
+    source_ref: str | None,
+    observed_at: datetime | None,
+) -> int | None:
+    """Create one reference edge, unioning threads for `closes` only."""
+    edge_id = ctx.edge(
+        src=src,
+        dst=dst,
+        edge_type=edge_type,
+        extractor=extractor,
+        source_ref=source_ref,
+        observed_at=observed_at,
+    )
+    if edge_type == "closes":
+        threads.union(ctx.conn, src, dst)
+    return edge_id
+
+
+def _enqueue_reference(
+    ctx: Context,
+    *,
+    src_node_id: int,
+    number: int,
+    edge_type: str,
+    extractor: str,
+    source_ref: str | None,
+    observed_at: datetime | None,
+) -> None:
+    """Record the intent to link, for the end-of-run drain (issue #3).
+
+    Stores the reference NUMBER rather than a target id, because the target does not
+    exist yet — that is the whole reason this row is being written.
+    """
+    ctx.conn.execute(
+        """
+        INSERT INTO pending_reference (repo_node_id, src_node_id, ref_number, edge_type,
+                                       extractor, source_ref, observed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (src_node_id, ref_number, edge_type) WHERE resolved_at IS NULL
+        DO NOTHING
+        """,
+        (
+            ctx.repo_node_id,
+            src_node_id,
+            number,
+            edge_type,
+            extractor,
+            source_ref,
+            observed_at,
+        ),
+    )
+    ctx.stats.note_skip(f"{edge_type}_ref_queued_for_resolution")
+
+
+def drain_pending_references(ctx: Context) -> tuple[int, int]:
+    """Retry queued references now the rest of the window has landed (issue #3).
+
+    Returns (resolved, still_pending). Only the LOOKUP is retried — the missing target
+    is never fetched — so the bounded backfill window stays bounded. A reference to an
+    artifact genuinely outside the window simply never resolves, which is correct, and
+    stays visible as a row with a climbing attempts count.
+    """
+    rows = ctx.conn.execute(
+        """
+        SELECT id, src_node_id, ref_number, edge_type, extractor, source_ref, observed_at
+        FROM pending_reference
+        WHERE repo_node_id = %s AND resolved_at IS NULL
+        ORDER BY id
+        """,
+        (ctx.repo_node_id,),
+    ).fetchall()
+
+    resolved = 0
+    for row in rows:
+        target = _lookup_by_number(ctx, row["ref_number"])
+        if target is None:
+            ctx.conn.execute(
+                "UPDATE pending_reference SET attempts = attempts + 1, "
+                "last_attempt_at = now() WHERE id = %s",
+                (row["id"],),
+            )
+            continue
+
+        edge_id = _link(
+            ctx,
+            row["src_node_id"],
+            target,
+            row["edge_type"],
+            row["extractor"],
+            row["source_ref"],
+            row["observed_at"],
         )
+        if edge_id is None:
+            # Self-reference; it will never resolve to a real edge. Count the attempt
+            # rather than looping on it every run.
+            ctx.conn.execute(
+                "UPDATE pending_reference SET attempts = attempts + 1, "
+                "last_attempt_at = now() WHERE id = %s",
+                (row["id"],),
+            )
+            continue
+
+        ctx.conn.execute(
+            "UPDATE pending_reference SET resolved_at = now(), resolved_edge_id = %s, "
+            "attempts = attempts + 1, last_attempt_at = now() WHERE id = %s",
+            (edge_id, row["id"]),
+        )
+        resolved += 1
+
+    still_pending = len(rows) - resolved
+    if rows:
+        log.info(
+            "pending references: %s resolved, %s still open", resolved, still_pending
+        )
+    return resolved, still_pending
+
+
+def reconcile_stored_bodies(ctx: Context) -> int:
+    """Re-parse already-ingested bodies and queue any reference that has no edge.
+
+    Recovery path for references dropped before the queue existed. Costs no API calls:
+    the bodies are already in the graph, so this re-derives the links purely from stored
+    text. Also a safety net if a parser rule is ever widened — reconcile picks up what
+    the new rule now matches, without re-polling GitHub.
+    """
+    sources = (
+        ("pull_request", "SELECT node_id AS id, body AS text FROM pull_request"),
+        ("issue", "SELECT node_id AS id, body AS text FROM issue"),
+        ("commit", "SELECT node_id AS id, message AS text FROM commit"),
+    )
+
+    queued = 0
+    for label, query in sources:
+        for row in ctx.conn.execute(query).fetchall():
+            text = row["text"]
+            if not text:
+                continue
+            for number, edge_type, extractor in [
+                *((n, "closes", "body_closing_keyword") for n in refs.closing_refs(text)),
+                *((n, "references", "body_issue_mention") for n in refs.mentioned_refs(text)),
+            ]:
+                target = _lookup_by_number(ctx, number)
+                if target is not None:
+                    # Idempotent: an edge that already exists is refreshed, not doubled.
+                    before = ctx.stats.edges
+                    _link(ctx, row["id"], target, edge_type, extractor, None, None)
+                    queued += ctx.stats.edges - before
+                    continue
+                _enqueue_reference(
+                    ctx,
+                    src_node_id=row["id"],
+                    number=number,
+                    edge_type=edge_type,
+                    extractor=extractor,
+                    source_ref=None,
+                    observed_at=None,
+                )
+        log.info("reconciled %s bodies", label)
+
+    return queued
 
 
 def _lookup_by_number(ctx: Context, number: int) -> int | None:
     """Resolve #N to an already-ingested issue or PR.
 
-    Returns None when the target is outside the backfill window. That is a real and
-    expected consequence of bounding the window: an in-window PR can close a
-    three-year-old issue. We do not fetch it — that would make the window unbounded
-    by the back door — so the edge is skipped and counted in Stats.skipped, where it
-    shows up honestly rather than silently.
+    Returns None for two different situations, which the caller must not conflate:
+    the target is outside the backfill window (permanent, correct), or it is inside the
+    window but has not been written yet (transient — issues are walked
+    updated-ascending, so a PR can be processed before the issue it closes).
+
+    Callers therefore queue rather than drop; drain_pending_references sorts out which
+    was which by retrying once the window has landed. We never fetch the missing target,
+    as that would make the window unbounded by the back door.
     """
     row = ctx.conn.execute(
         """
