@@ -107,6 +107,77 @@ def synthesize(conn: psycopg.Connection, repo_node_id: int) -> SynthesisResult:
     return result
 
 
+# A release note that itemises the issue a Decision was motivated by IS the formal
+# artifact §5.1 requires for `explicit` status -- "release note" is named there
+# alongside ADR and RFC.
+#
+# This UPGRADES an existing reconstructed Decision rather than creating a second one.
+# The decision is the same decision; what changed is that a formal record of it has been
+# found. Creating a parallel explicit Decision would assert that two decisions occurred
+# where the evidence shows one.
+#
+# Note this only reaches Decisions whose motivating artifact was itemised in a release
+# body. flask's release notes are mostly boilerplate pointing at CHANGES.rst, so
+# coverage is thin -- see the §9 note in the README.
+EXPLICIT_UPGRADE_QUERY = """
+SELECT DISTINCT ON (d.node_id)
+       d.node_id   AS decision_node_id,
+       rel.id      AS release_node_id,
+       rel.title   AS release_title,
+       art.external_id AS via_artifact
+FROM edge e
+JOIN node art ON art.id = e.src_node_id
+JOIN node rel ON rel.id = e.dst_node_id
+JOIN node dn  ON dn.thread_key = art.thread_key AND dn.node_type = 'decision'
+JOIN decision d ON d.node_id = dn.id
+WHERE e.edge_type = 'deployed_by'
+  AND e.tag       = 'explicit'
+  AND e.valid_to IS NULL
+  AND rel.node_type = 'release'
+  AND art.thread_key IS NOT NULL
+  AND d.status = 'reconstructed'
+ORDER BY d.node_id, rel.id
+"""
+
+
+def upgrade_explicit(conn: psycopg.Connection, repo_node_id: int) -> int:
+    """Promote reconstructed Decisions to `explicit` where a release note records them.
+
+    Returns the number upgraded. Idempotent: the query only selects Decisions still in
+    `reconstructed` status, so a second run finds nothing to do.
+    """
+    rows = conn.execute(EXPLICIT_UPGRADE_QUERY).fetchall()
+
+    for row in rows:
+        # status and source_artifact_node_id must move in ONE statement --
+        # decision_explicit_needs_artifact (migration 0001) rejects an explicit
+        # Decision without an artifact, so setting them separately would fail.
+        conn.execute(
+            """
+            UPDATE decision
+            SET status = 'explicit', source_artifact_node_id = %s
+            WHERE node_id = %s
+            """,
+            (row["release_node_id"], row["decision_node_id"]),
+        )
+        # Keep the artifact reachable by traversal, not only by the FK column.
+        db.upsert_explicit_edge(
+            conn,
+            src=row["decision_node_id"],
+            dst=row["release_node_id"],
+            edge_type="deployed_by",
+            extractor="synthesis_release_note",
+            source_ref=f"release:{row['release_title']} via #{row['via_artifact']}",
+        )
+        log.info(
+            "decision %s upgraded to explicit via release %s",
+            row["decision_node_id"],
+            row["release_title"],
+        )
+
+    return len(rows)
+
+
 def _promote(conn: psycopg.Connection, repo_node_id: int, row: dict) -> bool:
     """Create or refresh one Decision plus its two rubric edges. Returns True if new."""
     thread_key = row["thread_key"]
