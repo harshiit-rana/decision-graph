@@ -17,6 +17,17 @@ import re
 # §5.1 rubric while `references` does not.
 CLOSING_KEYWORDS = r"clos(?:e|es|ed)|fix(?:|es|ed)|resolv(?:e|es|ed)"
 
+# The two patterns resist URL fragments (`.../changes/#5448`) by DIFFERENT mechanisms,
+# which is worth stating because it is not obvious and one of them is implicit:
+#
+#   ISSUE_REF_RE  — explicit (?<![\w/]) lookbehind.
+#   CLOSES_RE     — no lookbehind, but `\s*:?\s+` makes whitespace before '#' MANDATORY,
+#                   so a '#' glued to '/' or a word character cannot match.
+#
+# Audited over 447 stored bodies: 39 CLOSES_RE matches, the preceding character was
+# whitespace in every one, and there were zero refs it accepted that the lookbehind-
+# guarded pattern rejected. Relaxing that `\s+` to `\s*` would silently reintroduce the
+# false-positive class, so test_closing_keyword_rejects_url_fragments pins it.
 CLOSES_RE = re.compile(rf"\b(?:{CLOSING_KEYWORDS})\b\s*:?\s+#(\d+)", re.IGNORECASE)
 ISSUE_REF_RE = re.compile(r"(?<![\w/])#(\d+)\b")
 

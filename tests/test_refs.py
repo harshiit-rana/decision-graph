@@ -44,6 +44,24 @@ class TestClosingRefs(unittest.TestCase):
     def test_ignores_urls_and_paths(self) -> None:
         self.assertEqual(refs.mentioned_refs("see docs/page#3 for detail"), set())
 
+    def test_closing_keyword_rejects_url_fragments(self) -> None:
+        """CLOSES_RE has no lookbehind; it relies on `\\s+` making whitespace before '#'
+        mandatory. Relaxing that to `\\s*` would silently admit URL fragments, which
+        could then upgrade the wrong Decision to explicit status via a release note."""
+        for text in (
+            "Changes: https://flask.palletsprojects.com/en/3.0.x/changes/#5448",
+            "fixes https://github.com/pallets/flask/issues/5448",
+            "closes flask#5448",
+            "resolved by commit_abc#123",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(refs.closing_refs(text), set())
+
+    def test_closing_keyword_still_matches_real_forms(self) -> None:
+        # The guard must not cost recall on the forms that actually occur in flask.
+        self.assertEqual(refs.closing_refs("Fixes #5776."), {5776})
+        self.assertEqual(refs.closing_refs("## Fixes\n#5825"), {5825})
+
     def test_handles_empty_and_none(self) -> None:
         self.assertEqual(refs.closing_refs(None), set())
         self.assertEqual(refs.mentioned_refs(""), set())
