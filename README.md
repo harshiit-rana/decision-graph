@@ -2,8 +2,10 @@
 
 Organizational Intelligence Engine — implementation of `PRD_v3.1_Organizational_Intelligence_Engine.md`.
 
-**Phase 1 only.** The knowledge graph schema and extraction-first GitHub ingestion.
-Retrieval, traversal, reasoning, and Decision synthesis (Phase 2+) are not built.
+**Phases 1–3 built.** Time-versioned graph schema, extraction-first GitHub ingestion,
+Decision synthesis, candidate retrieval, the Why/Impact traversal engine, and evidence
+tiering. Phase 4 (Explainability Mode presentation, the §9 evaluation set) is not built;
+Engine 2 already returns the path data it will present.
 
 - **Code repo:** this repository.
 - **Ingestion target:** `pallets/flask`.
@@ -11,10 +13,10 @@ Retrieval, traversal, reasoning, and Decision synthesis (Phase 2+) are not built
 ## Layout
 
 ```
-db/migrations/     schema (apply in numeric order)
-db/tests/          behavioural checks for the rubric + inferred-edge gate
-src/decision_graph/  ingestion
-tests/             unit tests for the parsers
+db/migrations/       schema, applied in numeric order
+db/tests/            behavioural checks — rubrics, gates, queue, tiering
+src/decision_graph/  ingestion, synthesis, retrieval, reasoning
+tests/               unit tests + traversal-fallback integration tests
 ```
 
 ## Schema
@@ -134,6 +136,35 @@ dg-query "#5898" --mode impact --depth 2
 dg-query "send_file type annotations" --mode why --as-of 2026-03-01T00:00:00Z
 ```
 
+## Evidence Ranking (Phase 3)
+
+An explicit edge upgrades to `corroborated` iff (1) its `edge_type` is evidence-carrying,
+(2) its endpoints share one thread cluster, and (3) that thread exhibits **≥3 of 4**
+categories:
+
+| category | edge + extractor | independent origin |
+|---|---|---|
+| DECLARED | `closes` via `body_closing_keyword`, dst an issue | the author's prose |
+| STRUCTURAL | `implements` via `pr_commit_list` | GitHub's PR↔commit structure |
+| ATTESTED | `reviewed` via `pr_review` | a reviewer's action |
+| PUBLISHED | `deployed_by` via `release_notes_reference` | a maintainer's release note |
+
+**Only observed edges count.** Every `synthesis_*` extractor is excluded, because
+`synthesis_closes_cluster` emits both `motivated_by` and `implemented_by` from a *single*
+underlying `closes` edge — counting them as two converging signals would be one signal
+wearing two hats. Note the deliberate asymmetry: synthesis edges are excluded from
+*counting* categories but remain *eligible* for upgrade, since a `motivated_by` edge is
+what a Why answer is made of and should carry the tier its thread earned.
+
+`apply_corroboration()` is idempotent **and reversible** — it withdraws the tier from
+threads whose evidence was later invalidated, not just grants it. It runs after every
+ingestion, reading `v_edge_corroboration_audit` so the rubric lives in exactly one place.
+
+A fifth category was drafted and rejected: "the same issue closed by ≥2 distinct source
+artifacts". All `closes` edges come from one extractor, so that condition always implies
+DECLARED and can never contribute an independent signal — nested, not independent. See
+issue #12 for the provenance-label work that would make such a category meaningful.
+
 ## Known limitations on `pallets/flask`
 
 Accepted deliberately rather than fixed by switching repos:
@@ -143,6 +174,15 @@ Accepted deliberately rather than fixed by switching repos:
   evaluation set cannot include ownership queries against flask.**
 - **`has_wiki: false`.** The `wiki_page` extractor no-ops. On this repo `motivated_by`
   therefore resolves only to issues and PR bodies, never wiki pages.
+- **The `corroborated` tier is sparse: 6 of 161 threads (33 of 811 explicit edges).**
+  flask merges largely without formal GitHub reviews — 11 `reviewed` edges across 145
+  PRs, and only 6 threads carry any review at all; 3 threads appear in release notes.
+  The rubric was chosen on independence grounds and not tuned to raise this number, so
+  §9 should report the tier as under-exercised on this repo rather than as a rubric
+  weakness. A repo with mandatory review would populate it heavily.
+- **Explicit-status Decisions are limited to what release notes itemise** (3 of 20).
+  flask's changelog lives in `CHANGES.rst`, a repo file, and file-content ingestion is
+  not built.
 - Cross-references to artifacts **outside** the 12-month window are skipped rather than
   fetched — fetching them would make the window unbounded by the back door. They are
   counted in the run summary under `*_target_not_ingested` rather than hidden.
@@ -173,6 +213,7 @@ cannot complete a backfill.
 ```bash
 psql "$DATABASE_URL" -f db/tests/0002_rubric_checks.sql             # 13 checks
 psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
+psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 DATABASE_URL=... python -m unittest discover -s tests               # 18 checks
 ```
 
