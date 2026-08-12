@@ -1,0 +1,181 @@
+{
+  "about": {
+    "target_repo": "pallets/flask",
+    "window": "12 months",
+    "spec": "PRD v3.1 §9 — 2 flagship queries + 13-18 additional covering harder, less curated cases",
+    "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask."
+  },
+  "queries": [
+    {
+      "id": "F1",
+      "category": "flagship",
+      "mode": "why",
+      "query": "change default redirect code to 303",
+      "depth": 3,
+      "intent": "Why did Flask change its default redirect status code?",
+      "verify": "Does the reconstructed chain (issue -> decision -> implementing PR/commit) match how this actually happened in flask? Is the motivating issue genuinely the 'why'?"
+    },
+    {
+      "id": "F2",
+      "category": "flagship",
+      "mode": "impact",
+      "query": "Looser type annotations for send_file() path_or_file argument",
+      "depth": 3,
+      "intent": "If this change were reverted, what is affected?",
+      "verify": "Are the reached artifacts (PR, commits, release 3.1.2) genuinely downstream of this change? Is release 3.1.2 the correct shipping vehicle?"
+    },
+
+    {
+      "id": "H1",
+      "category": "causal",
+      "mode": "why",
+      "query": "Config.from_file() missing ENOTDIR in silent error handling",
+      "depth": 3,
+      "intent": "Hardest clustering case: this issue was closed by FIVE distinct sources (3 PRs + 2 commits), all merged into one thread.",
+      "verify": "Should all five sources belong to one decision? Did flask really resolve this across multiple PRs, or are some unrelated?"
+    },
+    {
+      "id": "H2",
+      "category": "causal",
+      "mode": "why",
+      "query": "merge app and request contexts into a single context",
+      "depth": 3,
+      "intent": "A genuine architectural decision, not a bug fix.",
+      "verify": "Is the causal chain right? This is the kind of decision the system exists to reconstruct."
+    },
+    {
+      "id": "H3",
+      "category": "causal",
+      "mode": "why",
+      "query": "Recommend Warning and Safer Defaults for url_for(..., _external=True)",
+      "depth": 3,
+      "intent": "A CORROBORATED thread (3 of 4 categories, via ATTESTED). Tier should read corroborated, not explicit.",
+      "verify": "Is the chain correct, AND does the corroborated tier feel justified by the underlying evidence?"
+    },
+    {
+      "id": "H4",
+      "category": "causal",
+      "mode": "why",
+      "query": "deprecate `should_ignore_error`",
+      "depth": 3,
+      "intent": "A deprecation decision spanning 2 PRs and 3 commits.",
+      "verify": "Does the reconstruction capture the deprecation rationale?"
+    },
+    {
+      "id": "H5",
+      "category": "retrieval",
+      "mode": "why",
+      "query": "#5898",
+      "depth": 3,
+      "intent": "Bare identifier retrieval — the form an impact query normally arrives in.",
+      "verify": "Did retrieval resolve #5898 to the right artifact? Same answer as F1 reached by a different route?"
+    },
+    {
+      "id": "H6",
+      "category": "retrieval",
+      "mode": "why",
+      "query": "c8ecf241e3605c48ac84ab863c206f1072888668",
+      "depth": 3,
+      "intent": "Retrieval by full commit SHA.",
+      "verify": "Does the commit resolve, and does its Why chain reach the right decision?"
+    },
+    {
+      "id": "H7",
+      "category": "retrieval",
+      "mode": "why",
+      "query": "template_filter decorator broken",
+      "depth": 3,
+      "intent": "Fuzzy retrieval — the query wording does not match the issue title, which is 'The `template_filter` decorator doesn't work if you don't pass an argument'.",
+      "verify": "Did trigram matching find the right entity despite the paraphrase? Would a reasonable user consider this the right hit?"
+    },
+    {
+      "id": "H8",
+      "category": "impact",
+      "mode": "impact",
+      "query": "3.1.2",
+      "depth": 2,
+      "intent": "Impact from a release — what shipped in it?",
+      "verify": "Are the reached issues genuinely the contents of 3.1.2, per flask's actual release notes?"
+    },
+    {
+      "id": "H9",
+      "category": "impact",
+      "mode": "impact",
+      "query": "Config.from_file() missing ENOTDIR in silent error handling",
+      "depth": 3,
+      "intent": "Forward traversal over the 5-source cluster.",
+      "verify": "Does the blast radius look right, or does thread-merging over-connect unrelated work?"
+    },
+    {
+      "id": "H10",
+      "category": "impact",
+      "mode": "impact",
+      "query": "asgiref fails with gevent patching",
+      "depth": 3,
+      "intent": "Impact across a 2-PR / 2-commit thread.",
+      "verify": "Are all reached artifacts genuinely affected by a revert?"
+    },
+    {
+      "id": "N1",
+      "category": "negative",
+      "mode": "why",
+      "query": "package detection fails with namespace package in project layout",
+      "depth": 3,
+      "intent": "An issue in a thread with NO Decision — it did not meet the §5.1 rubric.",
+      "contract": "Must return no answer. The system must not invent a decision where the rubric declined to assert one.",
+      "verify": "Confirm flask genuinely has no recorded decision resolving this, i.e. the refusal is correct rather than a miss."
+    },
+    {
+      "id": "N2",
+      "category": "negative",
+      "mode": "impact",
+      "query": "davidism",
+      "depth": 2,
+      "intent": "Impact from a person. Authorship edges (`created`) are deliberately excluded from the impact edge set.",
+      "contract": "Must return no answer. 'Everything this person touched' is a Bus Factor / Expert Finder query, explicitly out of scope for v1 (§6).",
+      "verify": "Confirm the empty answer is the right behaviour rather than a gap worth closing."
+    },
+    {
+      "id": "N3",
+      "category": "negative",
+      "mode": "why",
+      "query": "quantum entanglement middleware autoscaler",
+      "depth": 3,
+      "intent": "Retrieval finds nothing at all.",
+      "contract": "Must return no candidates and say so, rather than fuzzy-matching to an unrelated entity.",
+      "verify": "Confirm no spurious candidate was returned above the 0.25 trigram floor."
+    },
+    {
+      "id": "N4",
+      "category": "negative",
+      "mode": "why",
+      "query": "#2581",
+      "depth": 3,
+      "intent": "An issue referenced by in-window artifacts but itself OUTSIDE the 12-month window. It sits unresolved in pending_reference with 7 attempts.",
+      "contract": "Must return no answer. The bounded window is a deliberate limit; the system must not fabricate a chain for an artifact it never ingested.",
+      "verify": "Confirm the honest 'not in graph' outcome, and that the pending queue records it rather than silently dropping it."
+    },
+    {
+      "id": "T1",
+      "category": "temporal",
+      "mode": "why",
+      "query": "change default redirect code to 303",
+      "depth": 3,
+      "as_of": "2025-06-01T00:00:00+00:00",
+      "intent": "Point-in-time query BEFORE this decision existed, using the valid_from/valid_to window.",
+      "contract": "Must return fewer paths than F1 — ideally none. Edges whose valid_from postdates the as-of instant must not be traversed.",
+      "verify": "Confirm the time filter genuinely restricts the answer rather than being ignored."
+    },
+    {
+      "id": "T2",
+      "category": "temporal",
+      "mode": "impact",
+      "query": "Looser type annotations for send_file() path_or_file argument",
+      "depth": 3,
+      "as_of": "2026-12-31T00:00:00+00:00",
+      "intent": "Point-in-time query AFTER everything — control for T1.",
+      "contract": "Must return the same paths as F2. If T1 shrinks and T2 does not, the time filter is working in both directions.",
+      "verify": "Compare against F2; they should match."
+    }
+  ]
+}

@@ -1,0 +1,2368 @@
+{
+  "about": {
+    "target_repo": "pallets/flask",
+    "window": "12 months",
+    "spec": "PRD v3.1 \u00a79 \u2014 2 flagship queries + 13-18 additional covering harder, less curated cases",
+    "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask."
+  },
+  "generated_at": "2026-08-12T19:52:18.687698+05:30",
+  "summary": {
+    "total": 18,
+    "answered": 12,
+    "returned_no_answer": 6,
+    "contracts_checked": 4,
+    "contracts_held": 4,
+    "used_inferred_fallback": 4,
+    "adjudicated": 0
+  },
+  "results": [
+    {
+      "id": "F1",
+      "category": "flagship",
+      "mode": "why",
+      "query": "change default redirect code to 303",
+      "intent": "Why did Flask change its default redirect status code?",
+      "verify": "Does the reconstructed chain (issue -> decision -> implementing PR/commit) match how this actually happened in flask? Is the motivating issue genuinely the 'why'?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 485,
+          "node_type": "issue",
+          "external_id": "5895",
+          "title": "change default redirect code to 303",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 930,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5898",
+          "title": "change default redirect code to 303",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 530,
+          "node_type": "pull_request",
+          "external_id": "5898",
+          "title": "redirect defaults to 303",
+          "match": "fuzzy",
+          "score": 0.622
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:485 \u2014 change default redirect code to 303",
+          "steps": [
+            {
+              "edge_type": "motivated_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5898",
+              "direction": "reverse",
+              "to_node": "decision:930 \u2014 change default redirect code to 303"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "F2",
+      "category": "flagship",
+      "mode": "impact",
+      "query": "Looser type annotations for send_file() path_or_file argument",
+      "intent": "If this change were reverted, what is affected?",
+      "verify": "Are the reached artifacts (PR, commits, release 3.1.2) genuinely downstream of this change? Is release 3.1.2 the correct shipping vehicle?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 51,
+          "node_type": "issue",
+          "external_id": "5776",
+          "title": "Looser type annotations for send_file() path_or_file argument",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 920,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5777",
+          "title": "Looser type annotations for send_file() path_or_file argument",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 41,
+          "node_type": "pull_request",
+          "external_id": "5794",
+          "title": "Loosen send_file type annotation to include typing.IO[bytes]",
+          "match": "fuzzy",
+          "score": 0.395
+        }
+      ],
+      "paths": [
+        {
+          "tier": "corroborated",
+          "depth": 1,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 1,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
+              "direction": "reverse",
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "45eb69f8bac0e4905c8f511a86b8c6705d33ff74",
+              "direction": "forward",
+              "to_node": "commit:43 \u2014 Update helpers.pyLoosen send_file type annotation to include t.IO[bytes]  Include typing.IO[bytes] to align with Werkzeug and resolve issue #5776."
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:53 \u2014 Session is not updated on redirect target endpoint in tests"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
+              "direction": "reverse",
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "d44f1c65239c3e33509224aa1931631243dbfa7f",
+              "direction": "forward",
+              "to_node": "commit:66 \u2014 relax type hint for bytes io"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:104 \u2014 `stream_with_context` does not work with async routes"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5786",
+              "direction": "reverse",
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5774",
+              "direction": "reverse",
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "forward",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:53 \u2014 Session is not updated on redirect target endpoint in tests"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5797",
+              "direction": "reverse",
+              "to_node": "pull_request:76 \u2014 push preserved contexts in correct order"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5786",
+              "direction": "reverse",
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5797",
+              "direction": "forward",
+              "to_node": "pull_request:76 \u2014 push preserved contexts in correct order"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:104 \u2014 `stream_with_context` does not work with async routes"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:100 \u2014 refactor stream_with_context for async views"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5774",
+              "direction": "reverse",
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5799",
+              "direction": "forward",
+              "to_node": "pull_request:100 \u2014 refactor stream_with_context for async views"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "17 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H1",
+      "category": "causal",
+      "mode": "why",
+      "query": "Config.from_file() missing ENOTDIR in silent error handling",
+      "intent": "Hardest clustering case: this issue was closed by FIVE distinct sources (3 PRs + 2 commits), all merged into one thread.",
+      "verify": "Should all five sources belong to one decision? Did flask really resolve this across multiple PRs, or are some unrelated?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 576,
+          "node_type": "issue",
+          "external_id": "5912",
+          "title": "Config.from_file() missing ENOTDIR in silent error handling",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 932,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5913",
+          "title": "Config.from_file() missing ENOTDIR in silent error handling",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 704,
+          "node_type": "pull_request",
+          "external_id": "5955",
+          "title": "Fix Config.from_file silent error handling to include ENOTDIR",
+          "match": "fuzzy",
+          "score": 0.719
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "motivated_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5913",
+              "direction": "reverse",
+              "to_node": "decision:932 \u2014 Config.from_file() missing ENOTDIR in silent error handling"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H2",
+      "category": "causal",
+      "mode": "why",
+      "query": "merge app and request contexts into a single context",
+      "intent": "A genuine architectural decision, not a bug fix.",
+      "verify": "Is the causal chain right? This is the kind of decision the system exists to reconstruct.",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 198,
+          "node_type": "issue",
+          "external_id": "5639",
+          "title": "merge app and request contexts into a single context",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 923,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5812",
+          "title": "merge app and request contexts into a single context",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 786,
+          "node_type": "pull_request",
+          "external_id": "5812",
+          "title": "merge app and request context",
+          "match": "fuzzy",
+          "score": 0.659
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:198 \u2014 merge app and request contexts into a single context",
+          "steps": [
+            {
+              "edge_type": "motivated_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5812",
+              "direction": "reverse",
+              "to_node": "decision:923 \u2014 merge app and request contexts into a single context"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H3",
+      "category": "causal",
+      "mode": "why",
+      "query": "Recommend Warning and Safer Defaults for url_for(..., _external=True)",
+      "intent": "A CORROBORATED thread (3 of 4 categories, via ATTESTED). Tier should read corroborated, not explicit.",
+      "verify": "Is the chain correct, AND does the corroborated tier feel justified by the underlying evidence?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 49,
+          "node_type": "issue",
+          "external_id": "5718",
+          "title": "Recommend Warning and Safer Defaults for url_for(..., _external=True)",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 918,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5722",
+          "title": "Recommend Warning and Safer Defaults for url_for(..., _external=True)",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 55,
+          "node_type": "pull_request",
+          "external_id": "5722",
+          "title": "docs: add warning and best practices for url_for(..., _external=True)\u2026",
+          "match": "fuzzy",
+          "score": 0.438
+        }
+      ],
+      "paths": [
+        {
+          "tier": "corroborated",
+          "depth": 1,
+          "start": "issue:49 \u2014 Recommend Warning and Safer Defaults for url_for(..., _external=True)",
+          "steps": [
+            {
+              "edge_type": "motivated_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5722",
+              "direction": "reverse",
+              "to_node": "decision:918 \u2014 Recommend Warning and Safer Defaults for url_for(..., _external=True)"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H4",
+      "category": "causal",
+      "mode": "why",
+      "query": "deprecate `should_ignore_error`",
+      "intent": "A deprecation decision spanning 2 PRs and 3 commits.",
+      "verify": "Does the reconstruction capture the deprecation rationale?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 481,
+          "node_type": "issue",
+          "external_id": "5816",
+          "title": "deprecate `should_ignore_error`",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 491,
+          "node_type": "pull_request",
+          "external_id": "5899",
+          "title": "deprecate `should_ignore_error`",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 493,
+          "node_type": "commit",
+          "external_id": "c77a5203438fe772d41f6a47303ad3f57a4efe6d",
+          "title": "deprecate should_ignore_error",
+          "match": "fuzzy",
+          "score": 1.0
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:481 \u2014 deprecate `should_ignore_error`",
+          "steps": [
+            {
+              "edge_type": "motivated_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5867",
+              "direction": "reverse",
+              "to_node": "decision:928 \u2014 deprecate `should_ignore_error`"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H5",
+      "category": "retrieval",
+      "mode": "why",
+      "query": "#5898",
+      "intent": "Bare identifier retrieval \u2014 the form an impact query normally arrives in.",
+      "verify": "Did retrieval resolve #5898 to the right artifact? Same answer as F1 reached by a different route?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 530,
+          "node_type": "pull_request",
+          "external_id": "5898",
+          "title": "redirect defaults to 303",
+          "match": "identifier",
+          "score": 0.95
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "pull_request:530 \u2014 redirect defaults to 303",
+          "steps": [
+            {
+              "edge_type": "implemented_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5898",
+              "direction": "reverse",
+              "to_node": "decision:930 \u2014 change default redirect code to 303"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H6",
+      "category": "retrieval",
+      "mode": "why",
+      "query": "c8ecf241e3605c48ac84ab863c206f1072888668",
+      "intent": "Retrieval by full commit SHA.",
+      "verify": "Does the commit resolve, and does its Why chain reach the right decision?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 574,
+          "node_type": "commit",
+          "external_id": "c8ecf241e3605c48ac84ab863c206f1072888668",
+          "title": "Fix Config.from_file() silent mode not handling ENOTDIR",
+          "match": "identifier",
+          "score": 0.95
+        }
+      ],
+      "paths": [],
+      "used_inferred_fallback": true,
+      "explanation": "no path found, explicit or inferred",
+      "answered": false,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H7",
+      "category": "retrieval",
+      "mode": "why",
+      "query": "template_filter decorator broken",
+      "intent": "Fuzzy retrieval \u2014 the query wording does not match the issue title, which is 'The `template_filter` decorator doesn't work if you don't pass an argument'.",
+      "verify": "Did trigram matching find the right entity despite the paraphrase? Would a reasonable user consider this the right hit?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 80,
+          "node_type": "issue",
+          "external_id": "5729",
+          "title": "The `template_filter` decorator doesn't work if you don't pass an argument",
+          "match": "fuzzy",
+          "score": 0.361
+        },
+        {
+          "node_id": 919,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5735",
+          "title": "The `template_filter` decorator doesn't work if you don't pass an argument",
+          "match": "fuzzy",
+          "score": 0.361
+        },
+        {
+          "node_id": 94,
+          "node_type": "commit",
+          "external_id": "edebd3704437f19b5b137eaffe97130fe817d144",
+          "title": "rewrite docs, clean up typing for template decorators",
+          "match": "fuzzy",
+          "score": 0.317
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:80 \u2014 The `template_filter` decorator doesn't work if you don't pass an argument",
+          "steps": [
+            {
+              "edge_type": "motivated_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5735",
+              "direction": "reverse",
+              "to_node": "decision:919 \u2014 The `template_filter` decorator doesn't work if you don't pass an argument"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H8",
+      "category": "impact",
+      "mode": "impact",
+      "query": "3.1.2",
+      "intent": "Impact from a release \u2014 what shipped in it?",
+      "verify": "Are the reached issues genuinely the contents of 3.1.2, per flask's actual release notes?",
+      "contract": null,
+      "as_of": null,
+      "depth": 2,
+      "candidates": [
+        {
+          "node_id": 961,
+          "node_type": "release",
+          "external_id": "3.1.2",
+          "title": "3.1.2",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 971,
+          "node_type": "release",
+          "external_id": "2.3.1",
+          "title": "2.3.1",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 978,
+          "node_type": "release",
+          "external_id": "2.1.3",
+          "title": "2.1.3",
+          "match": "fuzzy",
+          "score": 1.0
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:53 \u2014 Session is not updated on redirect target endpoint in tests"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:104 \u2014 `stream_with_context` does not work with async routes"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5786",
+              "direction": "reverse",
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5774",
+              "direction": "reverse",
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "forward",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
+              "direction": "reverse",
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:53 \u2014 Session is not updated on redirect target endpoint in tests"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5797",
+              "direction": "reverse",
+              "to_node": "pull_request:76 \u2014 push preserved contexts in correct order"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5786",
+              "direction": "reverse",
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5797",
+              "direction": "forward",
+              "to_node": "pull_request:76 \u2014 push preserved contexts in correct order"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:104 \u2014 `stream_with_context` does not work with async routes"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:100 \u2014 refactor stream_with_context for async views"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5774",
+              "direction": "reverse",
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5799",
+              "direction": "forward",
+              "to_node": "pull_request:100 \u2014 refactor stream_with_context for async views"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "13 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H9",
+      "category": "impact",
+      "mode": "impact",
+      "query": "Config.from_file() missing ENOTDIR in silent error handling",
+      "intent": "Forward traversal over the 5-source cluster.",
+      "verify": "Does the blast radius look right, or does thread-merging over-connect unrelated work?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 576,
+          "node_type": "issue",
+          "external_id": "5912",
+          "title": "Config.from_file() missing ENOTDIR in silent error handling",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 932,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5913",
+          "title": "Config.from_file() missing ENOTDIR in silent error handling",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 704,
+          "node_type": "pull_request",
+          "external_id": "5955",
+          "title": "Fix Config.from_file silent error handling to include ENOTDIR",
+          "match": "fuzzy",
+          "score": 0.719
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:572 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "commit:574 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5914",
+              "direction": "reverse",
+              "to_node": "pull_request:578 \u2014 add ENOTDIR to from_file silent error handling"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5944",
+              "direction": "reverse",
+              "to_node": "pull_request:651 \u2014 Add ENOTDIR handling to Config.from_file with silent=True"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "6422bf669e29db4dccebb17becf1f22f1a1634bf",
+              "direction": "reverse",
+              "to_node": "commit:706 \u2014 Fix Config.from_file silent error handling to include ENOTDIR"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "commit:574 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "c8ecf241e3605c48ac84ab863c206f1072888668",
+              "direction": "reverse",
+              "to_node": "pull_request:572 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:572 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "c8ecf241e3605c48ac84ab863c206f1072888668",
+              "direction": "forward",
+              "to_node": "commit:574 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5914",
+              "direction": "reverse",
+              "to_node": "pull_request:578 \u2014 add ENOTDIR to from_file silent error handling"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "560ea7fd409c839bc85382a05b6e1bd1d7ca8795",
+              "direction": "forward",
+              "to_node": "commit:580 \u2014 add ENOTDIR to from_file silent error handling"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5944",
+              "direction": "reverse",
+              "to_node": "pull_request:651 \u2014 Add ENOTDIR handling to Config.from_file with silent=True"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "14c80085434894d5a26a4e1cee7f4f4f3b97d9ce",
+              "direction": "forward",
+              "to_node": "commit:653 \u2014 Add ENOTDIR handling to Config.from_file with silent=True"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "6422bf669e29db4dccebb17becf1f22f1a1634bf",
+              "direction": "reverse",
+              "to_node": "commit:706 \u2014 Fix Config.from_file silent error handling to include ENOTDIR"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "6422bf669e29db4dccebb17becf1f22f1a1634bf",
+              "direction": "reverse",
+              "to_node": "pull_request:704 \u2014 Fix Config.from_file silent error handling to include ENOTDIR"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:572 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5913",
+              "direction": "reverse",
+              "to_node": "decision:932 \u2014 Config.from_file() missing ENOTDIR in silent error handling"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 3,
+          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "commit:574 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "c8ecf241e3605c48ac84ab863c206f1072888668",
+              "direction": "reverse",
+              "to_node": "pull_request:572 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5913",
+              "direction": "reverse",
+              "to_node": "decision:932 \u2014 Config.from_file() missing ENOTDIR in silent error handling"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "12 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "H10",
+      "category": "impact",
+      "mode": "impact",
+      "query": "asgiref fails with gevent patching",
+      "intent": "Impact across a 2-PR / 2-commit thread.",
+      "verify": "Are all reached artifacts genuinely affected by a revert?",
+      "contract": null,
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 477,
+          "node_type": "issue",
+          "external_id": "5881",
+          "title": "asgiref fails with gevent patching",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 929,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5885",
+          "title": "asgiref fails with gevent patching",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 439,
+          "node_type": "pull_request",
+          "external_id": "5885",
+          "title": "clarify async view incompatibility with gevent monkey patching",
+          "match": "fuzzy",
+          "score": 0.311
+        }
+      ],
+      "paths": [
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:477 \u2014 asgiref fails with gevent patching",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:439 \u2014 clarify async view incompatibility with gevent monkey patching"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:477 \u2014 asgiref fails with gevent patching",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5900",
+              "direction": "reverse",
+              "to_node": "pull_request:487 \u2014 document using gevent for async"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:477 \u2014 asgiref fails with gevent patching",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:439 \u2014 clarify async view incompatibility with gevent monkey patching"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "bec6b5ba460c0d0af9daf1707219ded5eb11f321",
+              "direction": "forward",
+              "to_node": "commit:441 \u2014 clarify async view incompatibility with gevent monkey patching"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:477 \u2014 asgiref fails with gevent patching",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5900",
+              "direction": "reverse",
+              "to_node": "pull_request:487 \u2014 document using gevent for async"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "ac5664d2281533eacafd64f5cc7d5edcdaccab60",
+              "direction": "forward",
+              "to_node": "commit:489 \u2014 document using gevent for async"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:477 \u2014 asgiref fails with gevent patching",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:439 \u2014 clarify async view incompatibility with gevent monkey patching"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5885",
+              "direction": "reverse",
+              "to_node": "decision:929 \u2014 asgiref fails with gevent patching"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "5 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": null
+    },
+    {
+      "id": "N1",
+      "category": "negative",
+      "mode": "why",
+      "query": "package detection fails with namespace package in project layout",
+      "intent": "An issue in a thread with NO Decision \u2014 it did not meet the \u00a75.1 rubric.",
+      "verify": "Confirm flask genuinely has no recorded decision resolving this, i.e. the refusal is correct rather than a miss.",
+      "contract": "Must return no answer. The system must not invent a decision where the rubric declined to assert one.",
+      "as_of": null,
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 536,
+          "node_type": "issue",
+          "external_id": "5897",
+          "title": "package detection fails with namespace package in editable mode",
+          "match": "fuzzy",
+          "score": 0.603
+        }
+      ],
+      "paths": [],
+      "used_inferred_fallback": true,
+      "explanation": "no path found, explicit or inferred",
+      "answered": false,
+      "verdict": null,
+      "notes": null,
+      "contract_check": "HELD"
+    },
+    {
+      "id": "N2",
+      "category": "negative",
+      "mode": "impact",
+      "query": "davidism",
+      "intent": "Impact from a person. Authorship edges (`created`) are deliberately excluded from the impact edge set.",
+      "verify": "Confirm the empty answer is the right behaviour rather than a gap worth closing.",
+      "contract": "Must return no answer. 'Everything this person touched' is a Bus Factor / Expert Finder query, explicitly out of scope for v1 (\u00a76).",
+      "as_of": null,
+      "depth": 2,
+      "candidates": [
+        {
+          "node_id": 57,
+          "node_type": "person",
+          "external_id": "davidism",
+          "title": "davidism",
+          "match": "exact",
+          "score": 1.0
+        }
+      ],
+      "paths": [],
+      "used_inferred_fallback": true,
+      "explanation": "no path found, explicit or inferred",
+      "answered": false,
+      "verdict": null,
+      "notes": null,
+      "contract_check": "HELD"
+    },
+    {
+      "id": "N3",
+      "category": "negative",
+      "mode": "why",
+      "query": "quantum entanglement middleware autoscaler",
+      "intent": "Retrieval finds nothing at all.",
+      "verify": "Confirm no spurious candidate was returned above the 0.25 trigram floor.",
+      "contract": "Must return no candidates and say so, rather than fuzzy-matching to an unrelated entity.",
+      "as_of": null,
+      "depth": 3,
+      "candidates": [],
+      "paths": [],
+      "used_inferred_fallback": false,
+      "explanation": "retrieval returned no candidate start node",
+      "answered": false,
+      "verdict": null,
+      "notes": null,
+      "contract_check": "HELD"
+    },
+    {
+      "id": "N4",
+      "category": "negative",
+      "mode": "why",
+      "query": "#2581",
+      "intent": "An issue referenced by in-window artifacts but itself OUTSIDE the 12-month window. It sits unresolved in pending_reference with 7 attempts.",
+      "verify": "Confirm the honest 'not in graph' outcome, and that the pending queue records it rather than silently dropping it.",
+      "contract": "Must return no answer. The bounded window is a deliberate limit; the system must not fabricate a chain for an artifact it never ingested.",
+      "as_of": null,
+      "depth": 3,
+      "candidates": [],
+      "paths": [],
+      "used_inferred_fallback": false,
+      "explanation": "retrieval returned no candidate start node",
+      "answered": false,
+      "verdict": null,
+      "notes": null,
+      "contract_check": "HELD"
+    },
+    {
+      "id": "T1",
+      "category": "temporal",
+      "mode": "why",
+      "query": "change default redirect code to 303",
+      "intent": "Point-in-time query BEFORE this decision existed, using the valid_from/valid_to window.",
+      "verify": "Confirm the time filter genuinely restricts the answer rather than being ignored.",
+      "contract": "Must return fewer paths than F1 \u2014 ideally none. Edges whose valid_from postdates the as-of instant must not be traversed.",
+      "as_of": "2025-06-01T00:00:00+00:00",
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 485,
+          "node_type": "issue",
+          "external_id": "5895",
+          "title": "change default redirect code to 303",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 930,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5898",
+          "title": "change default redirect code to 303",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 530,
+          "node_type": "pull_request",
+          "external_id": "5898",
+          "title": "redirect defaults to 303",
+          "match": "fuzzy",
+          "score": 0.622
+        }
+      ],
+      "paths": [],
+      "used_inferred_fallback": true,
+      "explanation": "no path found, explicit or inferred",
+      "answered": false,
+      "verdict": null,
+      "notes": null,
+      "contract_check": "COMPARE"
+    },
+    {
+      "id": "T2",
+      "category": "temporal",
+      "mode": "impact",
+      "query": "Looser type annotations for send_file() path_or_file argument",
+      "intent": "Point-in-time query AFTER everything \u2014 control for T1.",
+      "verify": "Compare against F2; they should match.",
+      "contract": "Must return the same paths as F2. If T1 shrinks and T2 does not, the time filter is working in both directions.",
+      "as_of": "2026-12-31T00:00:00+00:00",
+      "depth": 3,
+      "candidates": [
+        {
+          "node_id": 51,
+          "node_type": "issue",
+          "external_id": "5776",
+          "title": "Looser type annotations for send_file() path_or_file argument",
+          "match": "exact",
+          "score": 1.0
+        },
+        {
+          "node_id": 920,
+          "node_type": "decision",
+          "external_id": "thread:30:pr-5777",
+          "title": "Looser type annotations for send_file() path_or_file argument",
+          "match": "fuzzy",
+          "score": 1.0
+        },
+        {
+          "node_id": 41,
+          "node_type": "pull_request",
+          "external_id": "5794",
+          "title": "Loosen send_file type annotation to include typing.IO[bytes]",
+          "match": "fuzzy",
+          "score": 0.395
+        }
+      ],
+      "paths": [
+        {
+          "tier": "corroborated",
+          "depth": 1,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 1,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
+              "direction": "reverse",
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 1,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "45eb69f8bac0e4905c8f511a86b8c6705d33ff74",
+              "direction": "forward",
+              "to_node": "commit:43 \u2014 Update helpers.pyLoosen send_file type annotation to include t.IO[bytes]  Include typing.IO[bytes] to align with Werkzeug and resolve issue #5776."
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:53 \u2014 Session is not updated on redirect target endpoint in tests"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
+              "direction": "reverse",
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "d44f1c65239c3e33509224aa1931631243dbfa7f",
+              "direction": "forward",
+              "to_node": "commit:66 \u2014 relax type hint for bytes io"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:104 \u2014 `stream_with_context` does not work with async routes"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5786",
+              "direction": "reverse",
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+            }
+          ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 2,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5774",
+              "direction": "reverse",
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "forward",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:53 \u2014 Session is not updated on redirect target endpoint in tests"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5797",
+              "direction": "reverse",
+              "to_node": "pull_request:76 \u2014 push preserved contexts in correct order"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5786",
+              "direction": "reverse",
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5797",
+              "direction": "forward",
+              "to_node": "pull_request:76 \u2014 push preserved contexts in correct order"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "reverse",
+              "to_node": "issue:104 \u2014 `stream_with_context` does not work with async routes"
+            },
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:100 \u2014 refactor stream_with_context for async views"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "release_notes_reference",
+              "source_ref": "3.1.2",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5774",
+              "direction": "reverse",
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5799",
+              "direction": "forward",
+              "to_node": "pull_request:100 \u2014 refactor stream_with_context for async views"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:51 \u2014 Looser type annotations for send_file() path_or_file argument",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": null,
+              "direction": "reverse",
+              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "forward",
+              "to_node": "release:961 \u2014 3.1.2"
+            }
+          ]
+        }
+      ],
+      "used_inferred_fallback": false,
+      "explanation": "17 explicit path(s) found; inferred edges not consulted",
+      "answered": true,
+      "verdict": null,
+      "notes": null,
+      "contract_check": "COMPARE"
+    }
+  ]
+}
