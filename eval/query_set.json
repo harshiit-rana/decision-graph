@@ -2,8 +2,9 @@
   "about": {
     "target_repo": "pallets/flask",
     "window": "12 months",
-    "spec": "PRD v3.1 §9 — 2 flagship queries + 13-18 additional covering harder, less curated cases",
-    "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask."
+    "spec": "PRD v3.1 \u00a79 \u2014 2 flagship queries + 13-18 additional covering harder, less curated cases",
+    "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask.",
+    "revision": "Regenerated after issues #16/#17. The landing gate retracted 7 Decisions that rested on unmerged work; 13 remain, all with a merged implementer."
   },
   "queries": [
     {
@@ -24,15 +25,15 @@
       "intent": "If this change were reverted, what is affected?",
       "verify": "Are the reached artifacts (PR, commits, release 3.1.2) genuinely downstream of this change? Is release 3.1.2 the correct shipping vehicle?"
     },
-
     {
       "id": "H1",
-      "category": "causal",
+      "category": "negative",
       "mode": "why",
       "query": "Config.from_file() missing ENOTDIR in silent error handling",
       "depth": 3,
-      "intent": "Hardest clustering case: this issue was closed by FIVE distinct sources (3 PRs + 2 commits), all merged into one thread.",
-      "verify": "Should all five sources belong to one decision? Did flask really resolve this across multiple PRs, or are some unrelated?"
+      "intent": "The defect case. Issue 5912 was closed as NOT PLANNED and its three closing PRs were all rejected unmerged, yet every one contains 'fixes #5912'. Before the landing gate the system asserted a Decision here.",
+      "verify": "Confirm flask really did decline this work, i.e. the refusal is correct. The artifacts themselves remain queryable \u2014 only the Decision is withheld.",
+      "contract": "Must return no answer. Nothing in this thread ever merged, so no Decision may be asserted. This is the regression guard for issues #16/#17."
     },
     {
       "id": "H2",
@@ -67,7 +68,7 @@
       "mode": "why",
       "query": "#5898",
       "depth": 3,
-      "intent": "Bare identifier retrieval — the form an impact query normally arrives in.",
+      "intent": "Bare identifier retrieval \u2014 the form an impact query normally arrives in.",
       "verify": "Did retrieval resolve #5898 to the right artifact? Same answer as F1 reached by a different route?"
     },
     {
@@ -85,8 +86,8 @@
       "mode": "why",
       "query": "template_filter decorator broken",
       "depth": 3,
-      "intent": "Fuzzy retrieval — the query wording does not match the issue title, which is 'The `template_filter` decorator doesn't work if you don't pass an argument'.",
-      "verify": "Did trigram matching find the right entity despite the paraphrase? Would a reasonable user consider this the right hit?"
+      "intent": "Fuzzy retrieval \u2014 the wording does not match the issue title. Note the Decision for this thread was retracted by the landing gate (PR 5735 never merged), so retrieval succeeding while traversal returns nothing is the expected split.",
+      "verify": "Did trigram matching find the right entity despite the paraphrase? The absent Decision is correct, not a retrieval failure."
     },
     {
       "id": "H8",
@@ -94,7 +95,7 @@
       "mode": "impact",
       "query": "3.1.2",
       "depth": 2,
-      "intent": "Impact from a release — what shipped in it?",
+      "intent": "Impact from a release \u2014 what shipped in it?",
       "verify": "Are the reached issues genuinely the contents of 3.1.2, per flask's actual release notes?"
     },
     {
@@ -104,7 +105,7 @@
       "query": "Config.from_file() missing ENOTDIR in silent error handling",
       "depth": 3,
       "intent": "Forward traversal over the 5-source cluster.",
-      "verify": "Does the blast radius look right, or does thread-merging over-connect unrelated work?"
+      "verify": "Impact still traverses the rejected PRs as ARTIFACTS, which is correct \u2014 they exist and are linked. Only the Decision was withheld. Check the blast radius reads as 'these artifacts are related' and not as 'this shipped'."
     },
     {
       "id": "H10",
@@ -121,7 +122,7 @@
       "mode": "why",
       "query": "package detection fails with namespace package in project layout",
       "depth": 3,
-      "intent": "An issue in a thread with NO Decision — it did not meet the §5.1 rubric.",
+      "intent": "An issue in a thread with NO Decision \u2014 it did not meet the \u00a75.1 rubric.",
       "contract": "Must return no answer. The system must not invent a decision where the rubric declined to assert one.",
       "verify": "Confirm flask genuinely has no recorded decision resolving this, i.e. the refusal is correct rather than a miss."
     },
@@ -132,7 +133,7 @@
       "query": "davidism",
       "depth": 2,
       "intent": "Impact from a person. Authorship edges (`created`) are deliberately excluded from the impact edge set.",
-      "contract": "Must return no answer. 'Everything this person touched' is a Bus Factor / Expert Finder query, explicitly out of scope for v1 (§6).",
+      "contract": "Must return no answer. 'Everything this person touched' is a Bus Factor / Expert Finder query, explicitly out of scope for v1 (\u00a76).",
       "verify": "Confirm the empty answer is the right behaviour rather than a gap worth closing."
     },
     {
@@ -163,7 +164,7 @@
       "depth": 3,
       "as_of": "2025-06-01T00:00:00+00:00",
       "intent": "Point-in-time query BEFORE this decision existed, using the valid_from/valid_to window.",
-      "contract": "Must return fewer paths than F1 — ideally none. Edges whose valid_from postdates the as-of instant must not be traversed.",
+      "contract": "Must return fewer paths than F1 \u2014 ideally none. Edges whose valid_from postdates the as-of instant must not be traversed.",
       "verify": "Confirm the time filter genuinely restricts the answer rather than being ignored."
     },
     {
@@ -173,7 +174,7 @@
       "query": "Looser type annotations for send_file() path_or_file argument",
       "depth": 3,
       "as_of": "2026-12-31T00:00:00+00:00",
-      "intent": "Point-in-time query AFTER everything — control for T1.",
+      "intent": "Point-in-time query AFTER everything \u2014 control for T1.",
       "contract": "Must return the same paths as F2. If T1 shrinks and T2 does not, the time filter is working in both directions.",
       "verify": "Compare against F2; they should match."
     }

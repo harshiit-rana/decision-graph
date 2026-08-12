@@ -21,11 +21,27 @@ CREATE TEMP TABLE test_result (
     detail  text
 );
 
+CREATE SEQUENCE pg_temp.fixture_num;
+
+-- Since migration 0008 the rubric requires that something in the thread actually
+-- MERGED, so a pull_request fixture now carries a real detail row with merged_at set.
+-- Without it every case below would fail on the landing clause and the tests would pass
+-- for the wrong reason -- "rejected because nothing merged" instead of "rejected because
+-- there is no motivation". Each test still isolates the clause it names.
 CREATE FUNCTION pg_temp.mk(p_type node_type, p_ext text, p_thread text DEFAULT NULL)
-RETURNS bigint LANGUAGE sql AS $fn$
+RETURNS bigint LANGUAGE plpgsql AS $fn$
+DECLARE v_id bigint;
+BEGIN
     INSERT INTO node (node_type, external_id, thread_key)
     VALUES (p_type, p_ext, p_thread)
-    RETURNING id;
+    RETURNING id INTO v_id;
+
+    IF p_type = 'pull_request' THEN
+        INSERT INTO pull_request (node_id, number, state, merged_at)
+        VALUES (v_id, nextval('pg_temp.fixture_num'), 'closed', now() - interval '1 day');
+    END IF;
+    RETURN v_id;
+END;
 $fn$;
 
 CREATE FUNCTION pg_temp.mk_edge(
@@ -115,6 +131,10 @@ BEGIN
     SET CONSTRAINTS ALL DEFERRED;
     BEGIN
         i := pg_temp.mk('issue', 't3-issue', 'thread:t3');
+        -- A merged PR in the thread, but NO implemented_by / reviewed / closes edge:
+        -- landing holds, so the refusal below is genuinely about clause 2 having
+        -- neither Implementation nor Validation.
+        PERFORM pg_temp.mk('pull_request', 't3-pr', 'thread:t3');
         d := pg_temp.mk_decision('t3-dec');
         PERFORM pg_temp.mk_edge(d, i, 'motivated_by');
         SET CONSTRAINTS ALL IMMEDIATE;

@@ -71,6 +71,10 @@ def ingest(
 
         if synthesize:
             log.info("--- decision synthesis ---")
+            # Retract first: a rule change or invalidated evidence must be able to
+            # WITHDRAW a Decision, not merely fail to create new ones (issue #17).
+            synthesis.retract_unsupported(conn)
+            conn.commit()
             outcome = synthesis.synthesize(conn, repo_node_id)
             conn.commit()
             # Runs after promotion so a Decision created this run can be upgraded in the
