@@ -92,6 +92,48 @@ cleanly at a configurable floor and the next run resumes.
 between them; asserting that a *decision* occurred is gated by the rubric and belongs to
 a later phase.
 
+## Reasoning (Phase 2)
+
+**Engine 1.5 — Candidate Retrieval.** Exact → identifier → prefix → trigram, in that
+order, so an exact title always outranks a fuzzy match regardless of score. Deliberately
+not ranked or embedding-based. It exists as a named seam because traversal stops working
+past a toy graph without one, and adding a narrowing step after the traversal engine
+assumes it can start anywhere touches every caller.
+
+**Engine 2 — Graph Reasoning.** One `_walk` implementation, two modes. Only the start
+node and edge set differ — sharing is a requirement, not an optimisation, since two
+traversals would drift and §5.3's fallback rule would have to be correct twice.
+
+The fallback order is written as an algorithm, not left as a principle for callers to
+honour:
+
+1. Walk `explicit` edges only. Thanks to the tag/tier invariant, `tag='explicit'` is
+   exactly the "explicit and corroborated" set §5.3 names.
+2. Only if that leaves the start disconnected from a plausible answer does the walk
+   re-run with `inferred` edges admitted.
+3. If an explicit path exists, inferred edges are excluded **entirely** — never fetched,
+   not filtered out afterwards.
+
+Clause 3 fails invisibly if implemented as a single pass that merely admits inferred
+edges: the answers look fine and quietly blend tiers. The two-pass structure makes the
+blend impossible, because the second pass runs only when the first returned nothing.
+
+**A path's tier is its weakest link.** One inferred hop makes the whole answer inferred,
+however many explicit edges surround it.
+
+Two consequences worth knowing:
+
+- Because no inferred edge may touch a Decision (§5.1), the Why fallback can never fire
+  on its *first* hop from a Decision node. Any inferred bridge has to be further out.
+- Point-in-time queries work via `--as-of`, using the `valid_from` / `valid_to` window
+  that migration 0001 insisted on from v1.
+
+```bash
+dg-query "change default redirect code to 303" --mode why
+dg-query "#5898" --mode impact --depth 2
+dg-query "send_file type annotations" --mode why --as-of 2026-03-01T00:00:00Z
+```
+
 ## Known limitations on `pallets/flask`
 
 Accepted deliberately rather than fixed by switching repos:
@@ -129,6 +171,11 @@ cannot complete a backfill.
 ## Tests
 
 ```bash
-psql "$DATABASE_URL" -f db/tests/0002_rubric_checks.sql   # 13 checks, rolls back
-python -m unittest discover -s tests                       # 11 checks
+psql "$DATABASE_URL" -f db/tests/0002_rubric_checks.sql             # 13 checks
+psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
+DATABASE_URL=... python -m unittest discover -s tests               # 18 checks
 ```
+
+All SQL suites run in a transaction and roll back. The Python suite runs 11 unit tests
+standalone; setting `DATABASE_URL` adds the 7 traversal-fallback integration tests,
+which seed their own fixture because the real graph holds no inferred edges.
