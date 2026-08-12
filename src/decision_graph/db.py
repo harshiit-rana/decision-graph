@@ -122,8 +122,11 @@ def upsert_explicit_edge(
     extractor: str,
     source_ref: str | None = None,
     observed_at: datetime | None = None,
-) -> bool:
-    """Create (or refresh) an explicit edge. Returns True if a new edge was created.
+) -> tuple[int | None, bool]:
+    """Create (or refresh) an explicit edge. Returns (edge_id, newly_created).
+
+    The id is returned as well as the flag so deferred resolution (issue #3) can record
+    which edge finally satisfied a queued reference.
 
     Self-loops are dropped here rather than left to hit the CHECK constraint: a PR
     body containing its own number is common and is not an error worth aborting on.
@@ -132,7 +135,7 @@ def upsert_explicit_edge(
     currently-valid edges collide. Superseded edges keep their history via valid_to.
     """
     if src == dst:
-        return False
+        return None, False
 
     row = conn.execute(
         """
@@ -145,7 +148,7 @@ def upsert_explicit_edge(
         DO UPDATE SET
             source_ref  = COALESCE(EXCLUDED.source_ref, edge.source_ref),
             observed_at = COALESCE(EXCLUDED.observed_at, edge.observed_at)
-        RETURNING (xmax = 0) AS inserted
+        RETURNING id, (xmax = 0) AS inserted
         """,
         {
             "src": src,
@@ -158,7 +161,9 @@ def upsert_explicit_edge(
             "observed_at": observed_at,
         },
     ).fetchone()
-    return bool(row and row["inserted"])
+    if row is None:
+        return None, False
+    return row["id"], bool(row["inserted"])
 
 
 # ---------------------------------------------------------------------------
