@@ -3,16 +3,17 @@
     "target_repo": "pallets/flask",
     "window": "12 months",
     "spec": "PRD v3.1 \u00a79 \u2014 2 flagship queries + 13-18 additional covering harder, less curated cases",
-    "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask."
+    "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask.",
+    "revision": "Regenerated after issues #16/#17. The landing gate retracted 7 Decisions that rested on unmerged work; 13 remain, all with a merged implementer."
   },
-  "generated_at": "2026-08-12T19:52:18.687698+05:30",
+  "generated_at": "2026-08-12T20:21:38.196970+05:30",
   "summary": {
     "total": 18,
-    "answered": 12,
-    "returned_no_answer": 6,
-    "contracts_checked": 4,
-    "contracts_held": 4,
-    "used_inferred_fallback": 4,
+    "answered": 10,
+    "returned_no_answer": 8,
+    "contracts_checked": 5,
+    "contracts_held": 5,
+    "used_inferred_fallback": 6,
     "adjudicated": 0
   },
   "results": [
@@ -272,9 +273,9 @@
               "tier": "corroborated",
               "tag": "explicit",
               "extractor": "body_closing_keyword",
-              "source_ref": null,
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
               "direction": "reverse",
-              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
             },
             {
               "edge_type": "implemented_by",
@@ -392,7 +393,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5777",
               "direction": "forward",
-              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
             }
           ]
         },
@@ -542,9 +543,9 @@
               "tier": "corroborated",
               "tag": "explicit",
               "extractor": "body_closing_keyword",
-              "source_ref": null,
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
               "direction": "reverse",
-              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
             },
             {
               "edge_type": "implemented_by",
@@ -576,12 +577,12 @@
     },
     {
       "id": "H1",
-      "category": "causal",
+      "category": "negative",
       "mode": "why",
       "query": "Config.from_file() missing ENOTDIR in silent error handling",
-      "intent": "Hardest clustering case: this issue was closed by FIVE distinct sources (3 PRs + 2 commits), all merged into one thread.",
-      "verify": "Should all five sources belong to one decision? Did flask really resolve this across multiple PRs, or are some unrelated?",
-      "contract": null,
+      "intent": "The defect case. Issue 5912 was closed as NOT PLANNED and its three closing PRs were all rejected unmerged, yet every one contains 'fixes #5912'. Before the landing gate the system asserted a Decision here.",
+      "verify": "Confirm flask really did decline this work, i.e. the refusal is correct. The artifacts themselves remain queryable \u2014 only the Decision is withheld.",
+      "contract": "Must return no answer. Nothing in this thread ever merged, so no Decision may be asserted. This is the regression guard for issues #16/#17.",
       "as_of": null,
       "depth": 3,
       "candidates": [
@@ -594,46 +595,29 @@
           "score": 1.0
         },
         {
-          "node_id": 932,
-          "node_type": "decision",
-          "external_id": "thread:30:pr-5913",
-          "title": "Config.from_file() missing ENOTDIR in silent error handling",
-          "match": "exact",
-          "score": 1.0
-        },
-        {
           "node_id": 704,
           "node_type": "pull_request",
           "external_id": "5955",
           "title": "Fix Config.from_file silent error handling to include ENOTDIR",
           "match": "fuzzy",
           "score": 0.719
-        }
-      ],
-      "paths": [
+        },
         {
-          "tier": "explicit",
-          "depth": 1,
-          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
-          "steps": [
-            {
-              "edge_type": "motivated_by",
-              "tier": "explicit",
-              "tag": "explicit",
-              "extractor": "synthesis_closes_cluster",
-              "source_ref": "thread:30:pr-5913",
-              "direction": "reverse",
-              "to_node": "decision:932 \u2014 Config.from_file() missing ENOTDIR in silent error handling"
-            }
-          ]
+          "node_id": 706,
+          "node_type": "commit",
+          "external_id": "6422bf669e29db4dccebb17becf1f22f1a1634bf",
+          "title": "Fix Config.from_file silent error handling to include ENOTDIR",
+          "match": "fuzzy",
+          "score": 0.719
         }
       ],
-      "used_inferred_fallback": false,
-      "explanation": "1 explicit path(s) found; inferred edges not consulted",
-      "answered": true,
+      "paths": [],
+      "used_inferred_fallback": true,
+      "explanation": "no path found, explicit or inferred",
+      "answered": false,
       "verdict": null,
       "notes": null,
-      "contract_check": null
+      "contract_check": "HELD"
     },
     {
       "id": "H2",
@@ -896,8 +880,8 @@
       "category": "retrieval",
       "mode": "why",
       "query": "template_filter decorator broken",
-      "intent": "Fuzzy retrieval \u2014 the query wording does not match the issue title, which is 'The `template_filter` decorator doesn't work if you don't pass an argument'.",
-      "verify": "Did trigram matching find the right entity despite the paraphrase? Would a reasonable user consider this the right hit?",
+      "intent": "Fuzzy retrieval \u2014 the wording does not match the issue title. Note the Decision for this thread was retracted by the landing gate (PR 5735 never merged), so retrieval succeeding while traversal returns nothing is the expected split.",
+      "verify": "Did trigram matching find the right entity despite the paraphrase? The absent Decision is correct, not a retrieval failure.",
       "contract": null,
       "as_of": null,
       "depth": 3,
@@ -911,43 +895,26 @@
           "score": 0.361
         },
         {
-          "node_id": 919,
-          "node_type": "decision",
-          "external_id": "thread:30:pr-5735",
-          "title": "The `template_filter` decorator doesn't work if you don't pass an argument",
-          "match": "fuzzy",
-          "score": 0.361
-        },
-        {
           "node_id": 94,
           "node_type": "commit",
           "external_id": "edebd3704437f19b5b137eaffe97130fe817d144",
           "title": "rewrite docs, clean up typing for template decorators",
           "match": "fuzzy",
           "score": 0.317
-        }
-      ],
-      "paths": [
+        },
         {
-          "tier": "explicit",
-          "depth": 1,
-          "start": "issue:80 \u2014 The `template_filter` decorator doesn't work if you don't pass an argument",
-          "steps": [
-            {
-              "edge_type": "motivated_by",
-              "tier": "explicit",
-              "tag": "explicit",
-              "extractor": "synthesis_closes_cluster",
-              "source_ref": "thread:30:pr-5735",
-              "direction": "reverse",
-              "to_node": "decision:919 \u2014 The `template_filter` decorator doesn't work if you don't pass an argument"
-            }
-          ]
+          "node_id": 92,
+          "node_type": "commit",
+          "external_id": "daf1510a4bda652ac2cfca03ec5567b03ddf8bf1",
+          "title": "use template_filter without parens",
+          "match": "fuzzy",
+          "score": 0.308
         }
       ],
-      "used_inferred_fallback": false,
-      "explanation": "1 explicit path(s) found; inferred edges not consulted",
-      "answered": true,
+      "paths": [],
+      "used_inferred_fallback": true,
+      "explanation": "no path found, explicit or inferred",
+      "answered": false,
       "verdict": null,
       "notes": null,
       "contract_check": null
@@ -1119,31 +1086,6 @@
               "edge_type": "deployed_by",
               "tier": "explicit",
               "tag": "explicit",
-              "extractor": "synthesis_release_note",
-              "source_ref": "release:3.1.2 via #5776",
-              "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
-            },
-            {
-              "edge_type": "implemented_by",
-              "tier": "corroborated",
-              "tag": "explicit",
-              "extractor": "synthesis_closes_cluster",
-              "source_ref": "thread:30:pr-5777",
-              "direction": "forward",
-              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
-            }
-          ]
-        },
-        {
-          "tier": "corroborated",
-          "depth": 2,
-          "start": "release:961 \u2014 3.1.2",
-          "steps": [
-            {
-              "edge_type": "deployed_by",
-              "tier": "explicit",
-              "tag": "explicit",
               "extractor": "release_notes_reference",
               "source_ref": "3.1.2",
               "direction": "reverse",
@@ -1156,6 +1098,31 @@
               "extractor": "body_closing_keyword",
               "source_ref": "https://github.com/pallets/flask/pull/5777",
               "direction": "reverse",
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
+            }
+          ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 2,
+          "start": "release:961 \u2014 3.1.2",
+          "steps": [
+            {
+              "edge_type": "deployed_by",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "synthesis_release_note",
+              "source_ref": "release:3.1.2 via #5776",
+              "direction": "reverse",
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+            },
+            {
+              "edge_type": "implemented_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5777",
+              "direction": "forward",
               "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
             }
           ]
@@ -1274,7 +1241,7 @@
       "mode": "impact",
       "query": "Config.from_file() missing ENOTDIR in silent error handling",
       "intent": "Forward traversal over the 5-source cluster.",
-      "verify": "Does the blast radius look right, or does thread-merging over-connect unrelated work?",
+      "verify": "Impact still traverses the rejected PRs as ARTIFACTS, which is correct \u2014 they exist and are linked. Only the Decision was withheld. Check the blast radius reads as 'these artifacts are related' and not as 'this shipped'.",
       "contract": null,
       "as_of": null,
       "depth": 3,
@@ -1288,17 +1255,17 @@
           "score": 1.0
         },
         {
-          "node_id": 932,
-          "node_type": "decision",
-          "external_id": "thread:30:pr-5913",
-          "title": "Config.from_file() missing ENOTDIR in silent error handling",
-          "match": "exact",
-          "score": 1.0
-        },
-        {
           "node_id": 704,
           "node_type": "pull_request",
           "external_id": "5955",
+          "title": "Fix Config.from_file silent error handling to include ENOTDIR",
+          "match": "fuzzy",
+          "score": 0.719
+        },
+        {
+          "node_id": 706,
+          "node_type": "commit",
+          "external_id": "6422bf669e29db4dccebb17becf1f22f1a1634bf",
           "title": "Fix Config.from_file silent error handling to include ENOTDIR",
           "match": "fuzzy",
           "score": 0.719
@@ -1509,69 +1476,10 @@
               "to_node": "pull_request:704 \u2014 Fix Config.from_file silent error handling to include ENOTDIR"
             }
           ]
-        },
-        {
-          "tier": "explicit",
-          "depth": 2,
-          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
-          "steps": [
-            {
-              "edge_type": "closes",
-              "tier": "explicit",
-              "tag": "explicit",
-              "extractor": "body_closing_keyword",
-              "source_ref": null,
-              "direction": "reverse",
-              "to_node": "pull_request:572 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
-            },
-            {
-              "edge_type": "implemented_by",
-              "tier": "explicit",
-              "tag": "explicit",
-              "extractor": "synthesis_closes_cluster",
-              "source_ref": "thread:30:pr-5913",
-              "direction": "reverse",
-              "to_node": "decision:932 \u2014 Config.from_file() missing ENOTDIR in silent error handling"
-            }
-          ]
-        },
-        {
-          "tier": "explicit",
-          "depth": 3,
-          "start": "issue:576 \u2014 Config.from_file() missing ENOTDIR in silent error handling",
-          "steps": [
-            {
-              "edge_type": "closes",
-              "tier": "explicit",
-              "tag": "explicit",
-              "extractor": "body_closing_keyword",
-              "source_ref": null,
-              "direction": "reverse",
-              "to_node": "commit:574 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
-            },
-            {
-              "edge_type": "implements",
-              "tier": "explicit",
-              "tag": "explicit",
-              "extractor": "pr_commit_list",
-              "source_ref": "c8ecf241e3605c48ac84ab863c206f1072888668",
-              "direction": "reverse",
-              "to_node": "pull_request:572 \u2014 Fix Config.from_file() silent mode not handling ENOTDIR"
-            },
-            {
-              "edge_type": "implemented_by",
-              "tier": "explicit",
-              "tag": "explicit",
-              "extractor": "synthesis_closes_cluster",
-              "source_ref": "thread:30:pr-5913",
-              "direction": "reverse",
-              "to_node": "decision:932 \u2014 Config.from_file() missing ENOTDIR in silent error handling"
-            }
-          ]
         }
       ],
       "used_inferred_fallback": false,
-      "explanation": "12 explicit path(s) found; inferred edges not consulted",
+      "explanation": "10 explicit path(s) found; inferred edges not consulted",
       "answered": true,
       "verdict": null,
       "notes": null,
@@ -1706,9 +1614,9 @@
               "tier": "explicit",
               "tag": "explicit",
               "extractor": "body_closing_keyword",
-              "source_ref": null,
+              "source_ref": "https://github.com/pallets/flask/pull/5900",
               "direction": "reverse",
-              "to_node": "pull_request:439 \u2014 clarify async view incompatibility with gevent monkey patching"
+              "to_node": "pull_request:487 \u2014 document using gevent for async"
             },
             {
               "edge_type": "implemented_by",
@@ -2062,9 +1970,9 @@
               "tier": "corroborated",
               "tag": "explicit",
               "extractor": "body_closing_keyword",
-              "source_ref": null,
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
               "direction": "reverse",
-              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
             },
             {
               "edge_type": "implemented_by",
@@ -2182,7 +2090,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5777",
               "direction": "forward",
-              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
             }
           ]
         },
@@ -2332,9 +2240,9 @@
               "tier": "corroborated",
               "tag": "explicit",
               "extractor": "body_closing_keyword",
-              "source_ref": null,
+              "source_ref": "https://github.com/pallets/flask/pull/5777",
               "direction": "reverse",
-              "to_node": "pull_request:41 \u2014 Loosen send_file type annotation to include typing.IO[bytes]"
+              "to_node": "pull_request:64 \u2014 use IO[bytes] instead of BinaryIO for wider compatibility"
             },
             {
               "edge_type": "implemented_by",

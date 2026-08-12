@@ -15,6 +15,7 @@
   --inferred:     #A6742E;
   --held:     #2E7D5B;
   --violated: #B04A3E;
+  --halt-soft: #FBEDEA;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
@@ -35,13 +36,14 @@
     --inferred:     #D2A055;
     --held:     #5DB98C;
     --violated: #D97A6C;
+    --halt-soft: #2A1C1A;
   }
 }
 :root[data-theme="dark"] {
   --ground:#101317; --surface:#171B21; --sunk:#1D222A; --ink:#E4E8ED;
   --muted:#98A2AE; --faint:#6B7683; --rule:#272E37; --accent:#58B5A8;
   --accent-soft:#16302E; --explicit:#7FA3C2; --corroborated:#5DB98C;
-  --inferred:#D2A055; --held:#5DB98C; --violated:#D97A6C;
+  --inferred:#D2A055; --held:#5DB98C; --violated:#D97A6C; --halt-soft:#2A1C1A;
 }
 
 * { box-sizing: border-box; }
@@ -76,6 +78,8 @@ code, .mono { font-family: var(--mono); font-size: .86em; }
 }
 .note p { margin: 0; font-size: .93rem; }
 .note strong { color: var(--accent); }
+.note.fixed { background: var(--sunk); border-left-color: var(--held); }
+.note.fixed strong { color: var(--held); }
 
 .stats { display: flex; flex-wrap: wrap; gap: 1px; background: var(--rule);
   border: 1px solid var(--rule); margin: 2rem 0 .75rem; }
@@ -196,7 +200,19 @@ button:hover { opacity: .9; }
   <div class="lede">
     <h1>Evaluation worksheet</h1>
     <p class="sub">Decision Graph against <code>pallets/flask</code> — PRD v3.1 §9.
-    18 queries: 2 flagship plus 16 harder cases. Generated 2026-08-12 19:52.</p>
+    18 queries: 2 flagship plus 16 harder cases. Generated 2026-08-12 20:21.</p>
+
+    <div class="note fixed">
+      <p><strong>Regenerated after a defect found in adjudication.</strong>
+      A spot-check of issue 5912 against GitHub found it <em>closed as not planned</em>
+      with no linked pull requests. The extraction was correct — all five sources really
+      do contain <code>fixes #5912</code> — but the §5.1 rubric never checked whether the
+      work <em>landed</em>, and a closing keyword survives rejection intact.
+      <strong>12 of 20 Decisions rested on pull requests that were never merged.</strong>
+      Validation now requires a merged pull request; 7 Decisions were retracted and 13
+      remain, every one with a merged implementer. Issues #16 and #17.
+      Query H1 is now the regression guard for that defect.</p>
+    </div>
 
     <div class="note">
       <p><strong>Nothing here is graded.</strong> §9 requires answers checked against the
@@ -210,12 +226,12 @@ button:hover { opacity: .9; }
 
   <div class="stats">
     <div class="stat"><span class="n">18</span><span class="l">queries</span></div>
-    <div class="stat"><span class="n">12</span><span class="l">answered</span></div>
-    <div class="stat"><span class="n">6</span><span class="l">returned nothing</span></div>
-    <div class="stat good"><span class="n">4/4</span><span class="l">contracts held</span></div>
+    <div class="stat"><span class="n">10</span><span class="l">answered</span></div>
+    <div class="stat"><span class="n">8</span><span class="l">returned nothing</span></div>
+    <div class="stat good"><span class="n">5/5</span><span class="l">contracts held</span></div>
   </div>
 
-  <div class="tiers"><span class="tb tier-explicit" style="flex:41"><span>explicit 41</span></span><span class="tb tier-corroborated" style="flex:30"><span>corroborated 30</span></span></div>
+  <div class="tiers"><span class="tb tier-explicit" style="flex:37"><span>explicit 37</span></span><span class="tb tier-corroborated" style="flex:30"><span>corroborated 30</span></span></div>
   <p class="caption">Evidence tier across every path returned. No path used the inferred
   fallback — the graph holds no inferred edges, so that branch is exercised only by the
   seeded fixture in the test suite.</p>
@@ -525,9 +541,9 @@ button:hover { opacity: .9; }
         <span class="etype">closes</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">body_closing_keyword</span>
-        
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
       </div>
-      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       <div class="step">
         <span class="conn">←</span>
         <span class="etype">implemented_by</span>
@@ -647,7 +663,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_closes_cluster</span>
         <span class="ref">thread:30:pr-5777</span>
       </div>
-      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       </div>
     </li>
     <li class="path">
@@ -799,9 +815,9 @@ button:hover { opacity: .9; }
         <span class="etype">closes</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">body_closing_keyword</span>
-        
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
       </div>
-      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       <div class="step">
         <span class="conn">←</span>
         <span class="etype">implemented_by</span>
@@ -838,18 +854,23 @@ button:hover { opacity: .9; }
     <header class="q-head">
       <div class="q-id">H1</div>
       <div class="q-meta">
-        <span class="cat">Causal reconstruction</span>
+        <span class="cat">Correct refusal</span>
         <span class="meta-chip mode-why">why</span>
         <span class="meta-chip">depth 3</span>
         
-        <span class="meta-chip ans">answered</span>
+        <span class="meta-chip noans">no answer</span>
       </div>
     </header>
 
     <p class="query"><span class="q-label">Query</span> <code>Config.from_file() missing ENOTDIR in silent error handling</code></p>
-    <p class="intent">Hardest clustering case: this issue was closed by FIVE distinct sources (3 PRs + 2 commits), all merged into one thread.</p>
+    <p class="intent">The defect case. Issue 5912 was closed as NOT PLANNED and its three closing PRs were all rejected unmerged, yet every one contains &#x27;fixes #5912&#x27;. Before the landing gate the system asserted a Decision here.</p>
 
     
+        <div class="contract held">
+          <span class="contract-label">Engine contract</span>
+          <span class="contract-state">HELD</span>
+          <p>Must return no answer. Nothing in this thread ever merged, so no Decision may be asserted. This is the regression guard for issues #16/#17.</p>
+        </div>
 
     <section class="block">
       <h4>Retrieval candidates</h4>
@@ -862,12 +883,12 @@ button:hover { opacity: .9; }
               <td class="mono">fuzzy</td>
               <td class="num">1.00</td>
             </tr><tr>
-              <td class="mono">decision:932</td>
-              <td>Config.from_file() missing ENOTDIR in silent error handling</td>
-              <td class="mono">exact</td>
-              <td class="num">1.00</td>
-            </tr><tr>
               <td class="mono">pull_request:704</td>
+              <td>Fix Config.from_file silent error handling to include ENOTDIR</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.72</td>
+            </tr><tr>
+              <td class="mono">commit:706</td>
               <td>Fix Config.from_file silent error handling to include ENOTDIR</td>
               <td class="mono">fuzzy</td>
               <td class="num">0.72</td>
@@ -876,29 +897,11 @@ button:hover { opacity: .9; }
     </section>
 
     <section class="block">
-      <h4>Traversal <span class="count">1 path</span></h4>
-      <ul class="paths">
-    <li class="path">
-      <div class="path-head">
-        <span class="path-n">path 1</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="depth">1 hop</span>
-      </div>
-      <div class="trace">
-        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
-      <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">motivated_by</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5913</span>
-      </div>
-      <div class="node">decision:932 — Config.from_file() missing ENOTDIR in silent error handling</div>
-      </div>
-    </li></ul>
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">no path found, explicit or inferred</span></li></ul>
     </section>
 
-    <div class="verify"><span class="verify-label">Check against flask</span><p>Should all five sources belong to one decision? Did flask really resolve this across multiple PRs, or are some unrelated?</p></div>
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Confirm flask really did decline this work, i.e. the refusal is correct. The artifacts themselves remain queryable — only the Decision is withheld.</p></div>
 
     <footer class="verdict" data-q="H1">
       <span class="v-label">Verdict</span>
@@ -1248,12 +1251,12 @@ button:hover { opacity: .9; }
         <span class="meta-chip mode-why">why</span>
         <span class="meta-chip">depth 3</span>
         
-        <span class="meta-chip ans">answered</span>
+        <span class="meta-chip noans">no answer</span>
       </div>
     </header>
 
     <p class="query"><span class="q-label">Query</span> <code>template_filter decorator broken</code></p>
-    <p class="intent">Fuzzy retrieval — the query wording does not match the issue title, which is &#x27;The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument&#x27;.</p>
+    <p class="intent">Fuzzy retrieval — the wording does not match the issue title. Note the Decision for this thread was retracted by the landing gate (PR 5735 never merged), so retrieval succeeding while traversal returns nothing is the expected split.</p>
 
     
 
@@ -1268,43 +1271,25 @@ button:hover { opacity: .9; }
               <td class="mono">fuzzy</td>
               <td class="num">0.36</td>
             </tr><tr>
-              <td class="mono">decision:919</td>
-              <td>The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument</td>
-              <td class="mono">fuzzy</td>
-              <td class="num">0.36</td>
-            </tr><tr>
               <td class="mono">commit:94</td>
               <td>rewrite docs, clean up typing for template decorators</td>
               <td class="mono">fuzzy</td>
               <td class="num">0.32</td>
+            </tr><tr>
+              <td class="mono">commit:92</td>
+              <td>use template_filter without parens</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.31</td>
             </tr></tbody>
       </table>
     </section>
 
     <section class="block">
-      <h4>Traversal <span class="count">1 path</span></h4>
-      <ul class="paths">
-    <li class="path">
-      <div class="path-head">
-        <span class="path-n">path 1</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="depth">1 hop</span>
-      </div>
-      <div class="trace">
-        <div class="node node-start">issue:80 — The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument</div>
-      <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">motivated_by</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5735</span>
-      </div>
-      <div class="node">decision:919 — The `template_filter` decorator doesn&#x27;t work if you don&#x27;t pass an argument</div>
-      </div>
-    </li></ul>
+      <h4>Traversal <span class="count">0 paths</span></h4>
+      <ul class="paths"><li class="empty">No path returned. <span class="mono">no path found, explicit or inferred</span></li></ul>
     </section>
 
-    <div class="verify"><span class="verify-label">Check against flask</span><p>Did trigram matching find the right entity despite the paraphrase? Would a reasonable user consider this the right hit?</p></div>
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Did trigram matching find the right entity despite the paraphrase? The absent Decision is correct, not a retrieval failure.</p></div>
 
     <footer class="verdict" data-q="H7">
       <span class="v-label">Verdict</span>
@@ -1508,18 +1493,18 @@ button:hover { opacity: .9; }
         <span class="conn">←</span>
         <span class="etype">deployed_by</span>
         <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">synthesis_release_note</span>
-        <span class="ref">release:3.1.2 via #5776</span>
+        <span class="extractor">release_notes_reference</span>
+        <span class="ref">3.1.2</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
       <div class="step">
-        <span class="conn">→</span>
-        <span class="etype">implemented_by</span>
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
         <span class="tier tier-corroborated">corroborated</span>
-        <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
       </div>
-      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       </div>
     </li>
     <li class="path">
@@ -1534,16 +1519,16 @@ button:hover { opacity: .9; }
         <span class="conn">←</span>
         <span class="etype">deployed_by</span>
         <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">release_notes_reference</span>
-        <span class="ref">3.1.2</span>
+        <span class="extractor">synthesis_release_note</span>
+        <span class="ref">release:3.1.2 via #5776</span>
       </div>
-      <div class="node">issue:51 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
       <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">closes</span>
+        <span class="conn">→</span>
+        <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
-        <span class="extractor">body_closing_keyword</span>
-        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref">thread:30:pr-5777</span>
       </div>
       <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       </div>
@@ -1694,12 +1679,12 @@ button:hover { opacity: .9; }
               <td class="mono">fuzzy</td>
               <td class="num">1.00</td>
             </tr><tr>
-              <td class="mono">decision:932</td>
-              <td>Config.from_file() missing ENOTDIR in silent error handling</td>
-              <td class="mono">exact</td>
-              <td class="num">1.00</td>
-            </tr><tr>
               <td class="mono">pull_request:704</td>
+              <td>Fix Config.from_file silent error handling to include ENOTDIR</td>
+              <td class="mono">fuzzy</td>
+              <td class="num">0.72</td>
+            </tr><tr>
+              <td class="mono">commit:706</td>
               <td>Fix Config.from_file silent error handling to include ENOTDIR</td>
               <td class="mono">fuzzy</td>
               <td class="num">0.72</td>
@@ -1708,7 +1693,7 @@ button:hover { opacity: .9; }
     </section>
 
     <section class="block">
-      <h4>Traversal <span class="count">12 paths</span></h4>
+      <h4>Traversal <span class="count">10 paths</span></h4>
       <ul class="paths">
     <li class="path">
       <div class="path-head">
@@ -1802,7 +1787,7 @@ button:hover { opacity: .9; }
     </li>
         <li class="more">
           <details>
-            <summary>7 further paths</summary>
+            <summary>5 further paths</summary>
             <ul class="paths">
     <li class="path">
       <div class="path-head">
@@ -1933,72 +1918,12 @@ button:hover { opacity: .9; }
       </div>
       <div class="node">pull_request:704 — Fix Config.from_file silent error handling to include ENOTDIR</div>
       </div>
-    </li>
-    <li class="path">
-      <div class="path-head">
-        <span class="path-n">path 11</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="depth">2 hops</span>
-      </div>
-      <div class="trace">
-        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
-      <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">closes</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">body_closing_keyword</span>
-        
-      </div>
-      <div class="node">pull_request:572 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
-      <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">implemented_by</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5913</span>
-      </div>
-      <div class="node">decision:932 — Config.from_file() missing ENOTDIR in silent error handling</div>
-      </div>
-    </li>
-    <li class="path">
-      <div class="path-head">
-        <span class="path-n">path 12</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="depth">3 hops</span>
-      </div>
-      <div class="trace">
-        <div class="node node-start">issue:576 — Config.from_file() missing ENOTDIR in silent error handling</div>
-      <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">closes</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">body_closing_keyword</span>
-        
-      </div>
-      <div class="node">commit:574 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
-      <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">implements</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">pr_commit_list</span>
-        <span class="ref">c8ecf241e3605c48ac84ab863c206f1072888668</span>
-      </div>
-      <div class="node">pull_request:572 — Fix Config.from_file() silent mode not handling ENOTDIR</div>
-      <div class="step">
-        <span class="conn">←</span>
-        <span class="etype">implemented_by</span>
-        <span class="tier tier-explicit">explicit</span>
-        <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5913</span>
-      </div>
-      <div class="node">decision:932 — Config.from_file() missing ENOTDIR in silent error handling</div>
-      </div>
     </li></ul>
           </details>
         </li></ul>
     </section>
 
-    <div class="verify"><span class="verify-label">Check against flask</span><p>Does the blast radius look right, or does thread-merging over-connect unrelated work?</p></div>
+    <div class="verify"><span class="verify-label">Check against flask</span><p>Impact still traverses the rejected PRs as ARTIFACTS, which is correct — they exist and are linked. Only the Decision was withheld. Check the blast radius reads as &#x27;these artifacts are related&#x27; and not as &#x27;this shipped&#x27;.</p></div>
 
     <footer class="verdict" data-q="H9">
       <span class="v-label">Verdict</span>
@@ -2153,9 +2078,9 @@ button:hover { opacity: .9; }
         <span class="etype">closes</span>
         <span class="tier tier-explicit">explicit</span>
         <span class="extractor">body_closing_keyword</span>
-        
+        <span class="ref">https://github.com/pallets/flask/pull/5900</span>
       </div>
-      <div class="node">pull_request:439 — clarify async view incompatibility with gevent monkey patching</div>
+      <div class="node">pull_request:487 — document using gevent for async</div>
       <div class="step">
         <span class="conn">←</span>
         <span class="etype">implemented_by</span>
@@ -2649,9 +2574,9 @@ button:hover { opacity: .9; }
         <span class="etype">closes</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">body_closing_keyword</span>
-        
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
       </div>
-      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       <div class="step">
         <span class="conn">←</span>
         <span class="etype">implemented_by</span>
@@ -2771,7 +2696,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_closes_cluster</span>
         <span class="ref">thread:30:pr-5777</span>
       </div>
-      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       </div>
     </li>
     <li class="path">
@@ -2923,9 +2848,9 @@ button:hover { opacity: .9; }
         <span class="etype">closes</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">body_closing_keyword</span>
-        
+        <span class="ref">https://github.com/pallets/flask/pull/5777</span>
       </div>
-      <div class="node">pull_request:41 — Loosen send_file type annotation to include typing.IO[bytes]</div>
+      <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       <div class="step">
         <span class="conn">←</span>
         <span class="etype">implemented_by</span>

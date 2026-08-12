@@ -47,7 +47,16 @@ a higher tier. §5.3's "explicit and corroborated first" pass is then just `tag=
   `motivated_by` edge that justified it
 
 Motivation is mandatory; Implementation or Validation must also be present; all rubric
-edges must share one PR/issue thread. `decision_status` has no `inferred` member — a
+edges must share one PR/issue thread; and **something in that thread must have merged**.
+
+That last clause is not an addition — §5.1 always defined Validation as "that it landed",
+and §5.1's own worked example says "a *merged*, reviewed PR". The original implementation
+accepted a `closes` edge as proof, but a closing keyword is typed by a contributor before
+the outcome is known and survives rejection completely intact. 12 of the first 20
+Decisions turned out to rest on pull requests that were never merged (issues #16/#17).
+`thread_landed()` now checks merge state, and `retract_unsupported_decisions()` withdraws
+Decisions whose evidence stops holding — the deferred guard only re-validates rows
+something touches, so a claim made under an older rule would otherwise survive forever. `decision_status` has no `inferred` member — a
 Decision that cannot reach explicit or reconstructed is simply not created.
 
 **`thread_key` is the v1 stand-in for §5.1's "bounded time window"** and is the most
@@ -173,7 +182,7 @@ Accepted deliberately rather than fixed by switching repos:
   evaluation set cannot include ownership queries against flask.**
 - **`has_wiki: false`.** The `wiki_page` extractor no-ops. On this repo `motivated_by`
   therefore resolves only to issues and PR bodies, never wiki pages.
-- **The `corroborated` tier is sparse: 6 of 161 threads (33 of 811 explicit edges).**
+- **The `corroborated` tier is sparse: 6 of 161 threads.**
   flask merges largely without formal GitHub reviews — 11 `reviewed` edges across 145
   PRs, and only 6 threads carry any review at all; 3 threads appear in release notes.
   The rubric was chosen on independence grounds and not tuned to raise this number, so
@@ -226,7 +235,7 @@ only automatic assertion is `contract` — mechanical properties of the engine s
 "must return no answer for an artifact outside the window" — which are claims about the
 code rather than about flask.
 
-Current run: 12 answered, 6 returned nothing, 4/4 engine contracts held. The point-in-time
+Current run: 10 answered, 8 returned nothing, 5/5 engine contracts held. The point-in-time
 control is the load-bearing one: F1 returns 1 path and drops to 0 when asked as of
 2025-06, while F2 returns 17 both now and as of 2026-12 — so the time filter restricts in
 one direction only, rather than being silently ignored.
