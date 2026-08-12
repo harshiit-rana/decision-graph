@@ -87,6 +87,19 @@ def ingest(
             for refusal in outcome.refusals:
                 log.warning("  refused %s", refusal)
 
+        # Evidence Ranking (§5.4). Runs after synthesis so this run's new edges are
+        # scored, and before inference so tier assignment never sees a speculative edge.
+        # Idempotent and reversible: it withdraws the tier from threads whose supporting
+        # evidence was invalidated, as well as granting it.
+        tiers = conn.execute("SELECT * FROM apply_corroboration()").fetchone()
+        conn.commit()
+        if tiers and (tiers["upgraded"] or tiers["downgraded"]):
+            log.info(
+                "evidence tiers: %s upgraded to corroborated, %s withdrawn",
+                tiers["upgraded"],
+                tiers["downgraded"],
+            )
+
         # Gated inference runs last: it may only bridge gaps that explicit extraction
         # left behind, so it must not run before extraction has had its say (§5.1).
         inference.persist(conn, inference.propose(conn, repo_node_id))
