@@ -6,7 +6,7 @@
     "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask.",
     "revision": "Regenerated after issues #16/#17. The landing gate retracted 7 Decisions that rested on unmerged work; 13 remain, all with a merged implementer."
   },
-  "generated_at": "2026-08-14T20:57:51.634261+05:30",
+  "generated_at": "2026-08-14T23:11:55.117247+05:30",
   "summary": {
     "total": 18,
     "answered": 10,

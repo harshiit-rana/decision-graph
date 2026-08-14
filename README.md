@@ -10,14 +10,111 @@ with the disclosures that number needs recorded in [`eval/RESULTS.md`](eval/RESU
 - **Code repo:** this repository.
 - **Ingestion target:** `pallets/flask`.
 
+## Getting started
+
+**You need Docker Desktop. Nothing else.** No Python, no psql, no pip, no `gh`, no WSL.
+Python and the database live inside containers; `dg` is a thin wrapper that talks to them.
+
+```powershell
+git clone https://github.com/harshiit-rana/decision-graph
+cd decision-graph
+.\dg.ps1 init
+```
+
+On macOS or Linux use `./dg init`. On Windows, `dg init` also works from Command Prompt.
+
+### What `dg init` does, in four steps
+
+1. **Database** — starts a Postgres container and waits until it actually accepts
+   connections, rather than assuming it is ready.
+2. **GitHub token** — prompts for one and verifies it against the API before saving. A
+   token is required because unauthenticated GitHub allows 60 requests/hour, which cannot
+   finish a backfill. **A public repo needs no scopes** — a classic token with nothing
+   ticked works. Create one at <https://github.com/settings/tokens>.
+3. **Target repository** — prompts for `owner/name` and confirms it exists.
+4. **Schema** — applies the migrations. Safe to re-run: it keeps a ledger of what has been
+   applied, and adopts a database that was migrated by hand before the ledger existed.
+
+Answers are written to `.env` and read by every later command, so **you never export an
+environment variable again**. Re-run `dg init` any time; add `--reconfigure` to change the
+token or repo.
+
+### The five commands
+
+| command | what it does |
+|---|---|
+| `dg init` | first-time setup, and safe to repeat |
+| `dg doctor` | checks Docker, `.env`, token, rate limit, database, schema, data — and says how to fix each failure |
+| `dg ingest --repo owner/name` | pulls the last 12 months into the graph |
+| `dg status` | what is ingested: counts by type, per repo, cursor positions |
+| `dg query "..." --mode why` | ask why something happened, or what a change affects |
+
+```powershell
+.\dg.ps1 ingest --repo pallets/flask
+.\dg.ps1 status
+.\dg.ps1 query "change default redirect code to 303" --mode why
+.\dg.ps1 query "#5898" --mode impact --depth 2
+```
+
+`ingest` and `query` forward any flag they do not recognise to the underlying tools, so
+`--months`, `--resources`, `--max-pages`, `--as-of` and `--limit` all still work.
+
+### What to expect
+
+**Ingestion is the slow part** — roughly **2 API requests per pull request**, because
+reviews and commits are one call each. A repo with 200 PRs costs about 450 requests
+against a budget of 5,000/hour. If it runs out it stops cleanly, commits its cursor, and
+prints how to continue; **re-run the same command and it resumes from exactly there.**
+
+Check `dg status` afterwards. A cursor watermark short of today means there is more to
+fetch — that signal sat unnoticed through an entire evaluation cycle once, which is why
+`dg status` now prints it.
+
+**Few or no Decisions is a real answer, not a failure.** The rubric needs a motivating
+issue *and* merged work in the same thread. On flask, 235 thread clusters yield 13
+Decisions. A repo that does not reference issues from pull requests will yield fewer.
+
+### When something breaks
+
+Run `dg doctor` first. It reports each check as pass/warn/fail with a specific next step,
+rather than a stack trace:
+
+```
+Database
+────────
+  ok   database reachable
+ FAIL  2 migration(s) not applied
+        0008_rubric_requires_landing.sql, 0009_decision_thread_identity.sql
+        → run `dg init` — it is safe to re-run
+```
+
+- **"Docker is installed but not running"** — start Docker Desktop and wait for it to settle.
+- **Port already in use** — the database is published on 55434 only so you *can* reach it
+  with your own tools; nothing in `dg` uses it. Set `DG_DB_PORT=55444` to move it.
+- **Rebuilding after a Dockerfile change** — `dg rebuild`.
+- **Starting over** — `docker compose down -v` deletes the database volume and everything
+  ingested. `.env` survives.
+
+### Running the internals directly
+
+The original entry points still exist inside the container if you want them:
+`dg-ingest` and `dg-query` are the same code `dg ingest` and `dg query` call.
+
 ## Layout
 
 ```
-db/migrations/       schema, applied in numeric order
-db/tests/            behavioural checks — rubrics, gates, queue, tiering
-src/decision_graph/  ingestion, synthesis, retrieval, reasoning
-tests/               unit tests + traversal-fallback integration tests
+dg / dg.ps1 / dg.bat  host wrappers — the only thing you run directly
+Dockerfile            the toolchain: Python, psql, dependencies
+docker-compose.yml    app + database; injects DATABASE_URL
+db/migrations/        schema, applied in numeric order by `dg init`
+db/tests/             behavioural checks — rubrics, gates, queue, tiering
+src/decision_graph/   cli, ingestion, synthesis, retrieval, reasoning
+tests/                unit tests + traversal-fallback integration tests
 ```
+
+The wrappers do only what must happen on the host: confirm Docker is running, build the
+image once, and hand the arguments to `src/decision_graph/cli.py`. Every other decision
+lives in that one file rather than three times over in three shell dialects.
 
 ## Schema
 
@@ -202,27 +299,6 @@ Accepted deliberately rather than fixed by switching repos:
   fetched — fetching them would make the window unbounded by the back door. They are
   counted in the run summary under `*_target_not_ingested` rather than hidden.
 
-## Running it
-
-```bash
-docker run -d --name oie-pg -e POSTGRES_PASSWORD=oie -e POSTGRES_DB=oie \
-    -p 55432:5432 postgres:16
-
-for f in db/migrations/*.sql; do
-    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
-done
-
-pip install -e .
-export DATABASE_URL="postgresql://postgres:oie@localhost:55432/oie"
-export GITHUB_TOKEN="$(gh auth token)"
-
-dg-ingest --resources issues commits releases codeowners
-dg-ingest --resources issues --max-pages 1   # smoke test; leaves cursor mid-window
-```
-
-`GITHUB_TOKEN` is required — unauthenticated access is capped at 60 req/hour, which
-cannot complete a backfill.
-
 ## Evaluation (§9)
 
 ```bash
@@ -277,10 +353,13 @@ psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  5 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 38 checks
+DATABASE_URL=... python -m unittest discover -s tests               # 54 checks
 ```
 
-All SQL suites run in a transaction and roll back. The Python suite runs 26 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 42 tests
 standalone; setting `DATABASE_URL` adds 12 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 and 5 for the trace annotation.
+
+These run on the host and still need Python. They are for working *on* the tool; using it
+needs only Docker.

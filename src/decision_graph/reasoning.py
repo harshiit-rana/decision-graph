@@ -127,6 +127,13 @@ class Answer:
 # Recursive walk. Both orientations are followed in one CTE so a single implementation
 # serves "what led to this" and "what does this affect"; the mode's edge set is what
 # gives the walk its direction of meaning.
+#
+# "Now" is resolved by the DATABASE, not the client. `valid_from` is written by the server
+# clock, so comparing it against a client-side timestamp makes the query correct only while
+# the two clocks agree. They routinely do not -- a containerised Postgres drifting a second
+# ahead of its host is enough to make every edge written in the last second invisible, which
+# is exactly the state a query runs in immediately after an ingest. An explicit --as-of is
+# still honoured; only the default is server-side.
 _WALK_SQL = """
 WITH RECURSIVE walk AS (
     SELECT %(start)s::bigint AS node_id,
@@ -146,16 +153,16 @@ WITH RECURSIVE walk AS (
         FROM edge e
         WHERE e.src_node_id = w.node_id
           AND e.edge_type = ANY(%(types)s::edge_type[])
-          AND e.valid_from <= %(as_of)s
-          AND (e.valid_to IS NULL OR e.valid_to > %(as_of)s)
+          AND e.valid_from <= COALESCE(%(as_of)s::timestamptz, now())
+          AND (e.valid_to IS NULL OR e.valid_to > COALESCE(%(as_of)s::timestamptz, now()))
           {tag_clause}
         UNION ALL
         SELECT e.id, e.src_node_id
         FROM edge e
         WHERE e.dst_node_id = w.node_id
           AND e.edge_type = ANY(%(types)s::edge_type[])
-          AND e.valid_from <= %(as_of)s
-          AND (e.valid_to IS NULL OR e.valid_to > %(as_of)s)
+          AND e.valid_from <= COALESCE(%(as_of)s::timestamptz, now())
+          AND (e.valid_to IS NULL OR e.valid_to > COALESCE(%(as_of)s::timestamptz, now()))
           {tag_clause}
     ) nxt
     WHERE w.depth < %(max_depth)s
@@ -189,7 +196,7 @@ def _walk(
             "start": start,
             "types": list(edge_types),
             "max_depth": max_depth,
-            "as_of": as_of or datetime.now().astimezone(),
+            "as_of": as_of,
         },
     ).fetchall()
 

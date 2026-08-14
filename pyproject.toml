@@ -9,6 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
+dg = "decision_graph.cli:main"
 dg-ingest = "decision_graph.run:main"
 dg-query = "decision_graph.query:main"
 

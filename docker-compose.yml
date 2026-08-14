@@ -1,0 +1,45 @@
+name: decision-graph
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: dg
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dg
+    volumes:
+      - dgdata:/var/lib/postgresql/data
+    ports:
+      # Published only so you *can* reach it with your own tools. Nothing in `dg` uses
+      # this — the app talks to `db:5432` over the compose network — so a conflict here
+      # is harmless. Change it with DG_DB_PORT=55444 if 55434 is taken.
+      - "${DG_DB_PORT:-55434}:5432"
+    healthcheck:
+      # `dg` must not start before Postgres accepts connections, or first-run init fails
+      # with a confusing "connection refused" that resolves itself on retry.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dg"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Not user-managed, by design. The database lives at a fixed address on this
+      # network, so exporting a DSN by hand was never configuration — it was an
+      # implementation detail leaking onto the host.
+      DATABASE_URL: postgresql://postgres:dg@db:5432/dg
+      DG_PROJECT_DIR: /work
+    volumes:
+      # The project itself: source, migrations, and .env. Bind-mounted rather than copied
+      # so `dg init` can write .env where you can see it, and code edits need no rebuild.
+      - .:/work
+    working_dir: /work
+
+volumes:
+  dgdata:
