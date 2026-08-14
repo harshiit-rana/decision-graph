@@ -205,13 +205,33 @@ def _promote(conn: psycopg.Connection, repo_node_id: int, row: dict) -> bool:
     """Create or refresh one Decision plus its two rubric edges. Returns True if new."""
     thread_key = row["thread_key"]
 
+    # Look the cluster up by thread_key, NOT by external_id (issue #25).
+    #
+    # external_id is written as the thread_key at creation, but thread_key is not stable:
+    # union-find rewrites it whenever two clusters merge, and it rewrites node.thread_key
+    # without touching node.external_id. Matching on the frozen external_id therefore misses
+    # a Decision whose cluster has since been renamed, and promotes a SECOND Decision for
+    # the same decision. thread_key is the live cluster identity; external_id is a snapshot
+    # of it, so the lookup has to use the former and repair the latter.
     existing = conn.execute(
-        "SELECT id FROM node WHERE node_type = 'decision' AND repo_node_id = %s "
-        "AND external_id = %s",
+        "SELECT id, external_id FROM node WHERE node_type = 'decision' "
+        "AND repo_node_id = %s AND thread_key = %s",
         (repo_node_id, thread_key),
     ).fetchone()
 
-    # external_id is the thread_key, so a cluster always promotes to the same node.
+    if existing and existing["external_id"] != thread_key:
+        # The cluster was renamed by a merge after this Decision was created. Re-sync before
+        # upserting, or the upsert's ON CONFLICT (…, external_id) misses and inserts anew.
+        conn.execute(
+            "UPDATE node SET external_id = %s WHERE id = %s", (thread_key, existing["id"])
+        )
+        log.info(
+            "decision %s re-keyed to merged cluster %s (was %s)",
+            existing["id"],
+            thread_key,
+            existing["external_id"],
+        )
+
     decision_node_id = db.upsert_node(
         conn,
         node_type="decision",

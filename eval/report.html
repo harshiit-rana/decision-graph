@@ -205,7 +205,7 @@ button:hover { opacity: .9; }
   <div class="lede">
     <h1>Evaluation worksheet</h1>
     <p class="sub">Decision Graph against <code>pallets/flask</code> — PRD v3.1 §9.
-    18 queries: 2 flagship plus 16 harder cases. Generated 2026-08-14 19:06.</p>
+    18 queries: 2 flagship plus 16 harder cases. Generated 2026-08-14 20:57.</p>
 
     <div class="note fixed">
       <p><strong>Regenerated after a defect found in adjudication.</strong>
@@ -248,7 +248,7 @@ button:hover { opacity: .9; }
     <div class="stat good"><span class="n">5/5</span><span class="l">contracts held</span></div>
   </div>
 
-  <div class="tiers"><span class="tb tier-explicit" style="flex:37"><span>explicit 37</span></span><span class="tb tier-corroborated" style="flex:30"><span>corroborated 30</span></span></div>
+  <div class="tiers"><span class="tb tier-explicit" style="flex:38"><span>explicit 38</span></span><span class="tb tier-corroborated" style="flex:31"><span>corroborated 31</span></span></div>
   <p class="caption">Evidence tier across every path returned. No path used the inferred
   fallback — the graph holds no inferred edges, so that branch is exercised only by the
   seeded fixture in the test suite.</p>
@@ -897,7 +897,7 @@ button:hover { opacity: .9; }
         <tbody><tr class="chosen">
               <td class="mono">issue:576</td>
               <td>Config.from_file() missing ENOTDIR in silent error handling</td>
-              <td class="mono">fuzzy</td>
+              <td class="mono">exact</td>
               <td class="num">1.00</td>
             </tr><tr>
               <td class="mono">pull_request:704</td>
@@ -970,7 +970,7 @@ button:hover { opacity: .9; }
     </section>
 
     <section class="block">
-      <h4>Traversal <span class="count">1 path</span></h4>
+      <h4>Traversal <span class="count">2 paths</span></h4>
       <ul class="paths">
     <li class="path">
       <div class="path-head">
@@ -988,6 +988,40 @@ button:hover { opacity: .9; }
         <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5812</span>
       </div>
       <div class="node">decision:923 — merge app and request contexts into a single context<span class="node-note">implemented by PR 5812, merged 2025-09-19</span></div>
+      </div>
+    </li>
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 2</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:198 — merge app and request contexts into a single context</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">references</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_issue_mention</span>
+        <span class="ref">https://github.com/pallets/flask/issues/6123</span>
+      </div>
+      <div class="node">issue:1910 — `stream_with_context`: abandoned generator leaves the app context current on the worker thread; later requests skip `teardown_appcontext`</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">references</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_issue_mention</span>
+        <span class="ref">https://github.com/pallets/flask/issues/6123</span>
+      </div>
+      <div class="node">issue:104 — `stream_with_context` does not work with async routes</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">motivated_by</span>
+        <span class="tier tier-corroborated">corroborated</span>
+        <span class="extractor">synthesis_closes_cluster</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5799</span>
+      </div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes<span class="node-note">implemented by PR 5799, merged 2025-08-19</span></div>
       </div>
     </li></ul>
     </section>
@@ -1693,7 +1727,7 @@ button:hover { opacity: .9; }
         <tbody><tr class="chosen">
               <td class="mono">issue:576</td>
               <td>Config.from_file() missing ENOTDIR in silent error handling</td>
-              <td class="mono">fuzzy</td>
+              <td class="mono">exact</td>
               <td class="num">1.00</td>
             </tr><tr>
               <td class="mono">pull_request:704</td>
@@ -1992,7 +2026,7 @@ button:hover { opacity: .9; }
     </section>
 
     <section class="block">
-      <h4>Traversal <span class="count">5 paths</span></h4>
+      <h4>Traversal <span class="count">6 paths</span></h4>
       <ul class="paths">
     <li class="path">
       <div class="path-head">
@@ -2107,7 +2141,47 @@ button:hover { opacity: .9; }
       </div>
       <div class="node">decision:929 — asgiref fails with gevent patching<span class="node-note">implemented by PR 5900, merged 2026-01-25</span></div>
       </div>
+    </li>
+        <li class="more">
+          <details>
+            <summary>1 further path</summary>
+            <ul class="paths">
+    <li class="path">
+      <div class="path-head">
+        <span class="path-n">path 6</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="depth">3 hops</span>
+      </div>
+      <div class="trace">
+        <div class="node node-start">issue:477 — asgiref fails with gevent patching</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">closes</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">body_closing_keyword</span>
+        <span class="ref">https://github.com/pallets/flask/pull/5900</span>
+      </div>
+      <div class="node">pull_request:487 — document using gevent for async</div>
+      <div class="step">
+        <span class="conn">→</span>
+        <span class="etype">implements</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">pr_commit_list</span>
+        <span class="ref">ac5664d2281533eacafd64f5cc7d5edcdaccab60</span>
+      </div>
+      <div class="node">commit:489 — document using gevent for async</div>
+      <div class="step">
+        <span class="conn">←</span>
+        <span class="etype">depends_on</span>
+        <span class="tier tier-explicit">explicit</span>
+        <span class="extractor">commit_parent</span>
+        <span class="ref">ac5664d2281533eacafd64f5cc7d5edcdaccab60</span>
+      </div>
+      <div class="node">commit:2084 — document using gevent for async (#5900)</div>
+      </div>
     </li></ul>
+          </details>
+        </li></ul>
     </section>
 
     <div class="verify"><span class="verify-label">Check against flask</span><p>Are all reached artifacts genuinely affected by a revert?</p></div>
