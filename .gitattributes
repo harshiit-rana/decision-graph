@@ -1,0 +1,14 @@
+* text=auto
+
+# The bash wrapper is executed by /bin/sh on macOS and Linux. Checked out with CRLF it
+# fails with "bad interpreter: no such file or directory", which is a confusing way to
+# learn about line endings.
+dg           text eol=lf
+*.sh         text eol=lf
+Dockerfile   text eol=lf
+*.yml        text eol=lf
+db/**/*.sql  text eol=lf
+
+# The Windows wrappers are read by cmd.exe and PowerShell, which want CRLF.
+*.bat        text eol=crlf
+*.ps1        text eol=crlf
