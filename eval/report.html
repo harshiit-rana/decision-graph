@@ -153,12 +153,17 @@ ul.paths { list-style: none; margin: 0; padding: 0; display: flex;
   padding: .7rem .85rem; overflow-x: auto; border-radius: 2px; }
 .node { white-space: nowrap; padding: .1rem 0; }
 .node-start { font-weight: 700; }
+.node-note { color: var(--accent); font-weight: 400; margin-left: .5rem; }
+.node-note::before { content: "· "; color: var(--faint); }
+.node-note.warn { color: var(--violated); font-weight: 700; }
 .step { display: flex; gap: .5rem; align-items: center; padding: .12rem 0 .12rem 1.1rem;
   border-left: 1px solid var(--rule); margin-left: .35rem; white-space: nowrap; }
 .conn { color: var(--faint); }
 .etype { color: var(--ink); font-weight: 600; }
 .extractor { color: var(--faint); font-size: .92em; }
 .ref { color: var(--faint); font-size: .88em; opacity: .75; }
+.ref-kind { text-transform: uppercase; letter-spacing: .06em; font-size: .82em;
+  padding: 0 .3rem; margin-right: .35rem; background: var(--rule); border-radius: 2px; }
 
 .tier { font-size: .66rem; text-transform: uppercase; letter-spacing: .05em;
   padding: .08rem .4rem; border-radius: 2px; color: #fff; font-weight: 600;
@@ -200,7 +205,7 @@ button:hover { opacity: .9; }
   <div class="lede">
     <h1>Evaluation worksheet</h1>
     <p class="sub">Decision Graph against <code>pallets/flask</code> — PRD v3.1 §9.
-    18 queries: 2 flagship plus 16 harder cases. Generated 2026-08-12 20:21.</p>
+    18 queries: 2 flagship plus 16 harder cases. Generated 2026-08-14 19:06.</p>
 
     <div class="note fixed">
       <p><strong>Regenerated after a defect found in adjudication.</strong>
@@ -212,6 +217,18 @@ button:hover { opacity: .9; }
       Validation now requires a merged pull request; 7 Decisions were retracted and 13
       remain, every one with a merged implementer. Issues #16 and #17.
       Query H1 is now the regression guard for that defect.</p>
+    </div>
+
+    <div class="note">
+      <p><strong>Read the annotation, not the cluster id.</strong>
+      A Decision's <code>thread:…</code> key names its cluster, and that name is chosen
+      order-independently — PR-preferring, then lowest number — so when a change took two
+      attempts the cluster is named after the <em>abandoned</em> one. 3 of 13 Decisions
+      here are. Every Decision node in a trace now carries the pull request the graph
+      actually credits it to and that PR's merge date, so a stale label and a stale edge
+      no longer look alike. <code>NOT MERGED</code> or a missing implementer renders in
+      red; neither should appear. Issue #19 — display only, the keys themselves are
+      unchanged.</p>
     </div>
 
     <div class="note">
@@ -305,9 +322,9 @@ button:hover { opacity: .9; }
         <span class="etype">motivated_by</span>
         <span class="tier tier-explicit">explicit</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5898</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5898</span>
       </div>
-      <div class="node">decision:930 — change default redirect code to 303</div>
+      <div class="node">decision:930 — change default redirect code to 303<span class="node-note">implemented by PR 5898, merged 2026-01-25</span></div>
       </div>
     </li></ul>
     </section>
@@ -549,9 +566,9 @@ button:hover { opacity: .9; }
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5777</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       </div>
     </li>
     <li class="path">
@@ -577,7 +594,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5776</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       </div>
     </li>
     <li class="path">
@@ -603,7 +620,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5786</span>
       </div>
-      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests<span class="node-note">implemented by PR 5797, merged 2025-08-18</span></div>
       </div>
     </li>
     <li class="path">
@@ -629,7 +646,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5774</span>
       </div>
-      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes<span class="node-note">implemented by PR 5799, merged 2025-08-19</span></div>
       </div>
     </li>
     <li class="path">
@@ -655,13 +672,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5776</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5777</span>
       </div>
       <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       </div>
@@ -723,13 +740,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5786</span>
       </div>
-      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests<span class="node-note">implemented by PR 5797, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5797</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5797</span>
       </div>
       <div class="node">pull_request:76 — push preserved contexts in correct order</div>
       </div>
@@ -791,13 +808,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5774</span>
       </div>
-      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes<span class="node-note">implemented by PR 5799, merged 2025-08-19</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5799</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5799</span>
       </div>
       <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
       </div>
@@ -823,9 +840,9 @@ button:hover { opacity: .9; }
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5777</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">deployed_by</span>
@@ -968,9 +985,9 @@ button:hover { opacity: .9; }
         <span class="etype">motivated_by</span>
         <span class="tier tier-explicit">explicit</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5812</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5812</span>
       </div>
-      <div class="node">decision:923 — merge app and request contexts into a single context</div>
+      <div class="node">decision:923 — merge app and request contexts into a single context<span class="node-note">implemented by PR 5812, merged 2025-09-19</span></div>
       </div>
     </li></ul>
     </section>
@@ -1042,9 +1059,9 @@ button:hover { opacity: .9; }
         <span class="etype">motivated_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5722</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5722</span>
       </div>
-      <div class="node">decision:918 — Recommend Warning and Safer Defaults for url_for(..., _external=True)</div>
+      <div class="node">decision:918 — Recommend Warning and Safer Defaults for url_for(..., _external=True)<span class="node-note">implemented by PR 5798, merged 2025-08-18</span></div>
       </div>
     </li></ul>
     </section>
@@ -1116,9 +1133,9 @@ button:hover { opacity: .9; }
         <span class="etype">motivated_by</span>
         <span class="tier tier-explicit">explicit</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5867</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5867</span>
       </div>
-      <div class="node">decision:928 — deprecate `should_ignore_error`</div>
+      <div class="node">decision:928 — deprecate `should_ignore_error`<span class="node-note">implemented by PR 5899, merged 2026-01-25</span></div>
       </div>
     </li></ul>
     </section>
@@ -1180,9 +1197,9 @@ button:hover { opacity: .9; }
         <span class="etype">implemented_by</span>
         <span class="tier tier-explicit">explicit</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5898</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5898</span>
       </div>
-      <div class="node">decision:930 — change default redirect code to 303</div>
+      <div class="node">decision:930 — change default redirect code to 303<span class="node-note">implemented by PR 5898, merged 2026-01-25</span></div>
       </div>
     </li></ul>
     </section>
@@ -1412,7 +1429,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5776</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       </div>
     </li>
     <li class="path">
@@ -1430,7 +1447,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5786</span>
       </div>
-      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests<span class="node-note">implemented by PR 5797, merged 2025-08-18</span></div>
       </div>
     </li>
         <li class="more">
@@ -1452,7 +1469,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5774</span>
       </div>
-      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes<span class="node-note">implemented by PR 5799, merged 2025-08-19</span></div>
       </div>
     </li>
     <li class="path">
@@ -1522,13 +1539,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5776</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5777</span>
       </div>
       <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       </div>
@@ -1574,13 +1591,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5786</span>
       </div>
-      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests<span class="node-note">implemented by PR 5797, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5797</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5797</span>
       </div>
       <div class="node">pull_request:76 — push preserved contexts in correct order</div>
       </div>
@@ -1626,13 +1643,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5774</span>
       </div>
-      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes<span class="node-note">implemented by PR 5799, merged 2025-08-19</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5799</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5799</span>
       </div>
       <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
       </div>
@@ -2086,9 +2103,9 @@ button:hover { opacity: .9; }
         <span class="etype">implemented_by</span>
         <span class="tier tier-explicit">explicit</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5885</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5885</span>
       </div>
-      <div class="node">decision:929 — asgiref fails with gevent patching</div>
+      <div class="node">decision:929 — asgiref fails with gevent patching<span class="node-note">implemented by PR 5900, merged 2026-01-25</span></div>
       </div>
     </li></ul>
     </section>
@@ -2582,9 +2599,9 @@ button:hover { opacity: .9; }
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5777</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       </div>
     </li>
     <li class="path">
@@ -2610,7 +2627,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5776</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       </div>
     </li>
     <li class="path">
@@ -2636,7 +2653,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5786</span>
       </div>
-      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests<span class="node-note">implemented by PR 5797, merged 2025-08-18</span></div>
       </div>
     </li>
     <li class="path">
@@ -2662,7 +2679,7 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5774</span>
       </div>
-      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes<span class="node-note">implemented by PR 5799, merged 2025-08-19</span></div>
       </div>
     </li>
     <li class="path">
@@ -2688,13 +2705,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5776</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5777</span>
       </div>
       <div class="node">pull_request:64 — use IO[bytes] instead of BinaryIO for wider compatibility</div>
       </div>
@@ -2756,13 +2773,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5786</span>
       </div>
-      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests</div>
+      <div class="node">decision:921 — Session is not updated on redirect target endpoint in tests<span class="node-note">implemented by PR 5797, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5797</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5797</span>
       </div>
       <div class="node">pull_request:76 — push preserved contexts in correct order</div>
       </div>
@@ -2824,13 +2841,13 @@ button:hover { opacity: .9; }
         <span class="extractor">synthesis_release_note</span>
         <span class="ref">release:3.1.2 via #5774</span>
       </div>
-      <div class="node">decision:922 — `stream_with_context` does not work with async routes</div>
+      <div class="node">decision:922 — `stream_with_context` does not work with async routes<span class="node-note">implemented by PR 5799, merged 2025-08-19</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5799</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5799</span>
       </div>
       <div class="node">pull_request:100 — refactor stream_with_context for async views</div>
       </div>
@@ -2856,9 +2873,9 @@ button:hover { opacity: .9; }
         <span class="etype">implemented_by</span>
         <span class="tier tier-corroborated">corroborated</span>
         <span class="extractor">synthesis_closes_cluster</span>
-        <span class="ref">thread:30:pr-5777</span>
+        <span class="ref"><span class="ref-kind">cluster</span>thread:30:pr-5777</span>
       </div>
-      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument</div>
+      <div class="node">decision:920 — Looser type annotations for send_file() path_or_file argument<span class="node-note">implemented by PR 5777, merged 2025-08-18</span></div>
       <div class="step">
         <span class="conn">→</span>
         <span class="etype">deployed_by</span>
