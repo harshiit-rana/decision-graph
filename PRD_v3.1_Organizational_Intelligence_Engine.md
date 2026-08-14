@@ -1,7 +1,9 @@
-# PRD v3.1: Organizational Intelligence Engine
+# PRD v3.2: Organizational Intelligence Engine
 *Internal Design Document*
 
 **Changelog from v3:** tightened the `reconstructed` Decision rubric to a mechanical rule (5.1); made the inferred-edge fallback order an explicit traversal step (5.3); reconciled the flagship-query count with the evaluation set (9).
+
+**Changelog from v3.1 (post-implementation, Phases 1-4):** Validation now requires confirmed merge, not just a `closes`/`reviewed` edge (5.1) — implementation surfaced that rejected work otherwise satisfies the rubric's letter while violating its intent. Documented that rubric-passing threads are promoted to Decisions mechanically, with no significance filter (5.1). Documented the `tag` vs `evidence_tier` split the schema actually uses (5.1/5.4) — `tag` is provenance, fixed at creation; `evidence_tier` is derived and upgradeable, and only an explicit-tagged edge is eligible for the `corroborated` upgrade. Replaced the illustrative corroboration example with the mechanical rubric actually shipped (5.4). Added the real Phase 4 evaluation outcome and its epistemic limits (9).
 
 ## 1. Summary
 
@@ -67,15 +69,21 @@ Three signal categories, each mapped to an explicit edge type already in the gra
 |---|---|---|
 | Motivation | `motivated_by` (→ Issue/RFC/discussion) | Why |
 | Implementation | `implemented_by` (→ Commit/PR) | What was done |
-| Validation | `reviewed` / `closes` | That it landed |
+| Validation | `reviewed` / `closes`, **and the referenced PR's `merged_at` is not null** | That it landed |
 
 A `reconstructed` Decision node is created only when:
 
 1. **Motivation is present** — a `motivated_by` edge to an issue, RFC, or discussion exists. This is mandatory, not optional: a Decision node exists to answer "why," and Implementation + Validation alone (e.g. a merged, reviewed PR with no linked issue) describes *that* something happened and *that* it landed, but not *why* — it fails the rubric and no Decision node is created.
-2. **At least one of {Implementation, Validation} is also present** — i.e. `motivated_by` + `implemented_by`, or `motivated_by` + `reviewed`/`closes`.
+2. **At least one of {Implementation, Validation} is also present** — i.e. `motivated_by` + `implemented_by`, or `motivated_by` + `reviewed`/`closes`. **Both branches of this OR require a confirmed merge** (see below) — the clause is an OR over which category satisfies it, not over whether landing is checked.
 3. **All edges reference the same commit/PR cluster within a bounded time window** — e.g. the PR and the issue it closes, not two loosely related PRs weeks apart. (v1: same PR/issue thread, or commits sharing a PR; exact window to be fixed during implementation and documented alongside the rule.)
 
 This is a mechanical check over edge types already in the graph — no LLM judgment call, no ambiguity about "how many signals is enough." If the bar isn't met, the underlying PR/issue/commits remain queryable as plain artifacts; no Decision node is asserted.
+
+**Landing must be confirmed, not just claimed (added post-implementation).** A `closes` edge only records that someone wrote a closing keyword in a PR or commit — it survives the PR being rejected. Flask's real history contains genuine cases of this: an issue closed `not_planned` with three separate PRs each claiming to fix it, none ever merged. Validation and Implementation both require the referenced PR to have a non-null `merged_at` before they count; a `closes`/`implements` edge pointing at an unmerged PR does not satisfy clause 2 on its own, even though the edge itself is correctly extracted. This closes a real gap between the rubric's stated intent ("that it landed") and its original implementation (which checked for the edge's existence, not the landing itself) — declined work is not modelled as a Decision in v1; see the roadmap note in Section 11 for why that's a deliberate exclusion rather than an oversight.
+
+**Promotion is mechanical, with no significance filter.** Every thread that clears the rubric above is promoted to a Decision node — there is no secondary judgment of whether the underlying change is "important enough" to warrant one. A one-line fix that clears Motivation + Validation is promoted the same as an architectural change. Filtering on perceived significance would reintroduce exactly the kind of subjective, undocumented threshold the mechanical rubric exists to avoid; if significance-based ranking or filtering is wanted later, it belongs in a presentation/query layer over existing Decision nodes, not in the creation rule.
+
+**Provenance vs. derived confidence — two separate fields, not one.** Every edge carries two independent values: `tag` (`explicit` or `inferred`) is set once at creation and never rewritten — it records where the edge came from. `evidence_tier` (`explicit`, `corroborated`, or `inferred`) is derived and can be upgraded or downgraded as more evidence is observed (Section 5.4). A CHECK constraint enforces `tag = 'inferred' ⟺ evidence_tier = 'inferred'` — only an `explicit`-tagged edge is ever eligible for the `corroborated` upgrade, so an inferred edge can never launder itself into a higher-confidence tier by accumulating corroboration. §5.3's traversal order (below) operates on `tag = 'explicit'` for its first pass, not on `evidence_tier` — the two fields answer different questions (where did this come from vs. how much do we trust it now) and neither substitutes for the other.
 
 **Construction principle — extraction-first:** edges are built primarily from explicit signals: commit messages, issue/PR cross-links, review approvals, CODEOWNERS entries, file-path co-occurrence, and git history. LLM inference is used only to propose an edge when no explicit signal connects two entities that are plausibly related. Every inferred edge is tagged `inferred` at creation and never conflated with explicit data downstream. (Decision nodes specifically are exempt from ever being created via this inferred path — see above.)
 
@@ -114,10 +122,27 @@ This keeps `inferred` a genuine last resort rather than a background layer dilut
 Every answer produced by Engine 2 is annotated with an evidence tier, not a numeric confidence score:
 
 - **Explicit** — direct, unambiguous reference (PR closes Issue, commit implements Decision).
-- **Corroborated** — multiple independent explicit signals converge (issue + commits + review approval).
+- **Corroborated** — multiple independent explicit signals converge, per the mechanical rubric below.
 - **Inferred** — no explicit link exists; relationship proposed by LLM inference from content similarity.
 
 Tiers are surfaced alongside every answer so the basis for a conclusion is always visible.
+
+**Corroboration rubric (mechanical, added post-implementation).** "Multiple independent explicit signals converge" needs the same treatment the Decision rubric got in 5.1 — a fixed rule, not a judgment call. An `explicit`-tagged edge upgrades to `corroborated` iff:
+
+1. Its `edge_type` is evidence-carrying (`closes`, `implements`, `reviewed`, `motivated_by`, `implemented_by`, `deployed_by`) — authorship and loose mentions (`created`, `mentions`, `references`, `depends_on`) corroborate nothing.
+2. Its endpoints share one non-null `thread_key` (the same bounded-window cluster used by the Decision rubric's clause 3). Person-sourced edges (`reviewed`) are thread-less at the source, so only the `dst` endpoint must be in the thread.
+3. That thread exhibits at least 3 of 4 independent categories, counting only observed (non-`synthesis_*`) edges:
+
+| Category | Edge + extractor | Independent origin |
+|---|---|---|
+| DECLARED | `closes` via a body-parsed closing keyword | the author's prose |
+| STRUCTURAL | `implements` via the PR's commit list | GitHub's PR↔commit structure |
+| ATTESTED | `reviewed` via a review action | a reviewer's action |
+| PUBLISHED | `deployed_by` via a release-notes citation | a maintainer curating a changelog entry |
+
+A fifth candidate category — REDUNDANT (≥2 distinct sources independently declaring the same `closes` link) — was considered and dropped: when both declarations come from the same extractor (e.g. two PR bodies), REDUNDANT is always implied by DECLARED already being true, so it can never contribute an independent category and would silently inflate the count off one underlying fact. Synthesized edges (`synthesis_*`) never count toward any category — a Decision's `motivated_by` and `implemented_by` edges are themselves derived from an underlying `closes` edge, so counting them as separate corroborating signals would be circular (one signal wearing two hats).
+
+Only `explicit`-tagged edges are eligible for this upgrade (see the `tag` vs `evidence_tier` note in 5.1) — an `inferred` edge cannot become `corroborated` by accumulating category matches.
 
 ## 6. Feature Surface
 
@@ -150,6 +175,16 @@ Formal precision/recall evaluation at scale is out of scope for v1 given the eff
 - The two flagship queries referenced in Section 3 are a curated subset of this set, chosen for narrative clarity in demos — they are not validated separately from the other 13–18 queries. The evaluation set as a whole is: the 2 flagship queries + 13–18 additional queries covering less curated, harder cases.
 - Each answer manually checked against the repo's actual history for correctness.
 - Reported as a simple accuracy figure, with failure cases documented rather than hidden.
+
+**Actual v1 result and what it does and doesn't support.** The Phase 4 run against flask scored 18/18 (10 answered and independently verified against real GitHub history — 2 of those, a paraphrase-retrieval and a temporal control, are consistency checks rather than independent evidence — plus 8 correct refusals/contracts). That figure is reported plainly, alongside the following, so it isn't read as more than it is:
+
+- **The set is curated by the system's builder**, not sampled or adversarially constructed. A 100% result on 18 hand-picked queries is not evidence of accuracy at scale.
+- **8 of the 18 correct outcomes are "returned nothing."** A degenerate engine that always answers nothing would score 8/18 by this measure alone. The discriminating subset is the 10 answered queries, of which 8 are independently checked.
+- **The run observed zero real inferred edges** (the fallback path was entered 6 times, and returned nothing every time on this repository). Inferred-edge behavior is validated only by the seeded fixture from Phase 2 (5.3) — this evaluation cycle says nothing about inference quality on real data.
+- **13 Decisions were synthesized from 161 threads.** The evaluation measures precision on that set (are the 13 correct) — it does not measure recall (are any of the 148 non-Decision threads a Decision the rubric should have caught but didn't). Coverage at scale remains the binding open question and is explicitly out of scope for v1, per the Non-Goals in Section 4.
+- **Neither defect found during Phase 1-4 implementation (merge-state gaps #16/#17, the mislabeled-implementer trace #19) was caught by the evaluation set's automated portion.** Both were found by a human opening a trace and comparing it to GitHub directly. At the point where 12 of 20 Decisions rested on unmerged PRs, the same evaluation harness reported "12 answered, 4 refusals, contracts held" — a clean-looking result. This is §9's design working as intended, not a gap in it: the automated runner checks mechanical contracts (a query must/must not return an answer) and records what the engines returned: it has no power over whether an answer is *true*. Every correctness claim in this record came from a human reading GitHub, and the accuracy figure has no meaning independent of that manual review.
+
+What the 18/18 figure supports: precision on the sampled set, refusal discipline (the system correctly declines to assert when evidence doesn't clear the bar), and point-in-time correctness (the temporal filter genuinely restricts results rather than being cosmetic). What it does not support: recall/coverage, inference quality, evidence-tier calibration at scale, generalization beyond flask, or freedom from selection bias in how the query set was built. Five repository-specific limitations were carried into the final record (no CODEOWNERS, no wiki, sparse review culture limiting the corroborated tier, explicit-status coverage limited to 3 release-note matches, and the Why-from-a-commit structural gap tracked as issue #14) — each is a property of the target repository or a documented v1 scope boundary, not a silent gap.
 
 ## 10. Risks
 
