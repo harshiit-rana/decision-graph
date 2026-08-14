@@ -95,6 +95,12 @@ Three cursor strategies, because the endpoints genuinely differ:
 `window_floor` is pinned on first contact rather than recomputed, so resuming a backfill
 days later cannot move the floor forward and leave an unfetched hole mid-window.
 
+**Resume has now been exercised for real.** The first backfill stopped a third of the way
+short and sat that way through the whole §9 cycle — the graph held 54 of 80 issues and 145
+of 219 PRs without anything noticing. Re-running picked up from the committed watermark and
+completed the window in 167 requests; a third run was a no-op at 6 requests. The mechanism
+worked, and the gap it left is what the recall audit found (`eval/RECALL_AUDIT.md`).
+
 Rate limiting is first-class: a 12-month backfill of a repo flask's size sits close
 enough to the 5,000 req/hour budget that exhaustion is expected. The client stops
 cleanly at a configurable floor and the next run resumes.
@@ -183,9 +189,9 @@ Accepted deliberately rather than fixed by switching repos:
   evaluation set cannot include ownership queries against flask.**
 - **`has_wiki: false`.** The `wiki_page` extractor no-ops. On this repo `motivated_by`
   therefore resolves only to issues and PR bodies, never wiki pages.
-- **The `corroborated` tier is sparse: 6 of 161 threads.**
-  flask merges largely without formal GitHub reviews — 11 `reviewed` edges across 145
-  PRs, and only 6 threads carry any review at all; 3 threads appear in release notes.
+- **The `corroborated` tier is sparse: 7 of 235 threads.**
+  flask merges largely without formal GitHub reviews — 14 `reviewed` edges across 219
+  PRs, and only 7 threads carry any review at all; 3 threads appear in release notes.
   The rubric was chosen on independence grounds and not tuned to raise this number, so
   §9 should report the tier as under-exercised on this repo rather than as a rubric
   weakness. A repo with mandatory review would populate it heavily.
@@ -239,7 +245,7 @@ for the figure with its disclosures.** Read them before quoting the number. 8 of
 correct outcomes are the system returning nothing, so a degenerate engine that always
 returned nothing would score 8/18 on this set; the query set was curated by the person who
 built the system; and the graph holds zero inferred edges, so nothing here measures
-inference. 13 Decisions out of 161 threads — coverage, not precision, is the binding limit,
+inference. 13 Decisions out of 235 threads — coverage, not precision, is the binding limit,
 and this measures precision only.
 
 Most usefully: **neither defect found during the evaluation cycle was caught by the
@@ -270,6 +276,7 @@ psql "$DATABASE_URL" -f db/tests/0002_rubric_checks.sql             # 13 checks
 psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
+psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  5 checks
 DATABASE_URL=... python -m unittest discover -s tests               # 38 checks
 ```
 

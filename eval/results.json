@@ -6,7 +6,7 @@
     "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask.",
     "revision": "Regenerated after issues #16/#17. The landing gate retracted 7 Decisions that rested on unmerged work; 13 remain, all with a merged implementer."
   },
-  "generated_at": "2026-08-14T19:06:40.138845+05:30",
+  "generated_at": "2026-08-14T20:57:51.634261+05:30",
   "summary": {
     "total": 18,
     "answered": 10,
@@ -591,7 +591,7 @@
           "node_type": "issue",
           "external_id": "5912",
           "title": "Config.from_file() missing ENOTDIR in silent error handling",
-          "match": "fuzzy",
+          "match": "exact",
           "score": 1.0
         },
         {
@@ -671,10 +671,44 @@
               "to_node": "decision:923 \u2014 merge app and request contexts into a single context  [implemented by PR 5812, merged 2025-09-19]"
             }
           ]
+        },
+        {
+          "tier": "corroborated",
+          "depth": 3,
+          "start": "issue:198 \u2014 merge app and request contexts into a single context",
+          "steps": [
+            {
+              "edge_type": "references",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_issue_mention",
+              "source_ref": "https://github.com/pallets/flask/issues/6123",
+              "direction": "reverse",
+              "to_node": "issue:1910 \u2014 `stream_with_context`: abandoned generator leaves the app context current on the worker thread; later requests skip `teardown_appcontext`"
+            },
+            {
+              "edge_type": "references",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_issue_mention",
+              "source_ref": "https://github.com/pallets/flask/issues/6123",
+              "direction": "forward",
+              "to_node": "issue:104 \u2014 `stream_with_context` does not work with async routes"
+            },
+            {
+              "edge_type": "motivated_by",
+              "tier": "corroborated",
+              "tag": "explicit",
+              "extractor": "synthesis_closes_cluster",
+              "source_ref": "thread:30:pr-5799",
+              "direction": "reverse",
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes  [implemented by PR 5799, merged 2025-08-19]"
+            }
+          ]
         }
       ],
       "used_inferred_fallback": false,
-      "explanation": "1 explicit path(s) found; inferred edges not consulted",
+      "explanation": "2 explicit path(s) found; inferred edges not consulted",
       "answered": true,
       "verdict": null,
       "notes": null,
@@ -1251,7 +1285,7 @@
           "node_type": "issue",
           "external_id": "5912",
           "title": "Config.from_file() missing ENOTDIR in silent error handling",
-          "match": "fuzzy",
+          "match": "exact",
           "score": 1.0
         },
         {
@@ -1628,10 +1662,44 @@
               "to_node": "decision:929 \u2014 asgiref fails with gevent patching  [implemented by PR 5900, merged 2026-01-25]"
             }
           ]
+        },
+        {
+          "tier": "explicit",
+          "depth": 3,
+          "start": "issue:477 \u2014 asgiref fails with gevent patching",
+          "steps": [
+            {
+              "edge_type": "closes",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "body_closing_keyword",
+              "source_ref": "https://github.com/pallets/flask/pull/5900",
+              "direction": "reverse",
+              "to_node": "pull_request:487 \u2014 document using gevent for async"
+            },
+            {
+              "edge_type": "implements",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "pr_commit_list",
+              "source_ref": "ac5664d2281533eacafd64f5cc7d5edcdaccab60",
+              "direction": "forward",
+              "to_node": "commit:489 \u2014 document using gevent for async"
+            },
+            {
+              "edge_type": "depends_on",
+              "tier": "explicit",
+              "tag": "explicit",
+              "extractor": "commit_parent",
+              "source_ref": "ac5664d2281533eacafd64f5cc7d5edcdaccab60",
+              "direction": "reverse",
+              "to_node": "commit:2084 \u2014 document using gevent for async (#5900)"
+            }
+          ]
         }
       ],
       "used_inferred_fallback": false,
-      "explanation": "5 explicit path(s) found; inferred edges not consulted",
+      "explanation": "6 explicit path(s) found; inferred edges not consulted",
       "answered": true,
       "verdict": null,
       "notes": null,
