@@ -2,9 +2,10 @@
 
 Organizational Intelligence Engine — implementation of `PRD_v3.1_Organizational_Intelligence_Engine.md`.
 
-**Phases 1–4 built.** Time-versioned graph schema, extraction-first GitHub ingestion,
+**Phases 1–4 complete.** Time-versioned graph schema, extraction-first GitHub ingestion,
 Decision synthesis, candidate retrieval, the Why/Impact traversal engine, evidence
-tiering, and the §9 evaluation set.
+tiering, and the §9 evaluation set — adjudicated 18 of 18 against flask's real history,
+with the disclosures that number needs recorded in [`eval/RESULTS.md`](eval/RESULTS.md).
 
 - **Code repo:** this repository.
 - **Ingestion target:** `pallets/flask`.
@@ -188,7 +189,7 @@ Accepted deliberately rather than fixed by switching repos:
   The rubric was chosen on independence grounds and not tuned to raise this number, so
   §9 should report the tier as under-exercised on this repo rather than as a rubric
   weakness. A repo with mandatory review would populate it heavily.
-- **Explicit-status Decisions are limited to what release notes itemise** (3 of 20).
+- **Explicit-status Decisions are limited to what release notes itemise** (3 of 13).
   flask's changelog lives in `CHANGES.rst`, a repo file, and file-content ingestion is
   not built.
 - Cross-references to artifacts **outside** the 12-month window are skipped rather than
@@ -233,10 +234,22 @@ only automatic assertion is `contract` — mechanical properties of the engine s
 "must return no answer for an artifact outside the window" — which are claims about the
 code rather than about flask.
 
-Current run: 10 answered, 8 returned nothing, 5/5 engine contracts held. The point-in-time
-control is the load-bearing one: F1 returns 1 path and drops to 0 when asked as of
-2025-06, while F2 returns 17 both now and as of 2026-12 — so the time filter restricts in
-one direction only, rather than being silently ignored.
+**Adjudicated: 18 of 18 correct, no failures — see [`eval/RESULTS.md`](eval/RESULTS.md)
+for the figure with its disclosures.** Read them before quoting the number. 8 of the 18
+correct outcomes are the system returning nothing, so a degenerate engine that always
+returned nothing would score 8/18 on this set; the query set was curated by the person who
+built the system; and the graph holds zero inferred edges, so nothing here measures
+inference. 13 Decisions out of 161 threads — coverage, not precision, is the binding limit,
+and this measures precision only.
+
+Most usefully: **neither defect found during the evaluation cycle was caught by the
+evaluation set.** Both #16/#17 and #19 were found by a human comparing a trace to GitHub,
+which is what §9 is for — and which establishes that the automatic portion of the runner
+has no power over correctness.
+
+The point-in-time control is the load-bearing mechanical check: F1 returns 1 path and drops
+to 0 when asked as of 2025-06, while F2 returns 17 both now and as of 2026-12 — so the time
+filter restricts in one direction only, rather than being silently ignored.
 
 **Every Decision in a trace names the artifact it is credited to.** A Why-walk reaching a
 Decision across `motivated_by` stops there and never traverses `implemented_by`, so the
