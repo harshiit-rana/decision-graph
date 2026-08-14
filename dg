@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# dg — macOS / Linux wrapper.
+#
+# Does only what must happen on the host: confirm Docker is running, build the image the
+# first time, and hand the arguments to the container. Every other decision lives in
+# src/decision_graph/cli.py so it exists once instead of once per shell dialect.
+#
+#   ./dg init
+#   ./dg query "send_file" --mode why
+
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+fail() {
+    printf '\033[31merror: %s\033[0m\n' "$1" >&2
+    [ $# -gt 1 ] && printf '\033[33m  -> %s\033[0m\n' "$2" >&2
+    exit 1
+}
+
+command -v docker >/dev/null 2>&1 || fail \
+    "Docker is not installed." \
+    "Install Docker Desktop: https://www.docker.com/products/docker-desktop"
+
+# `docker info` fails when the engine is not running, which is the single most common
+# cause of every other error this tool could report.
+docker info >/dev/null 2>&1 || fail \
+    "Docker is installed but not running." \
+    "Start Docker Desktop and wait for it to settle, then retry."
+
+docker compose version >/dev/null 2>&1 || fail \
+    "This Docker has no 'compose' subcommand." \
+    "Update Docker Desktop — Compose v2 is required."
+
+# Build once. Docker caches layers, so rebuilding after a Dockerfile change is quick, but
+# doing it on every command would add seconds to every query.
+if [ -z "$(docker compose images -q app 2>/dev/null)" ] || [ "${1:-}" = "rebuild" ]; then
+    printf '\033[36mBuilding the decision-graph image (first run only)...\033[0m\n'
+    docker compose build app || fail "Image build failed." "Scroll up for the build error."
+    if [ "${1:-}" = "rebuild" ]; then printf '\033[32mRebuilt.\033[0m\n'; exit 0; fi
+fi
+
+exec docker compose run --rm app "$@"
