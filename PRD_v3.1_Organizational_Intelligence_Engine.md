@@ -1,5 +1,5 @@
 # PRD v3.2: Organizational Intelligence Engine
-*Internal Design Document*
+*Design document — the specification this repository implements.*
 
 **Changelog from v3:** tightened the `reconstructed` Decision rubric to a mechanical rule (5.1); made the inferred-edge fallback order an explicit traversal step (5.3); reconciled the flagship-query count with the evaluation set (9).
 

@@ -4,6 +4,10 @@ services:
   db:
     image: postgres:16
     environment:
+      # Not a secret. This is a disposable local development credential for a container
+      # that holds only public GitHub data, is reachable only on this compose network,
+      # and is destroyed by `docker compose down -v`. Secret scanners will flag it; there
+      # is nothing here to protect.
       POSTGRES_PASSWORD: dg
       POSTGRES_USER: postgres
       POSTGRES_DB: dg
