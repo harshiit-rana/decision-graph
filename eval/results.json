@@ -6,7 +6,7 @@
     "adjudication": "Correctness is decided by a human against flask's actual history. The runner records what the system returned and never grades it. Where a 'contract' field appears, that is a mechanically checkable property of the engine (e.g. 'must return no answer'), not a claim about flask.",
     "revision": "Regenerated after issues #16/#17. The landing gate retracted 7 Decisions that rested on unmerged work; 13 remain, all with a merged implementer."
   },
-  "generated_at": "2026-08-12T20:21:38.196970+05:30",
+  "generated_at": "2026-08-14T19:06:40.138845+05:30",
   "summary": {
     "total": 18,
     "answered": 10,
@@ -66,7 +66,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5898",
               "direction": "reverse",
-              "to_node": "decision:930 \u2014 change default redirect code to 303"
+              "to_node": "decision:930 \u2014 change default redirect code to 303  [implemented by PR 5898, merged 2026-01-25]"
             }
           ]
         }
@@ -284,7 +284,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5777",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             }
           ]
         },
@@ -309,7 +309,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5776",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             }
           ]
         },
@@ -334,7 +334,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5786",
               "direction": "reverse",
-              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests  [implemented by PR 5797, merged 2025-08-18]"
             }
           ]
         },
@@ -359,7 +359,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5774",
               "direction": "reverse",
-              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes  [implemented by PR 5799, merged 2025-08-19]"
             }
           ]
         },
@@ -384,7 +384,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5776",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             },
             {
               "edge_type": "implemented_by",
@@ -452,7 +452,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5786",
               "direction": "reverse",
-              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests  [implemented by PR 5797, merged 2025-08-18]"
             },
             {
               "edge_type": "implemented_by",
@@ -520,7 +520,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5774",
               "direction": "reverse",
-              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes  [implemented by PR 5799, merged 2025-08-19]"
             },
             {
               "edge_type": "implemented_by",
@@ -554,7 +554,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5777",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             },
             {
               "edge_type": "deployed_by",
@@ -668,7 +668,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5812",
               "direction": "reverse",
-              "to_node": "decision:923 \u2014 merge app and request contexts into a single context"
+              "to_node": "decision:923 \u2014 merge app and request contexts into a single context  [implemented by PR 5812, merged 2025-09-19]"
             }
           ]
         }
@@ -729,7 +729,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5722",
               "direction": "reverse",
-              "to_node": "decision:918 \u2014 Recommend Warning and Safer Defaults for url_for(..., _external=True)"
+              "to_node": "decision:918 \u2014 Recommend Warning and Safer Defaults for url_for(..., _external=True)  [implemented by PR 5798, merged 2025-08-18]"
             }
           ]
         }
@@ -790,7 +790,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5867",
               "direction": "reverse",
-              "to_node": "decision:928 \u2014 deprecate `should_ignore_error`"
+              "to_node": "decision:928 \u2014 deprecate `should_ignore_error`  [implemented by PR 5899, merged 2026-01-25]"
             }
           ]
         }
@@ -835,7 +835,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5898",
               "direction": "reverse",
-              "to_node": "decision:930 \u2014 change default redirect code to 303"
+              "to_node": "decision:930 \u2014 change default redirect code to 303  [implemented by PR 5898, merged 2026-01-25]"
             }
           ]
         }
@@ -1016,7 +1016,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5776",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             }
           ]
         },
@@ -1032,7 +1032,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5786",
               "direction": "reverse",
-              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests  [implemented by PR 5797, merged 2025-08-18]"
             }
           ]
         },
@@ -1048,7 +1048,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5774",
               "direction": "reverse",
-              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes  [implemented by PR 5799, merged 2025-08-19]"
             }
           ]
         },
@@ -1114,7 +1114,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5776",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             },
             {
               "edge_type": "implemented_by",
@@ -1164,7 +1164,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5786",
               "direction": "reverse",
-              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests  [implemented by PR 5797, merged 2025-08-18]"
             },
             {
               "edge_type": "implemented_by",
@@ -1214,7 +1214,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5774",
               "direction": "reverse",
-              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes  [implemented by PR 5799, merged 2025-08-19]"
             },
             {
               "edge_type": "implemented_by",
@@ -1625,7 +1625,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5885",
               "direction": "reverse",
-              "to_node": "decision:929 \u2014 asgiref fails with gevent patching"
+              "to_node": "decision:929 \u2014 asgiref fails with gevent patching  [implemented by PR 5900, merged 2026-01-25]"
             }
           ]
         }
@@ -1981,7 +1981,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5777",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             }
           ]
         },
@@ -2006,7 +2006,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5776",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             }
           ]
         },
@@ -2031,7 +2031,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5786",
               "direction": "reverse",
-              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests  [implemented by PR 5797, merged 2025-08-18]"
             }
           ]
         },
@@ -2056,7 +2056,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5774",
               "direction": "reverse",
-              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes  [implemented by PR 5799, merged 2025-08-19]"
             }
           ]
         },
@@ -2081,7 +2081,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5776",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             },
             {
               "edge_type": "implemented_by",
@@ -2149,7 +2149,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5786",
               "direction": "reverse",
-              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests"
+              "to_node": "decision:921 \u2014 Session is not updated on redirect target endpoint in tests  [implemented by PR 5797, merged 2025-08-18]"
             },
             {
               "edge_type": "implemented_by",
@@ -2217,7 +2217,7 @@
               "extractor": "synthesis_release_note",
               "source_ref": "release:3.1.2 via #5774",
               "direction": "reverse",
-              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes"
+              "to_node": "decision:922 \u2014 `stream_with_context` does not work with async routes  [implemented by PR 5799, merged 2025-08-19]"
             },
             {
               "edge_type": "implemented_by",
@@ -2251,7 +2251,7 @@
               "extractor": "synthesis_closes_cluster",
               "source_ref": "thread:30:pr-5777",
               "direction": "reverse",
-              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument"
+              "to_node": "decision:920 \u2014 Looser type annotations for send_file() path_or_file argument  [implemented by PR 5777, merged 2025-08-18]"
             },
             {
               "edge_type": "deployed_by",

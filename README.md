@@ -216,8 +216,6 @@ dg-ingest --resources issues --max-pages 1   # smoke test; leaves cursor mid-win
 `GITHUB_TOKEN` is required — unauthenticated access is capped at 60 req/hour, which
 cannot complete a backfill.
 
-## Tests
-
 ## Evaluation (§9)
 
 ```bash
@@ -240,15 +238,29 @@ control is the load-bearing one: F1 returns 1 path and drops to 0 when asked as 
 2025-06, while F2 returns 17 both now and as of 2026-12 — so the time filter restricts in
 one direction only, rather than being silently ignored.
 
+**Every Decision in a trace names the artifact it is credited to.** A Why-walk reaching a
+Decision across `motivated_by` stops there and never traverses `implemented_by`, so the
+only PR number on the page used to be the one inside the `thread_key` — and that key names
+the *cluster*, chosen order-independently as PR-preferring-then-lowest-number. Where a
+change took two attempts it names the abandoned one: decision 928 sits in
+`thread:30:pr-5867`, but 5867 was never merged and PR 5899 did the work. 3 of 13 Decisions
+read that way. The graph was right and the report was misleading, which is the worse
+failure of the two — it made a stale label and a stale edge indistinguishable on sight,
+and telling those apart is the whole job during adjudication. Traces now carry the current
+`implemented_by` target and its merge date, every one of them if there is more than one,
+with an unmerged or absent implementer flagged rather than omitted (issue #19).
+
 ## Tests
 
 ```bash
 psql "$DATABASE_URL" -f db/tests/0002_rubric_checks.sql             # 13 checks
 psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 18 checks
+psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
+DATABASE_URL=... python -m unittest discover -s tests               # 38 checks
 ```
 
-All SQL suites run in a transaction and roll back. The Python suite runs 11 unit tests
-standalone; setting `DATABASE_URL` adds the 7 traversal-fallback integration tests,
-which seed their own fixture because the real graph holds no inferred edges.
+All SQL suites run in a transaction and roll back. The Python suite runs 26 tests
+standalone; setting `DATABASE_URL` adds 12 integration tests — 7 for the traversal
+fallback, which seed their own fixture because the real graph holds no inferred edges,
+and 5 for the trace annotation.
