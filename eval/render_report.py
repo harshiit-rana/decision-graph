@@ -30,22 +30,54 @@ def e(text) -> str:
     return html.escape(str(text if text is not None else ""))
 
 
+# Anything the annotation flags as a broken claim. Styled as a warning rather than as
+# ordinary detail so it cannot be skimmed past.
+WARN_MARKERS = ("NOT MERGED", "no current implementer")
+
+
+def render_node(text, extra_class: str = "") -> str:
+    """Render a node label, splitting off the trailing `[...]` annotation if present.
+
+    Split from the RIGHT and only when the string closes with `]`: real flask titles
+    contain brackets (`typing.IO[bytes]`), and a left split would tear one of those in
+    half. The annotation is always appended last, so the rightmost match is the only
+    candidate that can be one.
+    """
+    label = str(text or "")
+    head, sep, tail = label.rpartition("  [")
+    note = ""
+    if sep and tail.endswith("]"):
+        body = tail[:-1]
+        cls = "node-note warn" if any(m in body for m in WARN_MARKERS) else "node-note"
+        note = f'<span class="{cls}">{e(body)}</span>'
+    else:
+        head = label
+    classes = " ".join(filter(None, ("node", extra_class)))
+    return f'<div class="{classes}">{e(head)}{note}</div>'
+
+
+def render_ref(source_ref) -> str:
+    if not source_ref:
+        return ""
+    # A bare `thread:...` is the union-find cluster id, and the PR number inside it is
+    # whichever attempt sorted first -- not necessarily the one that shipped. Labelling it
+    # stops it reading as an attribution (issue #19).
+    if str(source_ref).startswith("thread:"):
+        return f'<span class="ref"><span class="ref-kind">cluster</span>{e(source_ref)}</span>'
+    return f'<span class="ref">{e(source_ref)}</span>'
+
+
 def render_step(step: dict) -> str:
     arrow = "→" if step["direction"] == "forward" else "←"
-    ref = (
-        f'<span class="ref">{e(step["source_ref"])}</span>'
-        if step.get("source_ref")
-        else ""
-    )
     return f"""
       <div class="step">
         <span class="conn">{arrow}</span>
         <span class="etype">{e(step["edge_type"])}</span>
         <span class="tier tier-{e(step["tier"])}">{e(step["tier"])}</span>
         <span class="extractor">{e(step["extractor"])}</span>
-        {ref}
+        {render_ref(step.get("source_ref"))}
       </div>
-      <div class="node">{e(step["to_node"])}</div>"""
+      {render_node(step["to_node"])}"""
 
 
 def render_path(path: dict, index: int) -> str:
@@ -58,7 +90,7 @@ def render_path(path: dict, index: int) -> str:
         <span class="depth">{path["depth"]} hop{"s" if path["depth"] != 1 else ""}</span>
       </div>
       <div class="trace">
-        <div class="node node-start">{e(path["start"])}</div>{steps}
+        {render_node(path["start"], "node-start")}{steps}
       </div>
     </li>"""
 
@@ -358,12 +390,17 @@ ul.paths {{ list-style: none; margin: 0; padding: 0; display: flex;
   padding: .7rem .85rem; overflow-x: auto; border-radius: 2px; }}
 .node {{ white-space: nowrap; padding: .1rem 0; }}
 .node-start {{ font-weight: 700; }}
+.node-note {{ color: var(--accent); font-weight: 400; margin-left: .5rem; }}
+.node-note::before {{ content: "· "; color: var(--faint); }}
+.node-note.warn {{ color: var(--violated); font-weight: 700; }}
 .step {{ display: flex; gap: .5rem; align-items: center; padding: .12rem 0 .12rem 1.1rem;
   border-left: 1px solid var(--rule); margin-left: .35rem; white-space: nowrap; }}
 .conn {{ color: var(--faint); }}
 .etype {{ color: var(--ink); font-weight: 600; }}
 .extractor {{ color: var(--faint); font-size: .92em; }}
 .ref {{ color: var(--faint); font-size: .88em; opacity: .75; }}
+.ref-kind {{ text-transform: uppercase; letter-spacing: .06em; font-size: .82em;
+  padding: 0 .3rem; margin-right: .35rem; background: var(--rule); border-radius: 2px; }}
 
 .tier {{ font-size: .66rem; text-transform: uppercase; letter-spacing: .05em;
   padding: .08rem .4rem; border-radius: 2px; color: #fff; font-weight: 600;
@@ -417,6 +454,18 @@ button:hover {{ opacity: .9; }}
       Validation now requires a merged pull request; 7 Decisions were retracted and 13
       remain, every one with a merged implementer. Issues #16 and #17.
       Query H1 is now the regression guard for that defect.</p>
+    </div>
+
+    <div class="note">
+      <p><strong>Read the annotation, not the cluster id.</strong>
+      A Decision's <code>thread:…</code> key names its cluster, and that name is chosen
+      order-independently — PR-preferring, then lowest number — so when a change took two
+      attempts the cluster is named after the <em>abandoned</em> one. 3 of 13 Decisions
+      here are. Every Decision node in a trace now carries the pull request the graph
+      actually credits it to and that PR's merge date, so a stale label and a stale edge
+      no longer look alike. <code>NOT MERGED</code> or a missing implementer renders in
+      red; neither should appear. Issue #19 — display only, the keys themselves are
+      unchanged.</p>
     </div>
 
     <div class="note">
