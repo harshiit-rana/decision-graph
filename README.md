@@ -363,3 +363,7 @@ and 5 for the trace annotation.
 
 These run on the host and still need Python. They are for working *on* the tool; using it
 needs only Docker.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
