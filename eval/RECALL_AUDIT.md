@@ -77,7 +77,11 @@ construction. This bucket proves nothing about whether `thread_key` is a good st
 
 The real risk it was meant to probe — two threads a human would call one decision, with no
 explicit edge between them — is **not mechanically detectable at all** and remains
-unmeasured. It needs sampled human review, and this audit did not perform it.
+unmeasured. It cannot be: if an explicit edge connected the two clusters, they would already
+be one cluster. It needs sampled human review, and this audit did not perform it.
+
+**This is the largest open question about `thread_key` and it is not resolved by anything
+here.** Tracked as issue #26 so it is not read as settled once this cycle closes.
 
 ## Finding 2 — the graph is incomplete
 
@@ -125,6 +129,53 @@ residual, no misclassification found.
 
 The binding constraint on this system's usefulness is how much evidence GitHub carries in
 the first place — and, right now, how much of it we have actually fetched.
+
+## Resolution — the backfill was completed
+
+Finding 2 is fixed. `dg-ingest` was resumed and ran to completion in 167 API requests; the
+graph now matches GitHub exactly for the window.
+
+| | before | after | GitHub |
+|---|---|---|---|
+| issues | 54 | **80** | 80 |
+| pull requests | 145 | **219** | 219 |
+| commits | 213 | **381** | — |
+| nodes | 620 | **971** | — |
+| threads | 161 | **235** | — |
+| corroborated edges | 33 | **61** | — |
+| **Decisions** | 13 | **13** | — |
+
+**Resume worked as designed.** The cursor had committed exactly where it stopped, and the
+second run picked up from the watermark without re-fetching or double-writing. A third run
+was a no-op: 0 Decisions created, 13 refreshed, 6 API requests. This is the first time
+resume-as-primary-mechanism has been exercised against a genuinely interrupted backfill
+rather than a smoke test.
+
+### The completed window produced no new Decisions
+
+74 more pull requests, 26 more issues, 74 more threads — and the same 13 Decisions. The one
+apparent change is a relabelling: `thread:30:pr-6095` became `thread:30:pr-6072` when the
+new data merged the clusters. Same decision, same implementer (PR 6095), same verdict.
+
+This *strengthens* the audit's first finding rather than complicating it. Coverage was never
+being suppressed by the missing third; the added artifacts fall into exactly the same
+buckets as before — no motivating issue, or nothing merged. 13 Decisions from 235 threads
+is 5.5%, and the constraint is what flask records, not what the rubric accepts.
+
+### Completing the window exposed a real bug
+
+Ingesting the remaining third merged two clusters that already held a Decision, and
+synthesis promoted a **second** Decision node for the same decision (issue #25). Synthesis
+matched clusters on `external_id` — a snapshot of `thread_key` frozen at creation — while
+`threads.union` rewrites `thread_key` and leaves `external_id` stale.
+
+Both duplicates satisfied §5.1 individually, so neither the rubric guard nor
+`edge_current_uidx` could see it; the violated invariant — *at most one Decision per
+cluster* — was one nothing asserted. Migration 0009 repairs the duplicate, re-syncs the
+stale key, and enforces the invariant with a partial unique index.
+
+**No amount of re-running against the partial corpus would have found this.** It requires a
+merge to occur *after* a Decision exists, which is precisely what more data caused.
 
 ## Reproducing
 

@@ -3,6 +3,12 @@
 Target: `pallets/flask`, 12-month window. Adjudicated by hand against flask's real GitHub
 history. Closes Phases 1–4.
 
+> **Re-run on the complete window.** The figure was first measured on a partial corpus — the
+> backfill had stopped mid-window and was never resumed (see [`RECALL_AUDIT.md`](RECALL_AUDIT.md)).
+> The window is now complete: 80 issues and 219 pull requests, matching GitHub exactly.
+> **The 13 Decisions and all 18 verdicts are unchanged**, so no adjudication was invalidated.
+> Graph totals below are the complete-window figures.
+
 ## The figure
 
 **18 of 18 correct. No failures.**
@@ -41,7 +47,7 @@ and T2 re-runs F2 through the time filter. They confirm consistency, not correct
 | F1 | flagship | why | answered | 1 | explicit |
 | F2 | flagship | impact | answered | 17 | 11 corroborated, 6 explicit |
 | H1 | negative | why | nothing | 0 | — (regression guard for #16/#17) |
-| H2 | causal | why | answered | 1 | explicit |
+| H2 | causal | why | answered | 2 | 1 corroborated, 1 explicit |
 | H3 | causal | why | answered | 1 | corroborated |
 | H4 | causal | why | answered | 1 | explicit |
 | H5 | retrieval | why | answered | 1 | explicit |
@@ -49,7 +55,7 @@ and T2 re-runs F2 through the time filter. They confirm consistency, not correct
 | H7 | retrieval | why | nothing | 0 | — (thread retracted by #17) |
 | H8 | impact | impact | answered | 13 | 7 corroborated, 6 explicit |
 | H9 | impact | impact | answered | 10 | explicit |
-| H10 | impact | impact | answered | 5 | explicit |
+| H10 | impact | impact | answered | 6 | explicit |
 | N1 | negative | why | nothing | 0 | contract HELD |
 | N2 | negative | impact | nothing | 0 | contract HELD |
 | N3 | negative | why | nothing | 0 | contract HELD — no candidate retrieved |
@@ -91,17 +97,17 @@ degrades to nothing without it.
 
 | | |
 |---|---|
-| nodes | 620 |
-| current edges | 797 (+5 superseded, retained as history) |
-| thread clusters | 161 |
+| nodes | 971 |
+| current edges | 1,275 |
+| thread clusters | 235 |
 | **Decisions** | **13** — 3 explicit, 10 reconstructed |
 | rubric failures | 0 |
-| pull requests | 145 (27 merged in-window) |
-| issues / commits / releases | 54 / 213 / 38 |
-| corroborated edges | 33, across 6 threads |
+| pull requests | 219 (29 merged in-window) |
+| issues / commits / releases | 80 / 381 / 38 |
+| corroborated edges | 61, across 7 threads |
 | **inferred edges** | **0** |
 
-**13 Decisions from 161 threads is 8% coverage.** The system is precise and narrow by
+**13 Decisions from 235 threads is 5.5% coverage.** The system is precise and narrow by
 construction: the rubric refuses anything it cannot ground, and no significance filter was
 added because filtering for "important" decisions is exactly the model judgment §5.1
 exists to exclude. Coverage, not precision, is the binding constraint — and this
@@ -109,16 +115,21 @@ evaluation measures precision only.
 
 ## What the figure does not license
 
-- **Recall.** Nothing here measures decisions the system failed to reconstruct. 148 threads
-  produced no Decision and none were audited to establish whether they should have.
+- **Recall — partially answered since.** This evaluation measured none of it. The follow-up
+  recall audit ([`RECALL_AUDIT.md`](RECALL_AUDIT.md)) classified every non-Decision thread
+  and found no rubric bug: every rejection traces to absent evidence. What remains
+  unmeasured is whether `thread_key` splits decisions across clusters — that is not
+  mechanically detectable and is tracked as issue #26.
 - **Inference quality.** The graph holds zero inferred edges. §5.3's fallback was entered
   6 times and returned nothing every time, so its *entry condition* is exercised by flask
   while its answer-producing behaviour is verified only by the seeded fixture in
   `tests/test_traversal_fallback.py`. The LLM path remains stubbed and gated.
-- **Corroborated-tier calibration.** 33 edges across 6 of 161 threads, and only 3 queries
-  returned a corroborated path. flask merges largely without formal GitHub review — 11
-  `reviewed` edges across 145 PRs. The tier is under-exercised on this repo, which is a
-  property of the target, not evidence the rubric is right.
+- **Corroborated-tier calibration.** 61 edges across 7 of 235 threads, and only 4 queries
+  returned a corroborated path. flask merges largely without formal GitHub review — 14
+  `reviewed` edges across 219 PRs. Completing the window nearly doubled the corroborated
+  edge count while adding just one qualifying thread, which is consistent with the
+  sparsity being a property of the target rather than of the rubric — but the tier is
+  still under-exercised and this is not a calibration.
 - **Generalization.** One repository, one language, one 12-month window, one maintainer
   culture. flask's conventions — closing keywords in PR bodies, changelog in `CHANGES.rst`
   rather than release notes, no CODEOWNERS, no wiki — shaped what could be extracted at all.
@@ -130,7 +141,7 @@ Accepted deliberately rather than fixed by switching to a more convenient reposi
 1. **No CODEOWNERS** anywhere in flask. The `owns` extractor is built and no-ops; the §9
    set contains no ownership queries because it cannot.
 2. **`has_wiki: false`.** `motivated_by` resolves only to issues and PR bodies here.
-3. **Corroborated tier sparse** — 6 of 161 threads, for the reasons above.
+3. **Corroborated tier sparse** — 7 of 235 threads, for the reasons above.
 4. **Explicit-status Decisions limited to release-note citations** (3 of 13). flask's
    changelog lives in a repo file and file-content ingestion is not built.
 5. **Cross-references outside the 12-month window are skipped**, not fetched — fetching
