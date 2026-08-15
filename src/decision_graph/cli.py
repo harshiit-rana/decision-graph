@@ -526,7 +526,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     heading("Repositories")
     for r in repos:
-        print(f"  {bold(r['name'])}  {dim(f'{r['nodes']:,} artifacts')}")
+        artifacts = f"{r['nodes']:,} artifacts"
+        print(f"  {bold(r['name'])}  {dim(artifacts)}")
     # People carry no repo_node_id — a GitHub account is not owned by a repository — so
     # the per-repo counts deliberately do not sum to the total below. Say so, rather than
     # printing two numbers that look like they should reconcile and don't.
