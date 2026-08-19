@@ -39,10 +39,24 @@ Answers are written to `.env` and read by every later command, so **you never ex
 environment variable again**. Re-run `dg init` any time; add `--reconfigure` to change the
 token or repo.
 
-### The five commands
+### Just run it
+
+Run `dg` with no command and it opens an interactive menu — a banner, a live status line
+(is the database up? is the graph empty?), and a numbered list you pick from. Nothing to
+memorise; it asks for what a command would need. On a pipe or in a script it prints help
+instead, so it never blocks waiting for input.
+
+```powershell
+.\dg.ps1
+```
+
+### The commands
+
+Every menu choice maps to one of these, so you can skip the menu once you know them.
 
 | command | what it does |
 |---|---|
+| `dg` *(no command)* | open the interactive menu |
 | `dg init` | first-time setup, and safe to repeat |
 | `dg doctor` | checks Docker, `.env`, token, rate limit, database, schema, data — and says how to fix each failure |
 | `dg ingest --repo owner/name` | pulls the last 12 months into the graph |
@@ -353,10 +367,10 @@ psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  5 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 60 checks
+DATABASE_URL=... python -m unittest discover -s tests               # 68 checks
 ```
 
-All SQL suites run in a transaction and roll back. The Python suite runs 45 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 53 tests
 standalone. Setting `DATABASE_URL` adds 12 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 and 5 for the trace annotation. Docker adds 3 more that compile the whole package on the
