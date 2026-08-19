@@ -1,4 +1,4 @@
-# dg — PowerShell wrapper.
+# dg - PowerShell wrapper.
 #
 # Does only what must happen on the host: confirm Docker is running, build the image the
 # first time, and hand the arguments to the container. Every other decision lives in
@@ -29,7 +29,7 @@ if ($LASTEXITCODE -ne 0) {
 
 docker compose version 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Fail "This Docker has no 'compose' subcommand." "Update Docker Desktop — Compose v2 is required."
+    Fail "This Docker has no 'compose' subcommand." "Update Docker Desktop - Compose v2 is required."
 }
 
 # Build once. Docker caches layers, so a rebuild after a Dockerfile change is quick, but
