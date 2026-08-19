@@ -353,15 +353,19 @@ psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  5 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 57 checks
+DATABASE_URL=... python -m unittest discover -s tests               # 60 checks
 ```
 
-All SQL suites run in a transaction and roll back. The Python suite runs 42 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 45 tests
 standalone. Setting `DATABASE_URL` adds 12 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 and 5 for the trace annotation. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
+
+Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell
+5.1 decodes a BOM-less script using the system ANSI codepage, where an em-dash's last byte
+becomes a closing quote and silently truncates the string it sits in.
 
 These run on the host and still need Python. They are for working *on* the tool; using it
 needs only Docker.

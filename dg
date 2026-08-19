@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dg — macOS / Linux wrapper.
+# dg - macOS / Linux wrapper.
 #
 # Does only what must happen on the host: confirm Docker is running, build the image the
 # first time, and hand the arguments to the container. Every other decision lives in
@@ -29,7 +29,7 @@ docker info >/dev/null 2>&1 || fail \
 
 docker compose version >/dev/null 2>&1 || fail \
     "This Docker has no 'compose' subcommand." \
-    "Update Docker Desktop — Compose v2 is required."
+    "Update Docker Desktop - Compose v2 is required."
 
 # Build once. Docker caches layers, so rebuilding after a Dockerfile change is quick, but
 # doing it on every command would add seconds to every query.
