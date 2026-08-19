@@ -354,6 +354,12 @@ def cmd_init(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
+def cmd_menu(args: argparse.Namespace) -> int:
+    from . import menu
+
+    return menu.run(args)
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     heading("Environment")
     states: list[str] = []
@@ -626,6 +632,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     i.set_defaults(fn=cmd_init)
 
+    m = sub.add_parser("menu", help="interactive launcher (also shown when you run dg with no command)")
+    m.set_defaults(fn=cmd_menu)
+
     d = sub.add_parser("doctor", help="check everything is healthy and say how to fix it")
     d.set_defaults(fn=cmd_doctor)
 
@@ -657,6 +666,13 @@ def main(argv: list[str] | None = None) -> int:
     args, extra = parser.parse_known_args(argv)
 
     if not getattr(args, "command", None):
+        # A bare `dg` on a real terminal opens the interactive menu -- the front door for
+        # someone who does not yet know the commands. Piped or scripted, there is no one to
+        # answer its prompts, so fall back to help rather than block reading stdin.
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            from . import menu
+
+            return menu.run(args)
         parser.print_help()
         return 0
 
