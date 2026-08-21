@@ -10,7 +10,7 @@ RUN apt-get update \
 # Dependencies are baked into the image; the source is bind-mounted at /work. That split
 # is deliberate — deps change rarely, so the layer stays cached, while editing the code
 # takes effect immediately with no rebuild.
-RUN pip install --no-cache-dir "psycopg[binary]>=3.1" "httpx>=0.27"
+RUN pip install --no-cache-dir "psycopg[binary]>=3.1" "httpx>=0.27" "openai>=1.0"
 
 ENV PYTHONPATH=/work/src \
     PYTHONUNBUFFERED=1 \

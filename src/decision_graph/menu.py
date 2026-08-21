@@ -175,12 +175,23 @@ def _run_query(mode: str):
     return go
 
 
+def _run_ask(_ns: argparse.Namespace) -> None:
+    from .cli import cmd_ask
+
+    question = _ask("what do you want to ask? (e.g. 'Why did we change the redirect code?')")
+    if not question:
+        print(yellow("  nothing to ask"))
+        return
+    cmd_ask(argparse.Namespace(question=question), [])
+
+
 ACTIONS = [
     Action("1", "Ingest a repository", "pull the last 12 months into the graph", _run_ingest),
     Action("2", "Ask why", "why did a change happen?", _run_query("why")),
     Action("3", "Trace impact", "what does a change affect, downstream?", _run_query("impact")),
     Action("4", "Repository status", "counts, cursors, decisions", lambda ns: cmd_status(ns)),
     Action("5", "Health check", "what works, and how to fix what does not", lambda ns: cmd_doctor(ns)),
+    Action("6", "Natural Language Q&A", "ask a question in plain English (requires Nvidia API key)", _run_ask),
     Action("i", "Setup / reconfigure", "token, target repo, migrations (safe to re-run)", _run_init),
 ]
 
