@@ -60,6 +60,8 @@ SENTINELS: dict[str, str] = {
     "0007": "to_regproc('public.thread_landed') IS NOT NULL",
     "0008": "to_regproc('public.retract_unsupported_decisions') IS NOT NULL",
     "0009": "to_regclass('public.decision_thread_uidx') IS NOT NULL",
+    "0011": """EXISTS (SELECT 1 FROM pg_constraint
+                WHERE conname = 'decision_thread_key_matches_repo')""",
 }
 
 

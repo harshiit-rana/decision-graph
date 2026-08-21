@@ -71,6 +71,10 @@ def main(argv: list[str] | None = None) -> int:
         help="ISO timestamp for a point-in-time query; uses edge valid_from/valid_to",
     )
     parser.add_argument("--limit", type=int, default=3, help="candidate start nodes to try")
+    parser.add_argument(
+        "--repo", help="owner/name — restrict candidates to this repo (needed once more "
+        "than one repo is ingested into the same database)"
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -87,7 +91,16 @@ def main(argv: list[str] | None = None) -> int:
     as_of = datetime.fromisoformat(args.as_of) if args.as_of else None
     conn = db.connect(dsn)
 
-    candidates = retrieval.find_candidates(conn, args.query, limit=args.limit)
+    repo_node_id = None
+    if args.repo:
+        repo_node_id = retrieval.resolve_repo(conn, args.repo)
+        if repo_node_id is None:
+            print(f"error: repo {args.repo!r} has not been ingested", file=sys.stderr)
+            return 2
+
+    candidates = retrieval.find_candidates(
+        conn, args.query, repo_node_id=repo_node_id, limit=args.limit
+    )
     if not candidates:
         print(f"no candidate start node matched {args.query!r}", file=sys.stderr)
         return 1
