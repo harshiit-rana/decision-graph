@@ -38,11 +38,21 @@ class Candidate:
     score: float
 
 
+def resolve_repo(conn: psycopg.Connection, name: str) -> int | None:
+    """Look up a repository node's id by its `owner/name`. None if not ingested."""
+    row = conn.execute(
+        "SELECT id FROM node WHERE node_type = 'repository' AND external_id = %s",
+        (name,),
+    ).fetchone()
+    return row["id"] if row else None
+
+
 def find_candidates(
     conn: psycopg.Connection,
     query: str,
     *,
     node_types: tuple[str, ...] | None = None,
+    repo_node_id: int | None = None,
     limit: int = DEFAULT_LIMIT,
 ) -> list[Candidate]:
     """Resolve a query string to plausible start nodes, best match first.
@@ -50,6 +60,10 @@ def find_candidates(
     Tiers are tried in order and the results concatenated, so an exact title match
     always outranks a fuzzy one regardless of trigram score. `#1234` and a bare number
     resolve as identifiers, which is how an impact query normally arrives.
+
+    `repo_node_id`, when given, restricts matches to that repository (issue #28) --
+    without it, a query against a database holding more than one repo can return
+    candidates from any of them, indistinguishably.
     """
     cleaned = query.strip()
     if not cleaned:
@@ -57,6 +71,7 @@ def find_candidates(
 
     identifier = cleaned.lstrip("#")
     type_filter = "AND node_type = ANY(%(types)s)" if node_types else ""
+    repo_filter = "AND repo_node_id = %(repo)s" if repo_node_id is not None else ""
     params = {
         "q": cleaned,
         "identifier": identifier,
@@ -64,30 +79,31 @@ def find_candidates(
         "floor": FUZZY_FLOOR,
         "limit": limit,
         "types": list(node_types) if node_types else None,
+        "repo": repo_node_id,
     }
 
     sql = f"""
         WITH matches AS (
             SELECT id, node_type, external_id, title, 'exact' AS match, 1.0 AS score
             FROM node
-            WHERE lower(title) = lower(%(q)s) {type_filter}
+            WHERE lower(title) = lower(%(q)s) {type_filter} {repo_filter}
 
             UNION ALL
             SELECT id, node_type, external_id, title, 'identifier', 0.95
             FROM node
-            WHERE external_id = %(identifier)s {type_filter}
+            WHERE external_id = %(identifier)s {type_filter} {repo_filter}
 
             UNION ALL
             SELECT id, node_type, external_id, title, 'prefix', 0.75
             FROM node
-            WHERE title ILIKE %(prefix)s {type_filter}
+            WHERE title ILIKE %(prefix)s {type_filter} {repo_filter}
 
             UNION ALL
             SELECT id, node_type, external_id, title, 'fuzzy',
                    similarity(title, %(q)s)
             FROM node
             WHERE title IS NOT NULL
-              AND similarity(title, %(q)s) >= %(floor)s {type_filter}
+              AND similarity(title, %(q)s) >= %(floor)s {type_filter} {repo_filter}
         )
         SELECT DISTINCT ON (id) id, node_type, external_id, title, match, score
         FROM matches

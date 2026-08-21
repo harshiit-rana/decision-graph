@@ -13,6 +13,12 @@ The one thing it does assert is `contract` — mechanically checkable properties
 engine itself, like "must return no answer for an artifact outside the window". Those
 are statements about the code's contract, not about flask, so the runner can check them
 without grading itself.
+
+**Deliberately whole-database, not repo-scoped** (issue #28). The §9 query set is
+hand-written against `pallets/flask`, and every database this runs against today holds
+exactly that one repo, so there is nothing to scope against yet. Give this a `--repo`
+filter, matching `dg-query`'s, only when a second repo actually shares a database with
+flask -- not speculatively ahead of that.
 """
 
 from __future__ import annotations

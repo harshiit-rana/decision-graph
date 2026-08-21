@@ -40,6 +40,11 @@ log = logging.getLogger(__name__)
 # issues closed by up to five sources -- to one Decision per thread. Tie-breaks are
 # deterministic so that re-running, or ingesting in a different order, promotes the
 # same cluster to the same node.
+#
+# repo_node_id is a bind param, not a literal, because this query is shared across
+# every repo in the database (issue #28): without it, synthesizing repo B re-promotes
+# repo A's `closes` edges stamped with repo B's repo_node_id, producing a Decision whose
+# thread_key names one repo and whose repo_node_id names another.
 CANDIDATE_QUERY = """
 SELECT DISTINCT ON (src.thread_key)
        src.thread_key                       AS thread_key,
@@ -56,6 +61,7 @@ WHERE e.edge_type = 'closes'
   AND e.tag       = 'explicit'
   AND e.valid_to IS NULL
   AND dst.node_type = 'issue'
+  AND src.repo_node_id = %(repo)s
   AND src.thread_key IS NOT NULL
   AND src.thread_key = dst.thread_key
 ORDER BY src.thread_key,
@@ -102,7 +108,7 @@ def retract_unsupported(conn: psycopg.Connection) -> tuple[int, list[str]]:
 
 def synthesize(conn: psycopg.Connection, repo_node_id: int) -> SynthesisResult:
     """Promote every qualifying cluster. Idempotent."""
-    candidates = conn.execute(CANDIDATE_QUERY).fetchall()
+    candidates = conn.execute(CANDIDATE_QUERY, {"repo": repo_node_id}).fetchall()
     log.info("promotable clusters: %s", len(candidates))
 
     result = SynthesisResult()
@@ -157,6 +163,7 @@ WHERE e.edge_type = 'deployed_by'
   AND e.tag       = 'explicit'
   AND e.valid_to IS NULL
   AND rel.node_type = 'release'
+  AND art.repo_node_id = %(repo)s
   AND art.thread_key IS NOT NULL
   AND d.status = 'reconstructed'
 ORDER BY d.node_id, rel.id
@@ -169,7 +176,7 @@ def upgrade_explicit(conn: psycopg.Connection, repo_node_id: int) -> int:
     Returns the number upgraded. Idempotent: the query only selects Decisions still in
     `reconstructed` status, so a second run finds nothing to do.
     """
-    rows = conn.execute(EXPLICIT_UPGRADE_QUERY).fetchall()
+    rows = conn.execute(EXPLICIT_UPGRADE_QUERY, {"repo": repo_node_id}).fetchall()
 
     for row in rows:
         # status and source_artifact_node_id must move in ONE statement --
