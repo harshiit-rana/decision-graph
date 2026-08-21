@@ -615,6 +615,40 @@ def cmd_query(args: argparse.Namespace, extra: list[str]) -> int:
     return query.main([args.text] + list(extra))
 
 
+def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
+    from . import explain, db, retrieval, reasoning
+
+    print(f"Parsing intent for: {args.question!r}")
+    query_str, mode = explain.parse_intent(args.question)
+    print(f"-> Parsed intent: Search for {query_str!r}, Mode: {mode}\n")
+
+    dsn = os.environ.get("DATABASE_URL")
+    if not dsn:
+        print("error: DATABASE_URL is not set", file=sys.stderr)
+        return 2
+
+    conn = db.connect(dsn)
+    candidates = retrieval.find_candidates(conn, query_str, limit=1)
+    if not candidates:
+        print(f"No match found for extracted search term {query_str!r}.", file=sys.stderr)
+        return 1
+
+    c = candidates[0]
+    print(f"Found candidate: node:{c.node_id} {c.node_type} \"{c.title[:56]}\"\n")
+    print("Traversing the graph...")
+    answer = reasoning.reason(conn, c.node_id, reasoning.Mode(mode))
+
+    print("Generating explanation...\n")
+    explanation = explain.summarize_answer(args.question, answer)
+
+    print("-" * 40)
+    print(explanation)
+    print("-" * 40)
+
+    conn.close()
+    return 0
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -656,6 +690,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     q.add_argument("text", help="a title, #number, or commit sha")
     q.set_defaults(fn=cmd_query, passthrough=True)
+
+    a = sub.add_parser("ask", help="ask a natural language question about the repository")
+    a.add_argument("question", help="e.g. 'Why did we change the default redirect code?'")
+    a.set_defaults(fn=cmd_ask, passthrough=True)
 
     return p
 
