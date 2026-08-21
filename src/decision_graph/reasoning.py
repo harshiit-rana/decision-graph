@@ -51,10 +51,17 @@ class Mode(Enum):
 
 # §5.3 backward: motivation -> discussion -> decision -> implementation -> follow-ups.
 # implemented_by is included because the PRD's own description of the causal chain ends
-# at implementation, even though the prose list omits it.
+# at implementation, even though the prose list omits it. implements is the same argument
+# one hop further down the chain (issue #14): synthesis picks exactly one implementer per
+# thread via DISTINCT ON, so a thread's other commits -- the vast majority of commit nodes,
+# 213 vs 20 implemented_by edges on flask -- are never the target of implemented_by and
+# were dead ends for Why without it. commit <- implements <- PR <- implemented_by <-
+# decision is the chain that answers "why" for one of those commits; without this edge
+# backward traversal had nothing to walk from most commits at all.
 WHY_EDGES: tuple[str, ...] = (
     "motivated_by",
     "implemented_by",
+    "implements",
     "discussed_in",
     "references",
     "supersedes",
