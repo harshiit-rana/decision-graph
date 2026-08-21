@@ -139,12 +139,18 @@ class GitHubClient:
         params: dict[str, Any] | None = None,
         etag: str | None = None,
         max_pages: int | None = None,
+        items_key: str | None = None,
     ) -> Iterator[Page]:
         """Yield pages, following Link rel="next".
 
         Pages are yielded rather than accumulated so the caller can commit a cursor
         after each one. That is what makes a killed run resumable at page
         granularity instead of losing the whole window.
+
+        Most list endpoints return a bare JSON array. A few (`actions/workflows`,
+        the search endpoints) wrap it in an envelope object, e.g.
+        `{"total_count": N, "workflows": [...]}`. Pass `items_key` to unwrap those
+        instead of treating the whole envelope as a single item.
         """
         query = dict(params or {})
         query.setdefault("per_page", self.per_page)
@@ -167,7 +173,10 @@ class GitHubClient:
 
             resp.raise_for_status()
             payload = resp.json()
-            items = payload if isinstance(payload, list) else [payload]
+            if items_key is not None:
+                items = payload.get(items_key, []) if isinstance(payload, dict) else []
+            else:
+                items = payload if isinstance(payload, list) else [payload]
 
             yield Page(items=items, etag=resp.headers.get("ETag") if first else None)
 

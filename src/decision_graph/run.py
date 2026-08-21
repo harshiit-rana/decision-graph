@@ -159,7 +159,8 @@ def _ingest_resource(ctx: Context, resource: str, run_id: int, max_pages: int | 
 
     saw_any = False
 
-    for page in ctx.client.paginate(path, params, etag=etag, max_pages=max_pages):
+    items_key = _items_key(resource)
+    for page in ctx.client.paginate(path, params, etag=etag, max_pages=max_pages, items_key=items_key):
         if page.not_modified:
             log.info("%s: unchanged since last poll (304)", resource)
             return
@@ -233,6 +234,12 @@ def _resource_path(repo: str, resource: str) -> str:
     }[resource]
 
 
+def _items_key(resource: str) -> str | None:
+    # Most list endpoints return a bare array. `actions/workflows` wraps its array
+    # in an envelope object instead: {"total_count": N, "workflows": [...]}.
+    return {"workflows": "workflows"}.get(resource)
+
+
 def _report(ctx: Context, client: GitHubClient) -> None:
     log.info("")
     log.info("nodes upserted : %s", ctx.stats.nodes)
@@ -244,9 +251,7 @@ def _report(ctx: Context, client: GitHubClient) -> None:
             log.info("  %-36s %s", reason, count)
 
 
-# workflows sits behind a paginated object rather than a bare list, so it is excluded
-# from the default set until the response shape is handled.
-DEFAULT_RESOURCES = ["issues", "commits", "releases", "codeowners", "wiki"]
+DEFAULT_RESOURCES = ["issues", "commits", "releases", "codeowners", "wiki", "workflows"]
 
 
 def main(argv: list[str] | None = None) -> int:
