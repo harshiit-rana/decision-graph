@@ -60,6 +60,7 @@ SENTINELS: dict[str, str] = {
     "0007": "to_regproc('public.thread_landed') IS NOT NULL",
     "0008": "to_regproc('public.retract_unsupported_decisions') IS NOT NULL",
     "0009": "to_regclass('public.decision_thread_uidx') IS NOT NULL",
+    "0010": "pg_get_viewdef('public.v_thread_corroboration'::regclass) LIKE '%ESCAPE%'",
 }
 
 

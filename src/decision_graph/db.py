@@ -146,6 +146,7 @@ def upsert_explicit_edge(
                 COALESCE(%(observed_at)s, now()))
         ON CONFLICT (src_node_id, dst_node_id, edge_type) WHERE valid_to IS NULL
         DO UPDATE SET
+            extractor   = EXCLUDED.extractor,
             source_ref  = COALESCE(EXCLUDED.source_ref, edge.source_ref),
             observed_at = COALESCE(EXCLUDED.observed_at, edge.observed_at)
         RETURNING id, (xmax = 0) AS inserted

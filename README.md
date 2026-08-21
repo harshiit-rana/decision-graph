@@ -270,7 +270,7 @@ categories:
 
 | category | edge + extractor | independent origin |
 |---|---|---|
-| DECLARED | `closes` via `body_closing_keyword`, dst an issue | the author's prose |
+| DECLARED | `closes` via `pr_body_closing_keyword`/`commit_message_closing_keyword`, dst an issue | the author's prose |
 | STRUCTURAL | `implements` via `pr_commit_list` | GitHub's PR↔commit structure |
 | ATTESTED | `reviewed` via `pr_review` | a reviewer's action |
 | PUBLISHED | `deployed_by` via `release_notes_reference` | a maintainer's release note |

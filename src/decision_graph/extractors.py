@@ -194,7 +194,10 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
             observed_at=parse_ts(payload.get("created_at")),
         )
 
-    _link_body_refs(ctx, node_id, body, source_ref=payload.get("html_url"), observed_at=updated)
+    _link_body_refs(
+        ctx, node_id, body, source_ref=payload.get("html_url"), observed_at=updated,
+        source_type="pr_body",
+    )
     return node_id
 
 
@@ -205,6 +208,7 @@ def _link_body_refs(
     *,
     source_ref: str | None,
     observed_at: datetime | None,
+    source_type: str,
 ) -> None:
     """Turn #-references in body text into edges.
 
@@ -215,10 +219,14 @@ def _link_body_refs(
     clause 3 pass on unrelated work.
 
     A reference whose target is not in the graph yet is QUEUED, not dropped (issue #3).
+
+    `source_type` ("pr_body" or "commit_message") is folded into the extractor label so a
+    `closes` edge's provenance says which artifact it came from — a PR author's claim and a
+    committer's claim are different evidence (issue #12).
     """
     for number, edge_type, extractor in [
-        *((n, "closes", "body_closing_keyword") for n in refs.closing_refs(text)),
-        *((n, "references", "body_issue_mention") for n in refs.mentioned_refs(text)),
+        *((n, "closes", f"{source_type}_closing_keyword") for n in refs.closing_refs(text)),
+        *((n, "references", f"{source_type}_issue_mention") for n in refs.mentioned_refs(text)),
     ]:
         target = _lookup_by_number(ctx, number)
         if target is None:
@@ -371,15 +379,22 @@ def reconcile_stored_bodies(ctx: Context) -> int:
         ("commit", "SELECT node_id AS id, message AS text FROM commit"),
     )
 
+    source_type_by_label = {
+        "pull_request": "pr_body",
+        "issue": "pr_body",
+        "commit": "commit_message",
+    }
+
     queued = 0
     for label, query in sources:
+        source_type = source_type_by_label[label]
         for row in ctx.conn.execute(query).fetchall():
             text = row["text"]
             if not text:
                 continue
             for number, edge_type, extractor in [
-                *((n, "closes", "body_closing_keyword") for n in refs.closing_refs(text)),
-                *((n, "references", "body_issue_mention") for n in refs.mentioned_refs(text)),
+                *((n, "closes", f"{source_type}_closing_keyword") for n in refs.closing_refs(text)),
+                *((n, "references", f"{source_type}_issue_mention") for n in refs.mentioned_refs(text)),
             ]:
                 target = _lookup_by_number(ctx, number)
                 if target is not None:
@@ -498,7 +513,10 @@ def extract_commit(ctx: Context, payload: dict[str, Any]) -> int:
 
     # Commit messages carry the same closing keywords as PR bodies, and on flask this
     # is a primary source of issue linkage.
-    _link_body_refs(ctx, node_id, message, source_ref=sha, observed_at=committed)
+    _link_body_refs(
+        ctx, node_id, message, source_ref=sha, observed_at=committed,
+        source_type="commit_message",
+    )
 
     for parent in payload.get("parents") or []:
         parent_row = ctx.conn.execute(
