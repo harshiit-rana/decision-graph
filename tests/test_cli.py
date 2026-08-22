@@ -8,6 +8,7 @@ something it shouldn't, an error translator that stops translating.
 from __future__ import annotations
 
 import unittest
+from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -145,3 +146,76 @@ class ParserTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _row(repo, resource, phase="backfill", watermark=None):
+    return {"repo": repo, "resource": resource, "phase": phase, "steady_watermark": watermark}
+
+
+class CursorLinesTest(unittest.TestCase):
+    """`dg status` cursor rendering (issue #47).
+
+    Both defects were invisible to a reader of the output: a second repository appeared as
+    a duplicate row with no label, and `issues` reported a phase that is structurally
+    incapable of ever changing. The audit was misled by the second one, so it is worth a
+    test rather than a careful eye.
+    """
+
+    def test_single_repo_prints_no_repo_header(self) -> None:
+        lines = cli._cursor_lines([_row("pallets/flask", "issues"), _row("pallets/flask", "commits")])
+        self.assertFalse(any(line.strip() == "pallets/flask" for line in lines))
+        self.assertTrue(all(not line.startswith("    ") for line in lines if "up to" in line))
+
+    def test_two_repos_are_labelled_and_grouped(self) -> None:
+        rows = [
+            _row("a/one", "commits", phase="steady"),
+            _row("a/one", "issues"),
+            _row("b/two", "commits", phase="steady"),
+            _row("b/two", "issues"),
+        ]
+        lines = cli._cursor_lines(rows)
+        headers = [line.strip() for line in lines if line.strip() in {"a/one", "b/two"}]
+        self.assertEqual(headers, ["a/one", "b/two"])
+        # Every resource row sits under a header, indented, so no two rows read alike.
+        self.assertEqual(len([line for line in lines if "up to" in line]), 4)
+        self.assertTrue(all(line.startswith("    ") for line in lines if "up to" in line))
+
+    def test_repo_header_is_not_repeated_per_row(self) -> None:
+        rows = [_row("a/one", "commits"), _row("a/one", "issues"), _row("b/two", "issues")]
+        lines = cli._cursor_lines(rows)
+        self.assertEqual(len([line for line in lines if line.strip() == "a/one"]), 1)
+
+    def test_phase_is_shown_for_commits_only(self) -> None:
+        """COMMITTED_DESC owns `phase`; the forward-walking strategies never set it, so the
+        column would read 'backfill' forever for issues no matter what the truth was."""
+        lines = cli._cursor_lines([_row("a/one", "commits", phase="steady")])
+        self.assertIn("steady", lines[0])
+
+        lines = cli._cursor_lines([_row("a/one", "issues", phase="backfill")])
+        self.assertNotIn("backfill", lines[0])
+
+    def test_a_stuck_backfill_phase_on_issues_is_never_displayed(self) -> None:
+        """The exact state that misled the recall audit: phase says backfill, the watermark
+        says today. Only the watermark should reach the screen."""
+        rows = [_row("a/one", "issues", phase="backfill", watermark=datetime(2026, 8, 22))]
+        line = cli._cursor_lines(rows)[0]
+        self.assertIn("2026-08-22", line)
+        self.assertNotIn("backfill", line)
+
+    def test_missing_watermark_renders_as_a_dash_not_none(self) -> None:
+        line = cli._cursor_lines([_row("a/one", "releases", watermark=None)])[0]
+        self.assertIn("—", line)
+        self.assertNotIn("None", line)
+
+    def test_the_single_repo_hint_does_not_mention_target_repo_scoping(self) -> None:
+        """That caveat only makes sense when a repo the user can see will not advance."""
+        one = "\n".join(cli._cursor_lines([_row("a/one", "issues")]))
+        two = "\n".join(cli._cursor_lines([_row("a/one", "issues"), _row("b/two", "issues")]))
+        self.assertNotIn("TARGET_REPO", one)
+        self.assertIn("TARGET_REPO", two)
+
+    def test_the_phase_footnote_appears_only_when_a_phase_was_printed(self) -> None:
+        without = "\n".join(cli._cursor_lines([_row("a/one", "issues")]))
+        with_commits = "\n".join(cli._cursor_lines([_row("a/one", "commits", phase="steady")]))
+        self.assertNotIn("backfill/steady applies", without)
+        self.assertIn("backfill/steady applies", with_commits)

@@ -500,6 +500,51 @@ def _verdict(states: list[str]) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _cursor_lines(cursors: list) -> list[str]:
+    """Render the ingestion_cursor rows. Split out from cmd_status so the two things
+    that were wrong here can be tested without a database (issue #47).
+
+    Grouped by repository, because ordering by resource alone turns two ingested repos
+    into pairs of identically-labelled rows with different watermarks, and nothing on
+    screen says which row is which. The repo header is omitted for a single repository:
+    the Repositories section above has already named it, and repeating it there would be
+    noise for the common case.
+
+    `phase` is printed for commits alone. It is owned by COMMITTED_DESC, the only strategy
+    that pages backwards and therefore the only one with a transition to make; for every
+    other resource the column holds its 'backfill' default forever, whatever the true
+    state is. Printing it there does not merely fail to inform, it misleads — which is how
+    the recall audit came to cite `issues phase=backfill` as evidence of a stalled backfill
+    that had in fact completed.
+    """
+    from .cursors import RESOURCE_STRATEGY, Strategy
+
+    lines: list[str] = []
+    multi = len({c["repo"] for c in cursors}) > 1
+    shown_repo = None
+    phased = False
+    for c in cursors:
+        if multi and c["repo"] != shown_repo:
+            lines.append(f"  {bold(c['repo'])}")
+            shown_repo = c["repo"]
+        indent = "    " if multi else "  "
+        wm = f"{c['steady_watermark']:%Y-%m-%d}" if c["steady_watermark"] else "—"
+        if RESOURCE_STRATEGY.get(c["resource"]) is Strategy.COMMITTED_DESC:
+            phase, phased = c["phase"], True
+        else:
+            phase = ""
+        lines.append(f"{indent}{c['resource']:<10} {phase:<9} up to {wm}")
+
+    lines.append(dim("\n  A watermark short of today means there is more to fetch — re-run"))
+    lines.append(dim("  `dg ingest` to continue from exactly there."))
+    if multi:
+        lines.append(dim("  `dg ingest` reads TARGET_REPO, so it advances that repository only."))
+    if phased:
+        lines.append(dim("  backfill/steady applies to commits alone: they page backwards and"))
+        lines.append(dim("  have a floor to reach. The rest walk forward from the watermark."))
+    return lines
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     try:
         conn = _connect()
@@ -571,15 +616,17 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(dim("  no runs recorded"))
 
     cursors = conn.execute(
-        "SELECT resource, phase, steady_watermark FROM ingestion_cursor ORDER BY resource"
+        """
+        SELECT r.external_id AS repo, c.resource, c.phase, c.steady_watermark
+        FROM ingestion_cursor c
+        JOIN node r ON r.id = c.repo_node_id
+        ORDER BY r.external_id, c.resource
+        """
     ).fetchall()
     if cursors:
         print()
-        for c in cursors:
-            wm = f"{c['steady_watermark']:%Y-%m-%d}" if c["steady_watermark"] else "—"
-            print(f"  {c['resource']:<10} {c['phase']:<9} up to {wm}")
-        print(dim("\n  A watermark short of today means there is more to fetch — re-run"))
-        print(dim("  `dg ingest` to continue from exactly there."))
+        for line in _cursor_lines(cursors):
+            print(line)
 
     decisions = conn.execute("SELECT count(*) AS n FROM decision").fetchone()["n"]
     threads = conn.execute(
