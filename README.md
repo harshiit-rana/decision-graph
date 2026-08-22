@@ -335,10 +335,12 @@ for the figure with its disclosures.** Read them before quoting the number. 8 of
 correct outcomes are the system returning nothing, so a degenerate engine that always
 returned nothing would score 8/18 on this set; the query set was curated by the person who
 built the system; and the graph holds zero inferred edges, so nothing here measures
-inference. 13 Decisions out of 233 threads — coverage, not precision, is the binding limit,
+inference. 15 Decisions out of 231 threads — coverage, not precision, is the binding limit,
 and this measures precision only. That ratio is the completed window, re-measured (#46): the
-corpus grew by 45% after this figure was first taken and produced no fourteenth Decision, and
-no residual-bucket rubric bug either.
+corpus grew by 45% after this figure was first taken and produced no new Decision at all. The
+fourteenth and fifteenth came instead from a parser fix (#50) — two merged PRs named their
+motivating issue by URL rather than by `#N`, and the reference was being dropped. The 18
+adjudicated outcomes predate both and are unchanged by them.
 
 Most usefully: **neither defect found during the evaluation cycle was caught by the
 evaluation set.** Both #16/#17 and #19 were found by a human comparing a trace to GitHub,

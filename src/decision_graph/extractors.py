@@ -225,8 +225,14 @@ def _link_body_refs(
     committer's claim are different evidence (issue #12).
     """
     for number, edge_type, extractor in [
-        *((n, "closes", f"{source_type}_closing_keyword") for n in refs.closing_refs(text)),
-        *((n, "references", f"{source_type}_issue_mention") for n in refs.mentioned_refs(text)),
+        *(
+            (n, "closes", f"{source_type}_closing_keyword")
+            for n in refs.closing_refs(text, ctx.settings.target_repo)
+        ),
+        *(
+            (n, "references", f"{source_type}_issue_mention")
+            for n in refs.mentioned_refs(text, ctx.settings.target_repo)
+        ),
     ]:
         target = _lookup_by_number(ctx, number)
         if target is None:
@@ -393,8 +399,14 @@ def reconcile_stored_bodies(ctx: Context) -> int:
             if not text:
                 continue
             for number, edge_type, extractor in [
-                *((n, "closes", f"{source_type}_closing_keyword") for n in refs.closing_refs(text)),
-                *((n, "references", f"{source_type}_issue_mention") for n in refs.mentioned_refs(text)),
+                *(
+                    (n, "closes", f"{source_type}_closing_keyword")
+                    for n in refs.closing_refs(text, ctx.settings.target_repo)
+                ),
+                *(
+                    (n, "references", f"{source_type}_issue_mention")
+                    for n in refs.mentioned_refs(text, ctx.settings.target_repo)
+                ),
             ]:
                 target = _lookup_by_number(ctx, number)
                 if target is not None:
@@ -591,7 +603,8 @@ def extract_release(ctx: Context, payload: dict[str, Any]) -> int:
     # Release notes referencing a PR are a `deployed_by` signal: this is where the
     # change reached users. Release notes are also the classic source of an *explicit*
     # Decision in §5.1 — but creating that node is Phase 2+, not here.
-    for number in refs.mentioned_refs(body) | refs.closing_refs(body):
+    repo = ctx.settings.target_repo
+    for number in refs.mentioned_refs(body, repo) | refs.closing_refs(body, repo):
         target = _lookup_by_number(ctx, number)
         if target is None:
             ctx.stats.note_skip("release_ref_target_not_ingested")

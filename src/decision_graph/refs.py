@@ -31,6 +31,27 @@ CLOSING_KEYWORDS = r"clos(?:e|es|ed)|fix(?:|es|ed)|resolv(?:e|es|ed)"
 CLOSES_RE = re.compile(rf"\b(?:{CLOSING_KEYWORDS})\b\s*:?\s+#(\d+)", re.IGNORECASE)
 ISSUE_REF_RE = re.compile(r"(?<![\w/])#(\d+)\b")
 
+# GitHub honours `fixes https://github.com/owner/repo/issues/N` exactly as it honours
+# `fixes #N` -- it closes the issue on merge either way. The `\s+#` mechanism above
+# rejects a docs anchor and this alike, because neither has whitespace before the
+# digits: right for the anchor, wrong for a real reference. Two Decisions were lost to
+# that (issue #50).
+#
+# The owner/repo is captured rather than skipped, because the URL carries its own and it
+# is not always the repo being ingested -- a body reading `.../pallets/werkzeug/pull/3219`
+# would otherwise resolve 3219 against THIS repo's numbers and invent an edge to an
+# unrelated issue. The caller supplies the repo to compare against; a caller that does
+# not know it gets the old behaviour, which is why `repo` defaults to None and not to a
+# guess.
+#
+# `/issues/` only. A `/pull/` URL is a PR closing a PR, which is not the
+# Motivation-Implementation shape clause 3 is about.
+CLOSES_URL_RE = re.compile(
+    rf"\b(?:{CLOSING_KEYWORDS})\b\s*:?\s+https?://(?:www\.)?github\.com/"
+    r"([\w.-]+/[\w.-]+)/issues/(\d+)\b",
+    re.IGNORECASE,
+)
+
 # Only full 40-character SHAs. Abbreviated SHAs are indistinguishable from ordinary
 # hex strings in prose and produced false edges in early testing.
 SHA_RE = re.compile(r"\b([0-9a-f]{40})\b")
@@ -39,18 +60,37 @@ SHA_RE = re.compile(r"\b([0-9a-f]{40})\b")
 COAUTHOR_RE = re.compile(r"^Co-authored-by:\s*(.+?)\s*<(.+?)>\s*$", re.IGNORECASE | re.MULTILINE)
 
 
-def closing_refs(text: str | None) -> set[int]:
-    """Issue/PR numbers this text explicitly closes."""
+def closing_refs(text: str | None, repo: str | None = None) -> set[int]:
+    """Issue/PR numbers this text explicitly closes.
+
+    `repo` is the "owner/name" being ingested. Pass it to also honour the full-URL form,
+    `fixes https://github.com/owner/name/issues/N`, which GitHub treats as closing. Slugs
+    are compared case-insensitively because GitHub's are, and a URL naming a DIFFERENT
+    repository is ignored: its numbers are not this repository's numbers.
+    """
     if not text:
         return set()
-    return {int(m) for m in CLOSES_RE.findall(text)}
+    found = {int(m) for m in CLOSES_RE.findall(text)}
+    if repo:
+        target = repo.casefold()
+        found |= {
+            int(number)
+            for slug, number in CLOSES_URL_RE.findall(text)
+            if slug.casefold() == target
+        }
+    return found
 
 
-def mentioned_refs(text: str | None) -> set[int]:
-    """Issue/PR numbers mentioned but not closed."""
+def mentioned_refs(text: str | None, repo: str | None = None) -> set[int]:
+    """Issue/PR numbers mentioned but not closed.
+
+    Takes `repo` for the same reason: a number that is a *closing* reference in URL form
+    must not also be reported as a bare mention, or one artifact would earn both a `closes`
+    and a `references` edge and the weaker one would muddy its provenance.
+    """
     if not text:
         return set()
-    return {int(m) for m in ISSUE_REF_RE.findall(text)} - closing_refs(text)
+    return {int(m) for m in ISSUE_REF_RE.findall(text)} - closing_refs(text, repo)
 
 
 def commit_refs(text: str | None) -> set[str]:
