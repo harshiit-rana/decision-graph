@@ -47,15 +47,71 @@ class TestClosingRefs(unittest.TestCase):
     def test_closing_keyword_rejects_url_fragments(self) -> None:
         """CLOSES_RE has no lookbehind; it relies on `\\s+` making whitespace before '#'
         mandatory. Relaxing that to `\\s*` would silently admit URL fragments, which
-        could then upgrade the wrong Decision to explicit status via a release note."""
+        could then upgrade the wrong Decision to explicit status via a release note.
+
+        This used to also pin `fixes https://github.com/pallets/flask/issues/5448` as
+        rejected. That was wrong -- GitHub closes an issue written that way -- and it cost
+        two Decisions before anyone noticed (#50). The docs-anchor case below is the one
+        this mechanism is genuinely for; the GitHub-URL case moved to its own tests.
+        """
         for text in (
             "Changes: https://flask.palletsprojects.com/en/3.0.x/changes/#5448",
-            "fixes https://github.com/pallets/flask/issues/5448",
             "closes flask#5448",
             "resolved by commit_abc#123",
         ):
             with self.subTest(text=text):
-                self.assertEqual(refs.closing_refs(text), set())
+                self.assertEqual(refs.closing_refs(text, "pallets/flask"), set())
+
+    def test_closing_reference_as_a_full_github_url(self) -> None:
+        """The form that cost PR 5736 -> issue 5729 and PR 6096 -> issue 6093 (#50)."""
+        self.assertEqual(
+            refs.closing_refs(
+                "fixes https://github.com/pallets/flask/issues/5729", "pallets/flask"
+            ),
+            {5729},
+        )
+
+    def test_github_url_slug_is_matched_case_insensitively(self) -> None:
+        """GitHub slugs are case-insensitive, so `PALLETS/Flask` is the same repository."""
+        self.assertEqual(
+            refs.closing_refs(
+                "Fixes https://github.com/PALLETS/Flask/issues/6093", "pallets/flask"
+            ),
+            {6093},
+        )
+
+    def test_another_repositorys_url_is_not_resolved_against_our_numbers(self) -> None:
+        """The trap in the fix. werkzeug#3219 is not flask#3219, and reading it as one
+        would invent an edge to whatever unrelated issue holds that number here."""
+        for text in (
+            "fixes https://github.com/pallets/werkzeug/issues/3219",
+            "Added `client.query` in https://github.com/pallets/werkzeug/pull/3219",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(refs.closing_refs(text, "pallets/flask"), set())
+
+    def test_pull_urls_are_not_closing_references(self) -> None:
+        """A PR closing a PR is not the Motivation-Implementation shape clause 3 is about."""
+        self.assertEqual(
+            refs.closing_refs(
+                "fixes https://github.com/pallets/flask/pull/5729", "pallets/flask"
+            ),
+            set(),
+        )
+
+    def test_url_form_needs_a_repo_to_compare_against(self) -> None:
+        """A caller that does not know its repo keeps the old behaviour rather than
+        guessing that the URL's slug must be the right one."""
+        self.assertEqual(
+            refs.closing_refs("fixes https://github.com/pallets/flask/issues/5729"),
+            set(),
+        )
+
+    def test_a_url_closing_reference_is_not_also_a_bare_mention(self) -> None:
+        """Otherwise the same artifact earns both `closes` and `references`, and the
+        weaker edge muddies the provenance of the stronger one."""
+        text = "fixes https://github.com/pallets/flask/issues/5729"
+        self.assertEqual(refs.mentioned_refs(text, "pallets/flask"), set())
 
     def test_closing_keyword_still_matches_real_forms(self) -> None:
         # The guard must not cost recall on the forms that actually occur in flask.

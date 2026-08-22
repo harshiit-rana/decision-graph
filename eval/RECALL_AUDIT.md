@@ -60,7 +60,14 @@ what #16/#17 was built to reject.
 
 The other three (5729, 5836, 5863) were closed **`completed`**, which looked like a genuine
 recall loss: perhaps the fix landed as a direct commit and `thread_landed()` only checks
-`pull_request.merged_at`. That hypothesis was wrong. Each of those threads' commits was
+`pull_request.merged_at`. That hypothesis was wrong.
+
+> **5729 was a real recall loss after all, for a different reason (#50).** The fix is PR
+> 5736 — merged, in the graph, and saying `fixes https://github.com/pallets/flask/issues/5729`
+> in its own body, in a URL form the reference parser dropped. The commit-ancestry check
+> below is sound but was asking about the wrong thread: it tested whether `thread:1:pr-5735`
+> reached `main`, when the landing was in `thread:1:pr-5736` all along. 5836 and 5863 are
+> unaffected — nothing in their bodies points anywhere, and they remain correct refusals. Each of those threads' commits was
 compared against `main`:
 
 ```
@@ -132,8 +139,8 @@ the landing gate firing on work that demonstrably never reached `main`. No rubri
 residual, no misclassification found.
 
 > Those three figures are the partial corpus. On the completed window the same sentence reads
-> **207 of 220** and **13** — and the conclusion is unchanged. See *Re-measured on the
-> completed corpus*.
+> **205 of 216** and **11**, with 15 Decisions rather than 13 — and the conclusion is
+> unchanged. See *Re-measured on the completed corpus*.
 
 The binding constraint on this system's usefulness is how much evidence GitHub carries in
 the first place — and, right now, how much of it we have actually fetched.
@@ -238,6 +245,41 @@ should be re-checked, not assumed". Re-checked: **7 corroborating threads of 233
 of 161 before. A third more corpus bought one more. Proportionally it got *sparser* — 3.7% to
 3.0% — so flask's review culture remains the explanation, and the partial corpus was not
 hiding a denser tier.
+
+### The census that followed found two Decisions the parser was dropping
+
+Sharpening the frame for #26 — of bucket A's 155 threads, only **16** contain a merged pull
+request, and the rest fail the landing gate whatever their motivation — made the population
+small enough to read by hand. Two of the 16 turned out to name their motivating issue
+explicitly, as a full GitHub URL rather than `#N`:
+
+| merged PR | body | issue | issue's thread was |
+|---|---|---|---|
+| 5736 | `fixes .../issues/5729` | 5729 | bucket B, "nothing merged" |
+| 6096 | `Fixes .../issues/6093` | 6093 | bucket B, "nothing merged" |
+
+`CLOSES_RE` requires whitespace before `#`, which rejects a docs anchor correctly and a real
+GitHub closing URL as collateral (#50). Widening it and re-running `dg ingest --reconcile`
+unioned each pair into one cluster with a motivating issue and a merged implementation, and
+synthesis promoted both:
+
+| | before the fix | after |
+|---|---|---|
+| Decisions | 13 | **15** |
+| threads | 233 | 231 |
+| A — no issue in the thread | 155 | **153** |
+| B — in-thread `closes`, nothing merged | 13 | **11** |
+| D — singleton issue | 52 | 52 |
+| C / E / F | 0 | 0 |
+
+Both new Decisions pass all three rubric clauses, each motivated by its issue and implemented
+by the merged PR that did the work.
+
+**Neither the original audit nor the re-measurement above could have found this.** Both
+classify a thread by what edges it has; this was a thread that *should* have had an edge, and
+no bucket is defined by an absence that nothing recorded. It took reading the bodies of a
+small enough population by hand — which is what #26 asked for, applied to a frame narrow
+enough to be a census rather than a sample.
 
 ### What this still does not establish
 
