@@ -153,9 +153,13 @@ def _ingest_resource(ctx: Context, resource: str, run_id: int, max_pages: int | 
     path = _resource_path(ctx.settings.target_repo, resource)
     etag = cursor.last_etag if cursor.strategy is Strategy.FULL else None
 
-    log.info(
-        "%s: phase=%s params=%s", resource, cursor.phase, {k: v for k, v in params.items()}
-    )
+    # `phase` is printed only by the strategy that owns it. For everything else it is NULL
+    # (migration 0012) and saying so on every run would restate a non-fact — the same
+    # misreading `dg status` used to invite (#47).
+    if cursor.phase is not None:
+        log.info("%s: phase=%s params=%s", resource, cursor.phase, dict(params))
+    else:
+        log.info("%s: params=%s", resource, dict(params))
 
     saw_any = False
 

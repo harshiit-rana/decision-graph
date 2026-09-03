@@ -206,6 +206,12 @@ Three cursor strategies, because the endpoints genuinely differ:
 `window_floor` is pinned on first contact rather than recomputed, so resuming a backfill
 days later cannot move the floor forward and leave an unfetched hole mid-window.
 
+`phase` belongs to `COMMITTED_DESC` alone and is NULL for the other two strategies, because
+a forward walker has no floor to reach and so no transition to record. It used to sit on
+`backfill` forever for issues and pulls, which nothing could ever retract — and the recall
+audit read exactly that as proof of a stalled ingestion (#47, migration 0012). Read
+`steady_watermark` for progress; it is the field that moves.
+
 **Resume has now been exercised for real.** The first backfill stopped a third of the way
 short and sat that way through the whole §9 cycle — the graph held 54 of 80 issues and 145
 of 219 PRs without anything noticing. Re-running picked up from the committed watermark and
