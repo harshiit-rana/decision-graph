@@ -376,16 +376,24 @@ psql "$DATABASE_URL" -f db/tests/0002_rubric_checks.sql             # 13 checks
 psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
-psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  5 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 68 checks
+psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
+DATABASE_URL=... python -m unittest discover -s tests               # 94 tests
 ```
 
-All SQL suites run in a transaction and roll back. The Python suite runs 53 tests
+`.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
+16 on both ends of the supported Python range. That is recent: the 0009 suite had been
+aborting on its first statement since migration 0011 added a CHECK its fixture violated,
+and all five of its checks were silently dead until something finally ran them (#55).
+
+All SQL suites run in a transaction and roll back. The Python suite runs 79 tests
 standalone. Setting `DATABASE_URL` adds 12 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 and 5 for the trace annotation. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
+
+A run without those is still reported as `OK`, with 15 of the 94 quietly skipped — so a
+local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell
 5.1 decodes a BOM-less script using the system ANSI codepage, where an em-dash's last byte
