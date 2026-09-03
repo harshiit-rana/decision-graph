@@ -511,11 +511,12 @@ def _cursor_lines(cursors: list) -> list[str]:
     noise for the common case.
 
     `phase` is printed for commits alone. It is owned by COMMITTED_DESC, the only strategy
-    that pages backwards and therefore the only one with a transition to make; for every
-    other resource the column holds its 'backfill' default forever, whatever the true
-    state is. Printing it there does not merely fail to inform, it misleads — which is how
-    the recall audit came to cite `issues phase=backfill` as evidence of a stalled backfill
-    that had in fact completed.
+    that pages backwards and therefore the only one with a transition to make. It used to
+    hold its 'backfill' default forever for every other resource, whatever the true state
+    was — which does not merely fail to inform, it misleads, and is how the recall audit
+    came to cite `issues phase=backfill` as evidence of a stalled backfill that had in fact
+    completed. Migration 0012 stores NULL there instead, so the suppression below and the
+    stored value now agree rather than the display having to paper over the data.
     """
     from .cursors import RESOURCE_STRATEGY, Strategy
 
@@ -529,7 +530,11 @@ def _cursor_lines(cursors: list) -> list[str]:
             shown_repo = c["repo"]
         indent = "    " if multi else "  "
         wm = f"{c['steady_watermark']:%Y-%m-%d}" if c["steady_watermark"] else "—"
-        if RESOURCE_STRATEGY.get(c["resource"]) is Strategy.COMMITTED_DESC:
+        # Two gates on purpose. RESOURCE_STRATEGY is the authority; NULL is what 0012
+        # writes for the rest. Either would do today, but keeping both means neither a
+        # database still short of 0012 nor a future strategy can put a meaningless phase
+        # back on screen.
+        if RESOURCE_STRATEGY.get(c["resource"]) is Strategy.COMMITTED_DESC and c["phase"]:
             phase, phased = c["phase"], True
         else:
             phase = ""
