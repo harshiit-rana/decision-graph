@@ -52,9 +52,36 @@ CLOSES_URL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Pull request templates ship closing-keyword scaffolding commented out -- flask's PR 6106
+# is `<!-- Fixes #11 -->` above a docs typo fix, and issue 11 is from 2010. GitHub does not
+# honour a closing keyword inside an HTML comment: issue 11's timeline has five events and
+# not one references 6106. We did, and queued a `closes` that only had no effect because the
+# target sits outside the ingestion window (issue #59).
+#
+# Text a reader cannot see is not a claim the author made. Stripping is safe in a way that
+# guessing at cross-repo numbers is not: this is not inferring what was meant, it is
+# declining to read what was hidden.
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+
 # Only full 40-character SHAs. Abbreviated SHAs are indistinguishable from ordinary
 # hex strings in prose and produced false edges in early testing.
 SHA_RE = re.compile(r"\b([0-9a-f]{40})\b")
+
+
+def visible(text: str) -> str:
+    """Body text with HTML comments removed.
+
+    Deleted rather than replaced with a space, which is the less obvious of the two and
+    was got wrong first. A space would make `closes<!-- x -->#11` read as `closes #11`
+    and match -- manufacturing the whitespace that CLOSES_RE deliberately requires, and so
+    relaxing across a comment boundary exactly the `\\s+` guard documented above as the
+    thing standing between this parser and the URL-fragment false positives. Deleting also
+    reproduces GitHub, which sees `closes#11` there and closes nothing.
+
+    The mirror-image hazard -- a comment mid-word, `clos<!-- x -->es #11`, fusing into a
+    match -- is real but needs a comment inside a word, which no template or human writes.
+    """
+    return HTML_COMMENT_RE.sub("", text)
 
 # "Co-authored-by: Name <email>" — an explicit authorship signal git itself defines.
 COAUTHOR_RE = re.compile(r"^Co-authored-by:\s*(.+?)\s*<(.+?)>\s*$", re.IGNORECASE | re.MULTILINE)
@@ -70,6 +97,7 @@ def closing_refs(text: str | None, repo: str | None = None) -> set[int]:
     """
     if not text:
         return set()
+    text = visible(text)
     found = {int(m) for m in CLOSES_RE.findall(text)}
     if repo:
         target = repo.casefold()
@@ -90,7 +118,9 @@ def mentioned_refs(text: str | None, repo: str | None = None) -> set[int]:
     """
     if not text:
         return set()
-    return {int(m) for m in ISSUE_REF_RE.findall(text)} - closing_refs(text, repo)
+    # `closing_refs` strips comments itself; strip here too so a `#N` that appears ONLY
+    # inside one does not survive as a bare mention after the closing set fails to cancel it.
+    return {int(m) for m in ISSUE_REF_RE.findall(visible(text))} - closing_refs(text, repo)
 
 
 def commit_refs(text: str | None) -> set[str]:
