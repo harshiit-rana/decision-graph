@@ -123,6 +123,62 @@ class TestClosingRefs(unittest.TestCase):
         self.assertEqual(refs.mentioned_refs(""), set())
 
 
+class TestHtmlComments(unittest.TestCase):
+    """Closing keywords inside `<!-- -->` are template scaffolding, not claims (#59).
+
+    GitHub does not honour them. flask PR 6106 is `<!-- Fixes #11 -->` above a docs typo
+    fix, and issue 11's timeline carries no reference to 6106 at all — while we queued a
+    `closes`, which would have become a false edge had issue 11 been inside the window.
+    """
+
+    #: PR 6106's body, verbatim.
+    TEMPLATE_BOILERPLATE = (
+        "<!-- Fixes #11 -->\n\n## Summary\nFix typo in docs\n\n"
+        "## Changes\n- Formatting update in README.md\n\n## Testing\nN/A\n"
+    )
+
+    def test_the_flask_6106_body_yields_no_closing_reference(self) -> None:
+        self.assertEqual(refs.closing_refs(self.TEMPLATE_BOILERPLATE, "pallets/flask"), set())
+
+    def test_it_is_not_demoted_to_a_bare_mention_either(self) -> None:
+        """Stripping only the closing set would leave `#11` looking like a `references`
+        edge — a weaker false edge is still a false edge."""
+        self.assertEqual(refs.mentioned_refs(self.TEMPLATE_BOILERPLATE, "pallets/flask"), set())
+
+    def test_a_commented_url_reference_is_ignored_too(self) -> None:
+        text = "<!-- fixes https://github.com/pallets/flask/issues/5729 -->"
+        self.assertEqual(refs.closing_refs(text, "pallets/flask"), set())
+
+    def test_visible_text_around_a_comment_is_still_read(self) -> None:
+        """The comment must be removed, not the body. This is the case that would make the
+        fix a recall regression rather than a precision win."""
+        text = "Fixes #5776\n<!-- template note: closes #11 -->\nAlso see #5825"
+        self.assertEqual(refs.closing_refs(text, "pallets/flask"), {5776})
+        self.assertEqual(refs.mentioned_refs(text, "pallets/flask"), {5825})
+
+    def test_a_multiline_comment_is_stripped_whole(self) -> None:
+        text = "<!--\nFixes #11\nCloses #12\n-->\nFixes #5776"
+        self.assertEqual(refs.closing_refs(text, "pallets/flask"), {5776})
+
+    def test_two_comments_do_not_swallow_the_text_between_them(self) -> None:
+        """A greedy `.*` would treat the first `<!--` and the last `-->` as one comment and
+        eat the real reference in the middle."""
+        text = "<!-- a --> Fixes #5776 <!-- b -->"
+        self.assertEqual(refs.closing_refs(text, "pallets/flask"), {5776})
+
+    def test_a_comment_does_not_supply_the_whitespace_closes_re_requires(self) -> None:
+        """The comment is deleted, not replaced with a space. Replacing would turn this
+        into `closes #11` and match — relaxing across a comment boundary the mandatory
+        `\\s+` that keeps CLOSES_RE off URL fragments. GitHub sees `closes#11` here and
+        closes nothing, so neither should we."""
+        self.assertEqual(refs.closing_refs("closes<!-- x -->#11", "pallets/flask"), set())
+
+    def test_an_unclosed_comment_marker_is_not_treated_as_a_comment(self) -> None:
+        """`<!--` with no terminator is malformed; dropping the rest of the body on it
+        would lose real references to a stray angle bracket."""
+        self.assertEqual(refs.closing_refs("<!-- oops\nFixes #5776", "pallets/flask"), {5776})
+
+
 class TestCommitRefs(unittest.TestCase):
     def test_requires_full_forty_char_sha(self) -> None:
         full = "a" * 40
