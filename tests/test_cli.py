@@ -144,10 +144,6 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(extra, ["--bogus"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 def _row(repo, resource, phase="backfill", watermark=None):
     return {"repo": repo, "resource": resource, "phase": phase, "steady_watermark": watermark}
 
@@ -219,3 +215,23 @@ class CursorLinesTest(unittest.TestCase):
         with_commits = "\n".join(cli._cursor_lines([_row("a/one", "commits", phase="steady")]))
         self.assertNotIn("backfill/steady applies", without)
         self.assertIn("backfill/steady applies", with_commits)
+
+    def test_a_null_phase_prints_nothing_and_raises_no_footnote(self) -> None:
+        """What migration 0012 actually stores for a forward walker. The row must still
+        render its watermark, and `None` must never reach the screen."""
+        rows = [_row("a/one", "issues", phase=None, watermark=datetime(2026, 8, 22))]
+        lines = cli._cursor_lines(rows)
+        self.assertIn("2026-08-22", lines[0])
+        self.assertNotIn("None", lines[0])
+        self.assertNotIn("backfill/steady applies", "\n".join(lines))
+
+    def test_a_null_phase_on_commits_is_not_printed_as_none(self) -> None:
+        """Belt and braces: a commits row whose phase is somehow NULL — a database short of
+        0012's repair, or a hand-edited row — must degrade to blank, not to the string
+        'None' padded into the column."""
+        line = cli._cursor_lines([_row("a/one", "commits", phase=None)])[0]
+        self.assertNotIn("None", line)
+
+
+if __name__ == "__main__":
+    unittest.main()

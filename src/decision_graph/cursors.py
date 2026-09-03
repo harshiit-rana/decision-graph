@@ -22,6 +22,12 @@ Three strategies, because the GitHub endpoints genuinely differ:
                   Small, unwindowed, refreshed whole each run; ETag makes the
                   no-change case cost one request.
 
+Because only one of the three has a phase to be in, `phase` is NULL for the other two
+rather than parked on a default. It used to hold 'backfill' forever for issues and pulls,
+which nothing could retract and which the recall audit reasonably misread as a stalled
+ingestion (#47, migration 0012). A column that cannot change is worse than an absent one:
+it invites exactly that inference.
+
 The window floor is persisted on first contact rather than recomputed per run. If it
 were recomputed, resuming a backfill a week later would move the floor forward and
 leave an unfetched hole in the middle of the window that nothing would ever revisit.
@@ -62,7 +68,7 @@ RESOURCE_STRATEGY: dict[str, Strategy] = {
 class Cursor:
     repo_node_id: int
     resource: str
-    phase: str
+    phase: str | None
     window_floor: datetime | None
     backfill_cursor: datetime | None
     steady_watermark: datetime | None
@@ -75,6 +81,21 @@ class Cursor:
     @property
     def is_backfilling(self) -> bool:
         return self.phase == "backfill"
+
+
+def initial_phase(resource: str) -> str | None:
+    """The phase a cursor is born in, or None where the field does not apply.
+
+    Only COMMITTED_DESC has a backfill to be in the middle of: it pages backwards and has a
+    floor to reach, so 'backfill' -> 'steady' is a transition it genuinely makes. UPDATED_ASC
+    arrives in steady state and never leaves, because its backfill and its steady poll are
+    the same forward walk seeded differently; FULL has no window at all.
+
+    Storing 'backfill' for those was a claim nothing could ever retract — the audit read it
+    as a stalled ingestion (#47). NULL is the only value that declines to make the claim;
+    'steady' would assert a floor had been reached, which is equally untrue.
+    """
+    return "backfill" if RESOURCE_STRATEGY[resource] is Strategy.COMMITTED_DESC else None
 
 
 def load(
@@ -95,8 +116,7 @@ def load(
             repo_node_id,
             resource,
             floor,
-            # FULL resources have no window to walk, so they start life in steady.
-            "steady" if RESOURCE_STRATEGY[resource] is Strategy.FULL else "backfill",
+            initial_phase(resource),
         ),
     ).fetchone()
     assert row is not None

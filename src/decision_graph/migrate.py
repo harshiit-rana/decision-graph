@@ -63,6 +63,11 @@ SENTINELS: dict[str, str] = {
     "0010": "pg_get_viewdef('public.v_thread_corroboration'::regclass) LIKE '%ESCAPE%'",
     "0011": """EXISTS (SELECT 1 FROM pg_constraint
                 WHERE conname = 'decision_thread_key_matches_repo')""",
+    # 0012 is a data repair, so it has no new object to probe; the DROP NOT NULL it
+    # depends on is the schema change that exists iff it ran.
+    "0012": """EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'ingestion_cursor' AND column_name = 'phase'
+                  AND is_nullable = 'YES')""",
 }
 
 

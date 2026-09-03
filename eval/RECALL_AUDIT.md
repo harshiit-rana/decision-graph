@@ -9,9 +9,11 @@ reason it failed.
 1. The rubric is not losing decisions. Every rejection traces to evidence the graph does
    not contain, and the residual bucket — passes every mechanical check yet produced no
    Decision — is empty.
-2. **The graph is two-thirds of the intended window.** The `issues` cursor is still in
-   `phase = backfill`. Ingestion stopped mid-window and was never resumed, so every
-   coverage number reported in §9 is measured on a partial corpus.
+2. **The graph is two-thirds of the intended window.** The `issues` watermark sits at
+   2026-07-30 with 106 items updated after it. Ingestion stopped mid-window and was never
+   resumed, so every coverage number reported in §9 is measured on a partial corpus. (This
+   originally cited `phase = backfill` instead. That column could not have shown otherwise
+   — see the note under Finding 2.)
 
 ## Bucket classification — 148 threads
 
@@ -105,6 +107,13 @@ here.** Tracked as issue #26 so it is not read as settled once this cycle closes
 ```
 ingestion_cursor:  issues   phase=backfill   steady_watermark=2026-07-30
 ```
+
+> **`phase=backfill` was not evidence and never could have been.** The conclusion below is
+> right, but this line does not support it: `issues` is `UPDATED_ASC`, a strategy with no
+> floor to reach and so no transition to make, and nothing in the codebase could ever have
+> moved that value. It would have read `backfill` just the same had the window completed.
+> The watermark on the same line is the part that carried the finding. The column now reads
+> NULL for this resource (#47, migration 0012), so the trap is closed rather than annotated.
 
 The backfill never reached its floor. Comparing the graph against GitHub for the same
 window (`updated:>=2025-08-17`):
@@ -322,5 +331,7 @@ D, and only testing D first reproduces the original's `C = 0, D = 34`.
 The landing checks are not in the script — they need the network. They used
 `GET /repos/pallets/flask/compare/main...{sha}`, reading `.status`; anything other than
 `identical` or `behind` means the commit is not an ancestor of `main`. Cursor state is in
-`ingestion_cursor`, but note that `phase` is inert for `issues` and `pulls` (#47) — read the
-watermark, not the phase.
+`ingestion_cursor`; read `steady_watermark`, which is the field that moves. `phase` is now
+NULL for `issues` and `pulls` rather than permanently 'backfill' (#47, migration 0012), so
+the column can no longer be misread the way it was here — but on a database that predates
+0012 it will still read 'backfill', and it still means nothing there.

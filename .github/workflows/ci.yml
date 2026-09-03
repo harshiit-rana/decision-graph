@@ -1,0 +1,121 @@
+# Runs everything the README tells a contributor to run by hand.
+#
+# It exists because one of those suites had stopped working and nobody knew: migration 0011
+# added a CHECK that the 0009 test fixture violated, so that file aborted on its first
+# INSERT and all five of its checks went silent (#55). Nothing was watching. The Python
+# tests carry the same assumption in writing — test_every_migration_declares_a_sentinel says
+# a missing sentinel "should break here, not in someone's terminal" — which is only true if
+# something runs it on every change.
+#
+# Two things this deliberately does NOT do: it does not call the GitHub API (no token, and
+# ingestion is not what is under test), and it does not run `dg`. `dg` is the Docker
+# wrapper; running the suite through it would test the wrapper and hide everything else
+# behind an image build.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of the supported range. pyproject declares >=3.11 while the Dockerfile
+        # pins 3.13, and that gap is not hypothetical: `dg status` once shipped f-string
+        # syntax that only parses on 3.12+, and every containerised command ran it happily.
+        # tests/test_python_floor.py guards compilation at the floor; this runs the suite
+        # there too.
+        python-version: ["3.11", "3.13"]
+
+    services:
+      db:
+        image: postgres:16
+        env:
+          # Same disposable local credential as docker-compose.yml, for the same reason:
+          # a throwaway container holding public data, reachable only from this job.
+          POSTGRES_PASSWORD: dg
+          POSTGRES_USER: postgres
+          POSTGRES_DB: dg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dg"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      DATABASE_URL: postgresql://postgres:dg@localhost:5432/dg
+      PGPASSWORD: dg
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        # Editable install rather than PYTHONPATH, so a broken pyproject fails here too.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Install psql
+        # The SQL suites are run with psql, as the README documents them.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Apply migrations
+        # migrate.apply_all is the same code path `dg init` uses, called directly because
+        # `dg init` also wants a GitHub token and a target repo, neither of which this needs.
+        run: |
+          python - <<'PY'
+          import os
+          from decision_graph import db, migrate
+
+          conn = db.connect(os.environ["DATABASE_URL"])
+          result = migrate.apply_all(conn, "db/migrations")
+          print(f"applied {len(result.applied)}: {result.applied}")
+          if result.changed:
+              raise SystemExit(f"checksum drift in already-applied migrations: {result.changed}")
+          PY
+
+      - name: Migrations are idempotent
+        # `dg init` is documented as safe to re-run, and the sentinel probes are the only
+        # thing making that true. A second pass must apply nothing.
+        run: |
+          python - <<'PY'
+          import os
+          from decision_graph import db, migrate
+
+          conn = db.connect(os.environ["DATABASE_URL"])
+          result = migrate.apply_all(conn, "db/migrations")
+          if not result.up_to_date:
+              raise SystemExit(f"re-running migrations was not a no-op: applied={result.applied} adopted={result.adopted}")
+          print("second pass applied nothing")
+          PY
+
+      - name: Python suite
+        # DATABASE_URL is set for the whole job, so the 12 integration tests run rather than
+        # skipping. Docker is present on the runner, so the 3 python-floor tests run too:
+        # nothing here should be skipped, and a skip is worth noticing in the log.
+        run: python -m unittest discover -s tests -v
+
+      - name: SQL suites
+        # Each file opens a transaction and rolls back, so order does not matter and the
+        # database is unchanged afterwards. ON_ERROR_STOP is what turns a failed check into
+        # a failed job; without it psql reports success on a suite that aborted.
+        run: |
+          set -euo pipefail
+          for f in db/tests/*.sql; do
+            echo "::group::$f"
+            psql -h localhost -U postgres -d dg -v ON_ERROR_STOP=1 -f "$f"
+            echo "::endgroup::"
+          done
