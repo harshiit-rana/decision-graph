@@ -90,7 +90,13 @@ construction. This bucket proves nothing about whether `thread_key` is a good st
 
 The real risk it was meant to probe — two threads a human would call one decision, with no
 explicit edge between them — is **not mechanically detectable at all** and remains
-unmeasured. It cannot be: if an explicit edge connected the two clusters, they would already
+unmeasured.
+
+> Measured since, by census rather than by query: **2 of 14** threads that have a merged
+> implementation and no issue turn out to have their motivation in a neighbouring cluster,
+> with no link in either body or in GitHub's own timeline. See
+> [`THREAD_KEY_CENSUS.md`](THREAD_KEY_CENSUS.md). It is still not mechanically detectable —
+> the census found them by reading, not by querying. It cannot be: if an explicit edge connected the two clusters, they would already
 be one cluster. It needs sampled human review, and this audit did not perform it.
 
 **This is the largest open question about `thread_key` and it is not resolved by anything
@@ -292,11 +298,16 @@ enough to be a census rather than a sample.
 
 ### What this still does not establish
 
-Bucket A is 155 threads, and every one is classified by a mechanical check for the *presence*
+Bucket A is 153 threads, and every one is classified by a mechanical check for the *presence*
 of an issue node. Whether a human would say those threads embody a decision is exactly what
 #26 says cannot be measured this way, and re-running the buckets on a bigger corpus does not
-touch it. A bigger A is not evidence of a better rubric; it is 48 more threads that record no
-"why" anywhere the graph can see. The `thread_key` question stays open.
+touch it. A bigger A is not evidence of a better rubric; it is more threads that record no
+"why" anywhere the graph can see.
+
+That question is now partly answered, but by reading rather than by classifying: of bucket
+A's 153, only 14 have a merged implementation and could have become Decisions at all, and 2
+of those 14 have their motivation in a neighbouring cluster —
+[`THREAD_KEY_CENSUS.md`](THREAD_KEY_CENSUS.md).
 
 Nor does any of this measure precision on the added corpus. The 13 Decisions were verified by
 hand in §9 and are unchanged — same 13 nodes, all still passing `decision_rubric` — but no
