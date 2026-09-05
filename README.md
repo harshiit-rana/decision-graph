@@ -583,6 +583,7 @@ Accepted deliberately rather than fixed by switching repos:
 
 ```bash
 DATABASE_URL=... python -m decision_graph.evaluation   # runs eval/query_set.json
+#   --output elsewhere.json  writes there instead of over the committed record
 python eval/render_report.py                            # -> eval/report.html
 psql "$DATABASE_URL" -f eval/figures.sql                # every figure quoted below
 psql "$DATABASE_URL" -f eval/recall_audit.sql           # the coverage buckets
@@ -649,7 +650,7 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 199 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 209 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -664,7 +665,7 @@ so four of the five suites printed `FAIL` inside a collapsed group and exited 0 
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 175 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 180 tests
 standalone. Setting `DATABASE_URL` adds 21 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 5 for the trace annotation, 7 for reference retraction, and 2 that run every `dg report`
@@ -672,7 +673,7 @@ query against the real schema, which is the half a fixture cannot check. Docker 
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 24 of the 199 quietly skipped — so a
+A run without those is still reported as `OK`, with 29 of the 209 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell
