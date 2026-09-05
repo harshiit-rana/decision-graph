@@ -175,6 +175,14 @@ def _run_query(mode: str):
     return go
 
 
+def _run_report(_ns: argparse.Namespace) -> None:
+    from .cli import cmd_report
+
+    # --open by default from the menu: someone who picked "browse the graph" from a list
+    # wants to look at it, not to be told where a file is.
+    cmd_report(argparse.Namespace(repo=None, output=None, open=True))
+
+
 def _run_ask(_ns: argparse.Namespace) -> None:
     from .cli import cmd_ask
 
@@ -192,6 +200,7 @@ ACTIONS = [
     Action("4", "Repository status", "counts, cursors, decisions", lambda ns: cmd_status(ns)),
     Action("5", "Health check", "what works, and how to fix what does not", lambda ns: cmd_doctor(ns)),
     Action("6", "Natural Language Q&A", "ask a question in plain English (requires Nvidia API key)", _run_ask),
+    Action("7", "Browse the graph", "render every decision and its evidence to an HTML page", _run_report),
     Action("i", "Setup / reconfigure", "token, target repo, migrations (safe to re-run)", _run_init),
 ]
 
