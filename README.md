@@ -64,6 +64,7 @@ Every menu choice maps to one of these, so you can skip the menu once you know t
 | `dg query "..." --mode why` | ask why something happened, or what a change affects |
 | `dg ask "..."` | the same, asked in plain English — needs an Nvidia NIM key |
 | `dg query ... --format mermaid` | the same answer as a diagram (`dot` also available) |
+| `dg report` | render every decision and its evidence to a browsable HTML page |
 
 ```powershell
 .\dg.ps1 ingest --repo pallets/flask
@@ -408,6 +409,41 @@ dg-query "#5898" --mode impact --depth 2
 dg-query "send_file type annotations" --mode why --as-of 2026-03-01T00:00:00Z
 ```
 
+## Browsing the graph (`dg report`)
+
+`dg query` answers one question and `--format mermaid` draws one answer. `dg report` renders
+the whole graph — every Decision, its status, its motivating issue, the pull request credited
+with the work and when it merged, the evidence tier on every edge, and a diagram of each
+thread:
+
+```powershell
+.\dg.ps1 report --open
+```
+
+```
+wrote /work/decision-graph-report.html
+  15 decisions from 238 clusters
+```
+
+The page is one self-contained file. It fetches exactly one script — the mermaid UMD build,
+pinned — and if that fetch fails the diagram source stays on the page as readable text
+instead of vanishing. **A classic `<script>` tag, not an ES module**: `dg report` writes a
+file you open from disk, and Chrome refuses a module import from a remote origin on a
+`file://` page, which would render every diagram as nothing on exactly the path this command
+produces.
+
+It states its own coverage at the top, because a page listing 15 Decisions and saying nothing
+about the 223 clusters that produced none is a coverage claim made by omission:
+
+> **This is not the repository's history.** It is what the §5.1 rubric could evidence: a
+> motivating issue and merged work in one conversation. 223 clusters produced no decision,
+> most because no issue is referenced from the work at all, and a refusal to assert is the
+> intended outcome there rather than a gap.
+
+Its numbers come from the graph at the moment you run it, not from `eval/results.json` —
+that file is the record of an evaluation run and stays one — and they agree with
+`eval/figures.sql`, which is the script that exists so any figure here can be checked.
+
 ## Asking in English (`dg ask`)
 
 `dg query` takes a title, a `#number`, or a sha. `dg ask` takes a sentence, uses a model to
@@ -564,7 +600,7 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 161 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 176 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -579,14 +615,15 @@ so four of the five suites printed `FAIL` inside a collapsed group and exited 0 
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 139 tests
-standalone. Setting `DATABASE_URL` adds 19 integration tests — 7 for the traversal
+All SQL suites run in a transaction and roll back. The Python suite runs 152 tests
+standalone. Setting `DATABASE_URL` adds 21 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
-5 for the trace annotation, and 7 for reference retraction. Docker adds 3 more that compile the whole package on the
+5 for the trace annotation, 7 for reference retraction, and 2 that run every `dg report`
+query against the real schema, which is the half a fixture cannot check. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 22 of the 161 quietly skipped — so a
+A run without those is still reported as `OK`, with 24 of the 176 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell

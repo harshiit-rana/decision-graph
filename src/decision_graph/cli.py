@@ -728,6 +728,81 @@ def cmd_query(args: argparse.Namespace, extra: list[str]) -> int:
     return query.main([args.text] + list(extra))
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    """Render the graph to a browsable HTML file (issue #73).
+
+    Written next to `.env` in the project directory rather than into the container's
+    filesystem, because the point of the file is that a human opens it, and only the
+    bind-mounted project directory exists on both sides.
+    """
+    from . import report, retrieval
+
+    try:
+        conn = _connect()
+    except Exception as exc:
+        why, fix = explain_db_error(exc)
+        print(red(f"Cannot reach the database: {why}"))
+        print(f"{yellow('→')} {fix}")
+        return 1
+
+    repo = args.repo or os.environ.get("TARGET_REPO", "")
+    repo_node_id = retrieval.resolve_repo(conn, repo) if repo else None
+    if repo_node_id is None:
+        # Guessing which repository to report on would produce a page that looks complete
+        # and describes a different corpus than the reader expects.
+        rows = conn.execute(
+            "SELECT external_id FROM node WHERE node_type = 'repository' ORDER BY external_id"
+        ).fetchall()
+        if len(rows) == 1:
+            repo, repo_node_id = rows[0]["external_id"], None
+            repo_node_id = retrieval.resolve_repo(conn, repo)
+        else:
+            print(red(f"Cannot tell which repository to report on."))
+            print(f"{yellow('→')} pass --repo owner/name; ingested: "
+                  + ", ".join(r["external_id"] for r in rows))
+            conn.close()
+            return 2
+
+    data = report.collect(conn, repo_node_id)
+    conn.close()
+
+    if not data["decisions"]:
+        # Not an error. The rubric refusing to assert anything is a real state of this
+        # system, and a page saying so is more useful than a failure that implies breakage.
+        print(yellow("No decisions in the graph yet — the report would be empty."))
+        print(dim("  That is a result, not a failure: the rubric needs a motivating issue"))
+        print(dim("  and merged work in one thread. Run `dg status` to see what is ingested."))
+        return 0
+
+    out = Path(args.output) if args.output else PROJECT_DIR / "decision-graph-report.html"
+    out.write_text(report.render_html(data, repo), encoding="utf-8")
+
+    print(f"{green('wrote')} {out}")
+    print(dim(f"  {len(data['decisions'])} decisions from "
+              f"{data['coverage']['clusters']} clusters"))
+    if args.open:
+        _open_in_browser(out)
+    else:
+        print(dim("  open it in a browser, or re-run with --open"))
+    return 0
+
+
+def _open_in_browser(path: Path) -> None:
+    """Open the report, and say what to do when that is not possible.
+
+    `dg` runs inside a container with no browser and no display, which is the normal case
+    rather than the exception, so a failure here is expected and must not read as an error.
+    """
+    import webbrowser
+
+    try:
+        if webbrowser.open(path.as_uri()):
+            return
+    except Exception:  # noqa: BLE001 - a headless container raises in several ways
+        pass
+    print(dim("  (no browser reachable from here — open the file above from your host)"))
+
+
 def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     """Natural-language front door to the same engines `dg query` uses.
 
@@ -837,6 +912,12 @@ def build_parser() -> argparse.ArgumentParser:
     a = sub.add_parser("ask", help="ask a natural language question about the repository")
     a.add_argument("question", help="e.g. 'Why did we change the default redirect code?'")
     a.set_defaults(fn=cmd_ask, passthrough=True)
+
+    r = sub.add_parser("report", help="render the whole graph to a browsable HTML page")
+    r.add_argument("--repo", help="owner/name (defaults to TARGET_REPO from .env)")
+    r.add_argument("--output", help="where to write it (default: decision-graph-report.html)")
+    r.add_argument("--open", action="store_true", help="open it in a browser afterwards")
+    r.set_defaults(fn=cmd_report)
 
     return p
 
