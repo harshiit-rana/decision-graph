@@ -217,7 +217,8 @@ def _draw() -> None:
     print(
         "  " + dim("ask why? ") + "(2)   "
         + dim("what breaks? ") + "(3)   "
-        + dim("what is inside? ") + "(4)"
+        + dim("what is inside? ") + "(4)   "
+        + dim("show me everything? ") + "(7)"
     )
     print()
     print(f"  {_greeting()}.")
