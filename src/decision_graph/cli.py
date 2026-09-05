@@ -870,7 +870,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     heading("In plain English")
     print(explanation)
     print()
-    print(dim("Written by " + explain.MODEL + " from the trace above, which is the"))
+    print(dim("Written by " + explain.model() + " from the trace above, which is the"))
     print(dim("evidence. Where the two disagree, the trace is what the graph holds."))
     return 0
 

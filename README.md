@@ -501,7 +501,10 @@ prose:
 ```
 
 It needs `NVIDIA_API_KEY` in `.env` (get one at <https://build.nvidia.com>) and calls
-`meta/llama-3.1-70b-instruct` through Nvidia NIM. **The question and the traversal paths
+`nvidia/nemotron-3-super-120b-a12b` through Nvidia NIM. **Set `DG_NLP_MODEL` in `.env` to
+use a different one** — a hosted model id has an end-of-life date the code cannot see, and
+the previous default was retired mid-project, so moving off a dead model must not require
+editing Python and rebuilding an image. **The question and the traversal paths
 leave your machine**; nothing else does, and no other command in this repository calls any
 service but GitHub. `dg doctor` reports whether the key and the package are present, so you
 find out before typing a question rather than after. Everything else works without it.
@@ -646,7 +649,7 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 189 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 199 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -661,7 +664,7 @@ so four of the five suites printed `FAIL` inside a collapsed group and exited 0 
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 165 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 175 tests
 standalone. Setting `DATABASE_URL` adds 21 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 5 for the trace annotation, 7 for reference retraction, and 2 that run every `dg report`
@@ -669,7 +672,7 @@ query against the real schema, which is the half a fixture cannot check. Docker 
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 24 of the 189 quietly skipped — so a
+A run without those is still reported as `OK`, with 24 of the 199 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell

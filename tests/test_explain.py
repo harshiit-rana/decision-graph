@@ -112,6 +112,91 @@ class ParseIntentTest(unittest.TestCase):
             explain.parse_intent("why?", client)
 
 
+class ProviderFailureTest(unittest.TestCase):
+    """A hosted model is not a constant, and every way it can fail was a traceback.
+
+    NIM retired `meta/llama-3.1-70b-instruct` on 2026-08-26 and `dg ask` began printing a
+    40-line stack trace ending in `openai.APIStatusError: Error code: 410`. The code was
+    right and the reporting was not: the reader needed one sentence naming the fix.
+    """
+
+    class _Boom(Exception):
+        def __init__(self, code=None):
+            self.status_code = code
+            super().__init__(f"Error code: {code}")
+
+    def test_a_retired_model_says_how_to_change_it(self) -> None:
+        text = explain._diagnose(self._Boom(410))
+        self.assertIn("retired", text)
+        self.assertIn("DG_NLP_MODEL", text)
+
+    def test_a_rejected_key_is_not_reported_as_a_missing_model(self) -> None:
+        # The two are one character apart in the status code and completely different jobs
+        # for the reader: replace a key, or pick a model.
+        text = explain._diagnose(self._Boom(401))
+        self.assertIn("key", text)
+        self.assertNotIn("DG_NLP_MODEL", text)
+
+    def test_an_unavailable_model_points_at_the_catalogue(self) -> None:
+        self.assertIn("DG_NLP_MODEL", explain._diagnose(self._Boom(404)))
+
+    def test_rate_limiting_says_to_wait(self) -> None:
+        self.assertIn("Wait", explain._diagnose(self._Boom(429)))
+
+    def test_an_unknown_failure_keeps_its_first_line(self) -> None:
+        text = explain._diagnose(ConnectionError("Connection refused\nsecond line"))
+        self.assertIn("Connection refused", text)
+        self.assertNotIn("second line", text)
+
+    def test_the_call_wrapper_raises_explain_error_not_the_provider_error(self) -> None:
+        class Exploding:
+            def __init__(self) -> None:
+                self.chat = self
+                self.completions = self
+
+            def create(self, **_kwargs):
+                raise ProviderFailureTest._Boom(410)
+
+        with self.assertRaises(explain.ExplainError):
+            explain.parse_intent("why?", Exploding())
+
+
+class ModelSelectionTest(unittest.TestCase):
+    def test_the_default_is_used_when_nothing_is_set(self) -> None:
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("DG_NLP_MODEL", None)
+            self.assertEqual(explain.model(), explain.DEFAULT_MODEL)
+
+    def test_the_environment_overrides_the_default(self) -> None:
+        # The point of making it configurable: a model retiring must not require editing
+        # Python and rebuilding an image.
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(os.environ, {"DG_NLP_MODEL": "vendor/some-model"}):
+            self.assertEqual(explain.model(), "vendor/some-model")
+
+
+class JsonExtractionTest(unittest.TestCase):
+    """Models wrap JSON in prose even when asked not to, and even in JSON mode.
+
+    The model this defaults to answers `We need to output JSON only: {...}`, and a
+    reasoning model writes a plan first. Requiring the whole reply to parse made the
+    feature depend on a courtesy no provider actually guarantees.
+    """
+
+    def test_json_is_found_inside_surrounding_prose(self) -> None:
+        client = StubClient('We need to output JSON only: {"query": "#5898", "mode": "impact"} Done.')
+        self.assertEqual(explain.parse_intent("what breaks?", client), ("#5898", "impact"))
+
+    def test_a_reply_with_no_object_at_all_is_still_an_error(self) -> None:
+        with self.assertRaises(explain.ExplainError):
+            explain.parse_intent("why?", StubClient("I could not determine that."))
+
+
 class SummarizeTest(unittest.TestCase):
     def test_a_refusal_is_stated_by_the_code_and_never_generated(self) -> None:
         # The rule the module exists to enforce. 8 of the 18 §9 outcomes are refusals, and
