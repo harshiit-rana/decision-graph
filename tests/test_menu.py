@@ -125,6 +125,58 @@ class ViewTest(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertTrue(menu.View("why").toggle(key, ask=lambda _p: ""))
 
+    # -- mutual exclusion between diagram mode and prose modes --
+
+    def test_turning_on_details_clears_diagram(self) -> None:
+        """v while diagram is on must switch to prose — not pile -v onto --format mermaid,
+        which causes query.py to emit the graph and skip every prose block, making -v inert.
+        This was the bug: every toggle appeared to do something (the bar updated) but the
+        output never changed."""
+        view = menu.View("why")
+        view.toggle("d")                    # diagram on
+        self.assertTrue(view.diagram)
+        view.toggle("v")                    # prose: must clear diagram
+        self.assertFalse(view.diagram)
+        self.assertIn("-v", view.flags())
+        self.assertNotIn("--format", view.flags())
+
+    def test_turning_on_all_matches_clears_diagram(self) -> None:
+        view = menu.View("why")
+        view.toggle("d")
+        view.toggle("a")
+        self.assertFalse(view.diagram)
+        self.assertIn("--all", view.flags())
+        self.assertNotIn("--format", view.flags())
+
+    def test_turning_on_diagram_clears_details_and_all_matches(self) -> None:
+        view = menu.View("why")
+        view.toggle("v")
+        view.toggle("a")
+        view.toggle("d")
+        self.assertTrue(view.diagram)
+        self.assertFalse(view.details)
+        self.assertFalse(view.all_matches)
+        self.assertNotIn("-v", view.flags())
+        self.assertNotIn("--all", view.flags())
+
+    def test_as_of_while_diagram_is_on_clears_diagram(self) -> None:
+        view = menu.View("why")
+        view.toggle("d")
+        view.toggle("t", ask=lambda _p: "2025-06-01")
+        self.assertFalse(view.diagram)
+        self.assertIn("--as-of", view.flags())
+        self.assertNotIn("--format", view.flags())
+
+    def test_turning_on_diagram_clears_as_of(self) -> None:
+        view = menu.View("why")
+        view.toggle("t", ask=lambda _p: "2025-06-01")
+        view.toggle("d")
+        self.assertTrue(view.diagram)
+        self.assertIsNone(view.as_of)
+        self.assertNotIn("--as-of", view.flags())
+
+
+
 
 class LoopTest(unittest.TestCase):
     def _run_with_input(self, lines: list[str]) -> int:

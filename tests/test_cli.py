@@ -233,5 +233,33 @@ class CursorLinesTest(unittest.TestCase):
         self.assertNotIn("None", line)
 
 
+class ChooseReportRepoTest(unittest.TestCase):
+    def test_empty_ingested_returns_empty(self) -> None:
+        outcome, repo = cli.choose_report_repo("pallets/flask", [])
+        self.assertEqual(outcome, "empty")
+        self.assertIsNone(repo)
+
+    def test_requested_repo_matching_ingested_returns_use(self) -> None:
+        outcome, repo = cli.choose_report_repo("pallets/flask", ["pallets/flask"])
+        self.assertEqual(outcome, "use")
+        self.assertEqual(repo, "pallets/flask")
+
+    def test_requested_repo_not_in_ingested_returns_unknown(self) -> None:
+        outcome, repo = cli.choose_report_repo("foo/bar", ["pallets/flask"])
+        self.assertEqual(outcome, "unknown")
+        self.assertIsNone(repo)
+
+    def test_unspecified_repo_with_single_ingested_returns_use(self) -> None:
+        outcome, repo = cli.choose_report_repo("", ["pallets/flask"])
+        self.assertEqual(outcome, "use")
+        self.assertEqual(repo, "pallets/flask")
+
+    def test_unspecified_repo_with_multiple_ingested_returns_ambiguous(self) -> None:
+        outcome, repo = cli.choose_report_repo("", ["a/one", "b/two"])
+        self.assertEqual(outcome, "ambiguous")
+        self.assertIsNone(repo)
+
+
 if __name__ == "__main__":
     unittest.main()
+

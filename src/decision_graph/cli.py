@@ -728,6 +728,43 @@ def cmd_query(args: argparse.Namespace, extra: list[str]) -> int:
     return query.main([args.text] + list(extra))
 
 
+# Why a report cannot name its repository, in four cases that need four different
+# sentences. This started as one branch that told a caller who had just passed
+# `--repo pallets/flask` to pass `--repo owner/name`, and listed nothing after "ingested:"
+# because nothing had been (issue #82 follow-up).
+REPO_CHOICE_MESSAGE = {
+    "empty": (
+        "The graph is empty — nothing has been ingested yet.",
+        "run `dg ingest --repo owner/name` first",
+    ),
+    "unknown": (
+        "{repo!r} has not been ingested.",
+        "ingested so far: {ingested}",
+    ),
+    "ambiguous": (
+        "More than one repository is ingested, so this needs to be told which.",
+        "pass --repo owner/name: {ingested}",
+    ),
+}
+
+
+def choose_report_repo(requested: str, ingested: list[str]) -> tuple[str, str | None]:
+    """Which repository to report on, or which of three problems to report instead.
+
+    Pure, so the four outcomes can be tested without a database -- the branch that got this
+    wrong was the one nobody could reach in a test.
+    """
+    if not ingested:
+        return "empty", None
+    if requested:
+        return ("use", requested) if requested in ingested else ("unknown", None)
+    if len(ingested) == 1:
+        # No ambiguity to resolve, so resolve it. Only an unnamed choice between several is
+        # a question for the caller.
+        return "use", ingested[0]
+    return "ambiguous", None
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     """Render the graph to a browsable HTML file (issue #73).
 
@@ -747,21 +784,32 @@ def cmd_report(args: argparse.Namespace) -> int:
 
     repo = args.repo or os.environ.get("TARGET_REPO", "")
     repo_node_id = retrieval.resolve_repo(conn, repo) if repo else None
-    if repo_node_id is None:
+    if repo_node_id is None:  # noqa: PLR1702 - four outcomes, four sentences
         # Guessing which repository to report on would produce a page that looks complete
-        # and describes a different corpus than the reader expects.
-        rows = conn.execute(
-            "SELECT external_id FROM node WHERE node_type = 'repository' ORDER BY external_id"
-        ).fetchall()
-        if len(rows) == 1:
-            repo, repo_node_id = rows[0]["external_id"], None
+        # and describes a different corpus than the reader expects. But the three reasons a
+        # repo cannot be resolved need three different sentences: this said "pass --repo
+        # owner/name" to someone who had just passed it, and listed nothing after
+        # "ingested:", which is the answer to a question they had not asked.
+        ingested = [
+            r["external_id"]
+            for r in conn.execute(
+                "SELECT external_id FROM node WHERE node_type = 'repository' "
+                "ORDER BY external_id"
+            ).fetchall()
+        ]
+
+        outcome, chosen = choose_report_repo(repo, ingested)
+        if outcome == "use":
+            repo = chosen
             repo_node_id = retrieval.resolve_repo(conn, repo)
-        else:
-            print(red(f"Cannot tell which repository to report on."))
-            print(f"{yellow('→')} pass --repo owner/name; ingested: "
-                  + ", ".join(r["external_id"] for r in rows))
-            conn.close()
-            return 2
+
+    if repo_node_id is None:
+        conn.close()
+        headline, fix = REPO_CHOICE_MESSAGE[choose_report_repo(repo, ingested)[0]]
+        paint = yellow if headline.startswith("The graph is empty") else red
+        print(paint(headline.format(repo=repo)))
+        print(f"  {yellow('→')} " + fix.format(ingested=", ".join(ingested)))
+        return 2
 
     data = report.collect(conn, repo_node_id)
     conn.close()

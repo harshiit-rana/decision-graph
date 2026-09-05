@@ -197,13 +197,28 @@ class View:
         """Apply one keystroke. Returns False if the key means nothing here.
 
         `ask` is injected so the date prompt can be driven by a test without a terminal.
+
+        Diagram and prose views are mutually exclusive: `--format mermaid` causes query.py
+        to emit the graph and skip every prose block, so v/a/t have no visible effect while
+        diagram is on, and vice versa. Activating one side clears the other so the user is
+        never silently in a state where a toggle appears active but its output is suppressed.
         """
         if key == "d":
             self.diagram = not self.diagram
+            if self.diagram:
+                # Entering diagram mode: prose-only views become invisible, so clear them
+                # rather than leaving the bar showing flags that do nothing.
+                self.details = False
+                self.all_matches = False
+                self.as_of = None
         elif key == "v":
             self.details = not self.details
+            if self.details:
+                self.diagram = False  # details are prose; mermaid would suppress them
         elif key == "a":
             self.all_matches = not self.all_matches
+            if self.all_matches:
+                self.diagram = False  # all-matches is prose; mermaid would suppress it
         elif key == "s":
             self.mode = "impact" if self.mode == "why" else "why"
         elif key == "t":
@@ -216,6 +231,7 @@ class View:
                 when = (ask or _ask)("as of when? (YYYY-MM-DD, or Enter to cancel)")
                 if when:
                     self.as_of = when
+                    self.diagram = False  # as-of is prose; mermaid would suppress it
         else:
             return False
         return True
