@@ -205,4 +205,21 @@ SELECT count(*) FILTER (WHERE passed) AS passed,
        count(*) FILTER (WHERE NOT passed) AS failed, count(*) AS total
 FROM test_result;
 
+-- A failed check must fail the RUN, not merely appear in its output. CI invokes psql with
+-- ON_ERROR_STOP=1, which promotes a SQL *error* to a non-zero exit; a 'FAIL' row in the
+-- table above is not an error and left the job green (issue #62). The table is printed
+-- first and deliberately kept -- it is what makes the failure diagnosable -- and the raise
+-- comes after it, so the diagnosis survives the abort.
+DO $fail$
+DECLARE v_failed int; v_total int;
+BEGIN
+    SELECT count(*) FILTER (WHERE NOT passed), count(*) INTO v_failed, v_total
+    FROM test_result;
+    IF v_failed > 0 THEN
+        RAISE EXCEPTION '% of % check(s) failed', v_failed, v_total;
+    END IF;
+    RAISE NOTICE 'all % checks passed', v_total;
+END
+$fail$;
+
 ROLLBACK;
