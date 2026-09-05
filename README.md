@@ -1,4 +1,4 @@
-# decision-graph
+# TraceMind
 
 Organizational Intelligence Engine — implementation of `PRD_v3.1_Organizational_Intelligence_Engine.md`.
 
