@@ -633,6 +633,40 @@ def cmd_status(args: argparse.Namespace) -> int:
         for line in _cursor_lines(cursors):
             print(line)
 
+    # The reference queue, where the two things that look alike are worth telling apart:
+    # a row waiting for a target that has not been ingested is the bounded window working,
+    # while a row the parser no longer produces is an obsolete claim that would fire if
+    # that target ever arrived (issue #61). Printed because a queue nobody can see is how
+    # the one in #61 stayed loaded for two months.
+    refs_rows = conn.execute(
+        """
+        SELECT r.external_id AS repo, s.edge_type::text AS edge_type,
+               s.open_refs, s.target_outside_window, s.retracted
+        FROM v_pending_reference_status s
+        JOIN node r ON r.id = s.repo_node_id
+        WHERE s.open_refs > 0 OR s.retracted > 0
+        ORDER BY r.external_id, s.edge_type
+        """
+    ).fetchall()
+    if refs_rows:
+        heading("Cross-references not yet linked")
+        for r in refs_rows:
+            print(f"  {r['repo']}  {bold(str(r['open_refs']))} {r['edge_type']} queued")
+            if r["target_outside_window"]:
+                print(
+                    dim(
+                        f"    {r['target_outside_window']} name a target the graph does "
+                        "not hold; an out-of-window reference never resolves, correctly"
+                    )
+                )
+            if r["retracted"]:
+                print(
+                    dim(
+                        f"    {r['retracted']} retracted — the current parser no longer "
+                        "reads them from the source body"
+                    )
+                )
+
     decisions = conn.execute("SELECT count(*) AS n FROM decision").fetchone()["n"]
     threads = conn.execute(
         "SELECT count(DISTINCT thread_key) AS n FROM node WHERE thread_key IS NOT NULL"

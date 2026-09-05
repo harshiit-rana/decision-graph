@@ -222,6 +222,41 @@ Rate limiting is first-class: a 12-month backfill of a repo flask's size sits cl
 enough to the 5,000 req/hour budget that exhaustion is expected. The client stops
 cleanly at a configurable floor and the next run resumes.
 
+### The reference queue can now be un-said
+
+A `#N` whose target is not in the graph yet is queued rather than dropped (issue #3) —
+issues and PRs are walked updated-ascending, so a PR can be processed before the issue it
+closes. The queue was append-and-resolve: the only thing that ever happened to a row was
+becoming an edge. So a reference that was **wrong when it was queued stayed queued, armed,
+indefinitely**, and would resolve the moment its target happened to arrive.
+
+That is not hypothetical. Stopping the parser reading closing keywords out of HTML comments
+(#59) could not reach the row it was about — `<!-- Fixes #11 -->`, template boilerplate
+above a docs typo fix, waiting to become a `closes` edge, which is Validation-grade evidence
+under the §5.1 rubric, if the window ever widened far enough to ingest flask#11 (a 2010
+issue).
+
+`--reconcile` now **retracts** a queued reference when re-reading the same stored body with
+the current extractors no longer yields it (#61). The test is about the parser, not the
+target, and that distinction is the whole design:
+
+| the row | verdict |
+|---|---|
+| the current parser no longer reads it from the body | retracted |
+| the target is outside the 12-month window | **left open** — unresolvable is not wrong |
+| the number belongs to another repository (author's error) | left open — the parser still reads it |
+| the source body has no stored text | left open — silence is not evidence |
+
+On the flask graph that retracts exactly **1 of 26** open references: the `#11` above, and
+nothing else.
+
+Retraction is a column, not a `DELETE`, and the difference is the answer to the obvious
+objection — that a parser *regression* would now withdraw good references rather than
+merely fail to add them. The row stays with the reason it was withdrawn, `dg status` counts
+it, and the open-row unique index excludes retracted rows so fixing the parser and
+re-running `--reconcile` queues the reference again. A wrong retraction is visible and
+reversible; a wrong `DELETE` would be neither.
+
 **No Decision nodes are created by ingestion.** Phase 1 asserts artifacts and the links
 between them; asserting that a *decision* occurred is gated by the rubric and belongs to
 a later phase.
@@ -377,7 +412,8 @@ psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 105 tests
+psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
+DATABASE_URL=... python -m unittest discover -s tests               # 112 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -393,13 +429,13 @@ then raises if anything failed, and `tests/test_sql_suites.py` asserts that ever
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
 All SQL suites run in a transaction and roll back. The Python suite runs 90 tests
-standalone. Setting `DATABASE_URL` adds 12 integration tests — 7 for the traversal
+standalone. Setting `DATABASE_URL` adds 19 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
-and 5 for the trace annotation. Docker adds 3 more that compile the whole package on the
+5 for the trace annotation, and 7 for reference retraction. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 15 of the 105 quietly skipped — so a
+A run without those is still reported as `OK`, with 22 of the 112 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell

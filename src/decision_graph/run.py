@@ -56,6 +56,12 @@ def ingest(
             log.info("--- reconcile stored bodies ---")
             extractors.reconcile_stored_bodies(ctx)
             conn.commit()
+            # Retraction is the same re-derivation read the other way round: reconcile adds
+            # what the current parser now produces, this withdraws what it no longer does
+            # (issue #61). It runs here rather than on every ingestion because it is only
+            # meaningful against stored text, and --reconcile is the pass that re-reads it.
+            extractors.retract_stale_references(ctx)
+            conn.commit()
 
         for resource in resources:
             log.info("--- %s ---", resource)

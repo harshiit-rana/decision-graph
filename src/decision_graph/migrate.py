@@ -68,6 +68,9 @@ SENTINELS: dict[str, str] = {
     "0012": """EXISTS (SELECT 1 FROM information_schema.columns
                 WHERE table_name = 'ingestion_cursor' AND column_name = 'phase'
                   AND is_nullable = 'YES')""",
+    "0013": """EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'pending_reference'
+                  AND column_name = 'retracted_at')""",
 }
 
 
