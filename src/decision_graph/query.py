@@ -124,7 +124,29 @@ def main(argv: list[str] | None = None) -> int:
         print("error: DATABASE_URL is not set", file=sys.stderr)
         return 2
 
-    as_of = datetime.fromisoformat(args.as_of) if args.as_of else None
+    try:
+        as_of = datetime.fromisoformat(args.as_of) if args.as_of else None
+    except ValueError:
+        # Every other bad argument here produces a sentence; this one produced a traceback
+        # out of the standard library (issue #82).
+        print(
+            f"error: --as-of {args.as_of!r} is not a timestamp. Use YYYY-MM-DD, or a full "
+            "ISO instant like 2026-03-01T00:00:00Z.",
+            file=sys.stderr,
+        )
+        return 2
+
+    # A zero-hop walk cannot reach anything, so the engine correctly returns nothing -- and
+    # the renderer then says the graph holds no evidence, which is a false statement about
+    # the repository caused by the caller's own argument. A refusal that reports your
+    # mistake as a fact is worse than an error, because it is believable (issues #77, #82).
+    if args.depth < 1:
+        print(
+            f"error: --depth {args.depth} cannot reach anything. Use 1 or more.",
+            file=sys.stderr,
+        )
+        return 2
+
     conn = db.connect(dsn)
 
     repo_node_id = None

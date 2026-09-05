@@ -822,6 +822,12 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     """
     from . import explain, db, query, retrieval, reasoning, trace
 
+    if not (args.question or "").strip():
+        # Rejected here rather than at the provider: an empty question spends a real API
+        # request asking a model to extract a search term from nothing (issue #82).
+        print("error: no question was asked.", file=sys.stderr)
+        return 2
+
     print(f"Parsing intent for: {args.question!r}")
     try:
         query_str, mode = explain.parse_intent(args.question)
