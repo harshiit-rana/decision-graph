@@ -42,7 +42,7 @@ class FormatImplementerTest(unittest.TestCase):
                 "merged_at": datetime(2026, 1, 25, 3, 53, tzinfo=timezone.utc),
             }
         )
-        self.assertEqual(text, "PR 5899, merged 2026-01-25")
+        self.assertEqual(text, "PR #5899, merged 2026-01-25")
 
     def test_unmerged_pull_request_says_so_explicitly(self) -> None:
         # Post-#17 this cannot occur. It is spelled out rather than left blank so that a
@@ -75,16 +75,15 @@ class DescribeTest(unittest.TestCase):
         return reasoning.Path(
             node_ids=[928],
             steps=[],
-            titles={928: "deprecate `should_ignore_error`"},
-            types={928: "decision"},
+            nodes={928: reasoning.NodeRef("decision", "deprecate `should_ignore_error`")},
         )
 
     def test_annotation_is_appended_when_present(self) -> None:
         text = evaluation._describe(
-            self._path(), 928, {928: "implemented by PR 5899, merged 2026-01-25"}
+            self._path(), 928, {928: "implemented by PR #5899, merged 2026-01-25"}
         )
         self.assertIn("decision:928", text)
-        self.assertIn("PR 5899", text)
+        self.assertIn("PR #5899", text)
 
     def test_unannotated_node_is_unchanged(self) -> None:
         self.assertEqual(
@@ -209,7 +208,7 @@ class DecisionAnnotationsTest(unittest.TestCase):
         d = self._decision()
         self._implemented_by(d, self._pr(5899, self.MERGED))
         notes = evaluation.decision_annotations(self.conn, [d])
-        self.assertEqual(notes[d], "implemented by PR 5899, merged 2026-01-25")
+        self.assertEqual(notes[d], "implemented by PR #5899, merged 2026-01-25")
 
     def test_superseded_implementer_is_excluded(self) -> None:
         # This is the exact shape of decision 928: the abandoned attempt is still in the

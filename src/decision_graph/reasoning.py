@@ -93,14 +93,43 @@ class Step:
     source_ref: str | None
 
 
+@dataclass(frozen=True)
+class NodeRef:
+    """What a path knows about one node it passed through.
+
+    `external_id` and `url` are carried because every renderer needs them and none had
+    them: a trace printed `issue:620` while the graph held `#5895` and the issue's URL
+    (issue #69). They are read in the same query as the title, so this costs nothing.
+    """
+
+    node_type: str | None = None
+    title: str | None = None
+    external_id: str | None = None
+    url: str | None = None
+
+
 @dataclass
 class Path:
     """One route from the start node to a reached node, with its evidence trail."""
 
     node_ids: list[int]
     steps: list[Step]
-    titles: dict[int, str] = field(default_factory=dict)
-    types: dict[int, str] = field(default_factory=dict)
+    nodes: dict[int, NodeRef] = field(default_factory=dict)
+
+    # `titles` and `types` were two parallel dicts, and adding external_id and url would
+    # have made four. They stay as views over `nodes` rather than being deleted, because
+    # every caller reads them by `.get()` and a rename would touch three renderers and the
+    # evaluation runner to no benefit.
+    @property
+    def titles(self) -> dict[int, str | None]:
+        return {nid: n.title for nid, n in self.nodes.items()}
+
+    @property
+    def types(self) -> dict[int, str | None]:
+        return {nid: n.node_type for nid, n in self.nodes.items()}
+
+    def ref(self, node_id: int) -> NodeRef:
+        return self.nodes.get(node_id, NodeRef())
 
     @property
     def target_id(self) -> int:
@@ -231,9 +260,15 @@ def _walk(
         ).fetchall()
     }
     nodes = {
-        n["id"]: (n["node_type"], n["title"])
+        n["id"]: NodeRef(
+            node_type=n["node_type"],
+            title=n["title"],
+            external_id=n["external_id"],
+            url=n["url"],
+        )
         for n in conn.execute(
-            "SELECT id, node_type, title FROM node WHERE id = ANY(%s)", (list(node_ids),)
+            "SELECT id, node_type, title, external_id, url FROM node WHERE id = ANY(%s)",
+            (list(node_ids),),
         ).fetchall()
     }
 
@@ -241,8 +276,7 @@ def _walk(
         Path(
             node_ids=list(r["path_nodes"]),
             steps=[edges[eid] for eid in r["path_edges"]],
-            titles={nid: (nodes.get(nid) or (None, None))[1] for nid in r["path_nodes"]},
-            types={nid: (nodes.get(nid) or (None, None))[0] for nid in r["path_nodes"]},
+            nodes={nid: nodes.get(nid, NodeRef()) for nid in r["path_nodes"]},
         )
         for r in rows
     ]

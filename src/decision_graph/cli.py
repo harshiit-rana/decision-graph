@@ -737,7 +737,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     reads identically whether it rests on four corroborated edges or one inferred guess
     (issue #65). The trace is the answer; the paragraph is a reading of it.
     """
-    from . import explain, db, query, retrieval, reasoning
+    from . import explain, db, query, retrieval, reasoning, trace
 
     print(f"Parsing intent for: {args.question!r}")
     try:
@@ -759,15 +759,22 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
         return 1
 
     c = candidates[0]
-    print(f"Found candidate: node:{c.node_id} {c.node_type} \"{(c.title or '')[:56]}\"\n")
+    print(f"Found candidate: {trace.ref(c.node_type, c.external_id)} \"{(c.title or '')[:56]}\"\n")
     print("Traversing the graph...\n")
     answer = reasoning.reason(conn, c.node_id, reasoning.Mode(mode))
+    # Read the Decision facts before closing: they are a second query against the same
+    # connection, and the whole point of them is that a Why-walk stops at the Decision and
+    # never reaches the pull request that did the work (#19).
+    annotations, statuses, links = query._decision_facts(conn, answer)
     conn.close()
 
-    # The evidence, in the same form `dg query` prints it, tier marks and all. `sys.stdout`
-    # is passed rather than left to render's default, which binds at import and so ignores
-    # any later redirection -- including the one the test for this uses.
-    query.render(answer, sys.stdout)
+    # The evidence, in the same form `dg query` prints it -- one renderer, so the prose and
+    # the trace beside it cannot describe the answer differently. `sys.stdout` is passed
+    # rather than left to a default, which would bind at import and ignore any later
+    # redirection, including the one the test for this uses.
+    query.render_answer(
+        answer, annotations=annotations, statuses=statuses, links=links, out=sys.stdout
+    )
 
     try:
         explanation = explain.summarize_answer(args.question, answer)

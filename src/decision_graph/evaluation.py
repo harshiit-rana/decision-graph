@@ -32,7 +32,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import db, reasoning, retrieval
+from . import db, reasoning, retrieval, trace
 from .reasoning import Mode
 
 log = logging.getLogger(__name__)
@@ -80,69 +80,14 @@ class QueryResult:
     notes: str | None = None
 
 
-# A Decision carries the motivating issue's title and sits under a thread_key naming its
-# cluster. That key is chosen by `threads._rank` — PR-preferring, then lowest number —
-# purely so two ingestion orders produce the same key. It is a stable LABEL, not a claim
-# about which pull request did the work, and when a change took two attempts it names the
-# ABANDONED one: decision 928 sits in `thread:30:pr-5867`, but 5867 was never merged and
-# PR 5899 is the credited implementer.
-#
-# A Why-walk reaching a Decision across `motivated_by` stops there and never traverses
-# `implemented_by`, so the only PR number a reader saw was the wrong one (issue #19).
-# The graph was right; the report was misleading — which is worse than it sounds, because
-# it makes a stale label and a stale edge look identical on the page. Adjudication depends
-# on telling those apart.
-DECISION_FACTS_SQL = """
-SELECT d.node_id,
-       im.node_type   AS implementer_type,
-       im.external_id AS implementer_ref,
-       pr.merged_at
-FROM decision d
-LEFT JOIN edge e  ON e.src_node_id = d.node_id
-                 AND e.edge_type   = 'implemented_by'
-                 AND e.valid_to IS NULL
-LEFT JOIN node im ON im.id = e.dst_node_id
-LEFT JOIN pull_request pr ON pr.node_id = im.id
-WHERE d.node_id = ANY(%s)
-ORDER BY d.node_id, im.external_id
-"""
-
-
-def _format_implementer(row: dict[str, Any]) -> str:
-    kind = row["implementer_type"]
-    ref = row["implementer_ref"]
-    if kind == "commit":
-        return f"commit {ref[:7]}"
-    if kind != "pull_request":
-        return f"{kind} {ref}"
-    # Merge state is spelled out rather than implied. An unmerged implementer should not
-    # be able to sit quietly in a trace — post-#17 it cannot exist, and this is how a
-    # regression would announce itself instead of reading as an ordinary path.
-    when = f"merged {row['merged_at']:%Y-%m-%d}" if row["merged_at"] else "NOT MERGED"
-    return f"PR {ref}, {when}"
-
-
-def decision_annotations(conn, node_ids: list[int]) -> dict[int, str]:
-    """Map Decision node ids to a short statement of what the graph credits them to."""
-    if not node_ids:
-        return {}
-
-    grouped: dict[int, list[dict[str, Any]]] = {}
-    for row in conn.execute(DECISION_FACTS_SQL, (sorted(set(node_ids)),)).fetchall():
-        grouped.setdefault(row["node_id"], []).append(row)
-
-    notes: dict[int, str] = {}
-    for node_id, rows in grouped.items():
-        credited = [r for r in rows if r["implementer_ref"]]
-        if not credited:
-            # Unreachable while the rubric holds. Surfaced rather than skipped: a Decision
-            # asserting nothing is the single most important thing to show an adjudicator.
-            notes[node_id] = "no current implementer"
-            continue
-        # Every current implementer, not the first. A LIMIT 1 here would have concealed
-        # the double-implementer bug that the #17 fix introduced and then repaired.
-        notes[node_id] = "implemented by " + "; ".join(_format_implementer(r) for r in credited)
-    return notes
+# What a Decision is credited to, and how a node is named, both live in `trace` now: this
+# worksheet and `dg query` render the same answer for the same reader, and an adjudicator
+# comparing one against the other is doing the job §9 exists for. Two implementations would
+# drift precisely there (issue #69). The names are kept bound here because they were part of
+# this module's surface and the tests address them by it.
+DECISION_FACTS_SQL = trace.DECISION_FACTS_SQL
+_format_implementer = trace.format_implementer
+decision_annotations = trace.decision_annotations
 
 
 def _describe(

@@ -31,6 +31,7 @@ import json
 import os
 import sys
 
+from . import trace
 from .reasoning import Answer, Mode
 
 MODEL = "meta/llama-3.1-70b-instruct"
@@ -139,22 +140,23 @@ def render_paths(answer: Answer) -> str:
     evidence grade would be asking the model to describe a claim while withholding how
     well founded it is.
     """
+    def name(path, node_id: int) -> str:
+        ref = path.ref(node_id)
+        # The GitHub identity, not the database key. A summary is only checkable if the
+        # artifacts it cites are the ones a reader can open, and a model handed `issue:620`
+        # can only write `issue:620` back (issue #69).
+        return f"{trace.ref(ref.node_type, ref.external_id)} \"{ref.title or ''}\""
+
     blocks: list[str] = []
     for i, path in enumerate(answer.paths, 1):
         lines = [f"Path {i} (evidence tier={path.tier}, depth={path.depth}):"]
-        start = path.node_ids[0]
-        lines.append(
-            f"  Start: {path.types.get(start, '?')}:{start} \"{path.titles.get(start, '')}\""
-        )
+        lines.append(f"  Start: {name(path, path.node_ids[0])}")
         for step, node_id in zip(path.steps, path.node_ids[1:]):
             direction = "->" if step.to_node_id == node_id else "<-"
             lines.append(
                 f"    {direction} {step.edge_type} [{step.evidence_tier}] ({step.extractor})"
             )
-            lines.append(
-                f"    Node: {path.types.get(node_id, '?')}:{node_id} "
-                f"\"{path.titles.get(node_id, '')}\""
-            )
+            lines.append(f"    Node: {name(path, node_id)}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
