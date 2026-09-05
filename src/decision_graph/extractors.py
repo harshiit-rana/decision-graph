@@ -201,6 +201,61 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
     return node_id
 
 
+def _parsed_references(
+    text: str | None, repo: str | None, source_type: str
+) -> list[tuple[int, str, str]]:
+    """Every reference the CURRENT extractors read out of one body.
+
+    Returns (number, edge_type, extractor). One definition, three callers: the inline
+    extraction path, `reconcile_stored_bodies`, and `retract_stale_references`. Retraction
+    withdraws a queued row precisely when this function no longer yields it, so the two
+    must be the same code or a retraction would be measuring a second implementation's
+    disagreement with the first rather than a parser change (issue #61).
+    """
+    return [
+        *((n, "closes", f"{source_type}_closing_keyword") for n in refs.closing_refs(text, repo)),
+        *(
+            (n, "references", f"{source_type}_issue_mention")
+            for n in refs.mentioned_refs(text, repo)
+        ),
+    ]
+
+
+# Where a queued reference can have come from. Both `_enqueue_reference` call sites parse
+# one of these three bodies, so this is the complete set of text a retraction can re-read.
+# `source_type` matches _link_body_refs: an issue body and a PR body are both "pr_body",
+# which is #12's split between an author's prose and a committer's, not a node-type label.
+_BODY_SOURCES = (
+    ("pull_request", "body", "pr_body"),
+    ("issue", "body", "pr_body"),
+    ("commit", "message", "commit_message"),
+)
+
+
+def _stored_bodies(ctx: Context):
+    """Yield (node_id, text, source_type) for every stored body that has text.
+
+    Scoped to this run's repository. `_lookup_by_number` resolves "#N" against one repo's
+    numbers, so re-parsing another repository's bodies here would offer them this repo's
+    artifacts to link to — the cross-repo edge #42 went and closed elsewhere.
+
+    Bodies with no text are skipped rather than yielded as empty. The difference matters
+    only to retraction, and there it is the whole safety margin: "this body no longer says
+    that" is evidence, while "there is no body here to read" is not, and a NULL that came
+    from an ingestion gap would otherwise read as a licence to withdraw the reference.
+    """
+    for table, column, source_type in _BODY_SOURCES:
+        rows = ctx.conn.execute(
+            f"SELECT d.node_id AS id, d.{column} AS text "  # noqa: S608 - fixed literals
+            f"FROM {table} d JOIN node n ON n.id = d.node_id "
+            "WHERE n.repo_node_id = %s",
+            (ctx.repo_node_id,),
+        ).fetchall()
+        for row in rows:
+            if row["text"]:
+                yield row["id"], row["text"], source_type
+
+
 def _link_body_refs(
     ctx: Context,
     src_node_id: int,
@@ -224,16 +279,9 @@ def _link_body_refs(
     `closes` edge's provenance says which artifact it came from — a PR author's claim and a
     committer's claim are different evidence (issue #12).
     """
-    for number, edge_type, extractor in [
-        *(
-            (n, "closes", f"{source_type}_closing_keyword")
-            for n in refs.closing_refs(text, ctx.settings.target_repo)
-        ),
-        *(
-            (n, "references", f"{source_type}_issue_mention")
-            for n in refs.mentioned_refs(text, ctx.settings.target_repo)
-        ),
-    ]:
+    for number, edge_type, extractor in _parsed_references(
+        text, ctx.settings.target_repo, source_type
+    ):
         target = _lookup_by_number(ctx, number)
         if target is None:
             _enqueue_reference(
@@ -292,7 +340,8 @@ def _enqueue_reference(
         INSERT INTO pending_reference (repo_node_id, src_node_id, ref_number, edge_type,
                                        extractor, source_ref, observed_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (src_node_id, ref_number, edge_type) WHERE resolved_at IS NULL
+        ON CONFLICT (src_node_id, ref_number, edge_type)
+            WHERE resolved_at IS NULL AND retracted_at IS NULL
         DO NOTHING
         """,
         (
@@ -315,12 +364,16 @@ def drain_pending_references(ctx: Context) -> tuple[int, int]:
     is never fetched — so the bounded backfill window stays bounded. A reference to an
     artifact genuinely outside the window simply never resolves, which is correct, and
     stays visible as a row with a climbing attempts count.
+
+    Retracted rows are excluded (issue #61). A reference the current parser no longer
+    produces must not resolve into an edge on the run where its target finally arrives —
+    that arrival is exactly when an obsolete row does its damage.
     """
     rows = ctx.conn.execute(
         """
         SELECT id, src_node_id, ref_number, edge_type, extractor, source_ref, observed_at
         FROM pending_reference
-        WHERE repo_node_id = %s AND resolved_at IS NULL
+        WHERE repo_node_id = %s AND resolved_at IS NULL AND retracted_at IS NULL
         ORDER BY id
         """,
         (ctx.repo_node_id,),
@@ -379,54 +432,112 @@ def reconcile_stored_bodies(ctx: Context) -> int:
     text. Also a safety net if a parser rule is ever widened — reconcile picks up what
     the new rule now matches, without re-polling GitHub.
     """
-    sources = (
-        ("pull_request", "SELECT node_id AS id, body AS text FROM pull_request"),
-        ("issue", "SELECT node_id AS id, body AS text FROM issue"),
-        ("commit", "SELECT node_id AS id, message AS text FROM commit"),
-    )
-
-    source_type_by_label = {
-        "pull_request": "pr_body",
-        "issue": "pr_body",
-        "commit": "commit_message",
-    }
-
     queued = 0
-    for label, query in sources:
-        source_type = source_type_by_label[label]
-        for row in ctx.conn.execute(query).fetchall():
-            text = row["text"]
-            if not text:
+    for src_node_id, text, source_type in _stored_bodies(ctx):
+        for number, edge_type, extractor in _parsed_references(
+            text, ctx.settings.target_repo, source_type
+        ):
+            target = _lookup_by_number(ctx, number)
+            if target is not None:
+                # Idempotent: an edge that already exists is refreshed, not doubled.
+                before = ctx.stats.edges
+                _link(ctx, src_node_id, target, edge_type, extractor, None, None)
+                queued += ctx.stats.edges - before
                 continue
-            for number, edge_type, extractor in [
-                *(
-                    (n, "closes", f"{source_type}_closing_keyword")
-                    for n in refs.closing_refs(text, ctx.settings.target_repo)
-                ),
-                *(
-                    (n, "references", f"{source_type}_issue_mention")
-                    for n in refs.mentioned_refs(text, ctx.settings.target_repo)
-                ),
-            ]:
-                target = _lookup_by_number(ctx, number)
-                if target is not None:
-                    # Idempotent: an edge that already exists is refreshed, not doubled.
-                    before = ctx.stats.edges
-                    _link(ctx, row["id"], target, edge_type, extractor, None, None)
-                    queued += ctx.stats.edges - before
-                    continue
-                _enqueue_reference(
-                    ctx,
-                    src_node_id=row["id"],
-                    number=number,
-                    edge_type=edge_type,
-                    extractor=extractor,
-                    source_ref=None,
-                    observed_at=None,
-                )
-        log.info("reconciled %s bodies", label)
+            _enqueue_reference(
+                ctx,
+                src_node_id=src_node_id,
+                number=number,
+                edge_type=edge_type,
+                extractor=extractor,
+                source_ref=None,
+                observed_at=None,
+            )
 
+    log.info("reconciled stored bodies: %s reference(s) linked", queued)
     return queued
+
+
+def retract_stale_references(ctx: Context) -> int:
+    """Withdraw queued references the current parser no longer produces (issue #61).
+
+    The queue is append-and-resolve. A row written under an older parser rule stays armed
+    forever, and resolves into a real edge the moment its target happens to arrive — which
+    is how `<!-- Fixes #11 -->`, HTML-commented template boilerplate that GitHub honours as
+    nothing at all, remained a `closes` edge waiting to happen after #59 stopped the parser
+    reading it.
+
+    The test is deliberately narrow, and it is a claim about the extractor rather than
+    about the target: retract iff re-reading the SAME stored body with the CURRENT
+    extractors no longer yields that (number, edge_type). It says nothing about whether the
+    reference could ever resolve. An out-of-window target is unresolvable and entirely
+    correct, and stays open — 5 of flask's 7 open `closes` references are that case.
+
+    Three things bound the damage a parser regression could do here, because the obvious
+    objection to this function is that a broken parser now deletes good references rather
+    than merely failing to add them:
+
+    1. **Retraction is a column, not a DELETE.** The row stays, with its reason, and is
+       counted in `v_pending_reference_status`.
+    2. **It is reversible.** The open-row unique index excludes retracted rows (migration
+       0013), so fixing the parser and re-running `--reconcile` queues the reference again.
+    3. **Silence is not evidence.** A body with no stored text is skipped, so a missing
+       body cannot be read as the parser declining to produce anything.
+
+    Returns the number retracted. Runs only under `--reconcile`, which is the command that
+    already re-derives from stored bodies and costs no API calls.
+    """
+    produced: dict[int, set[tuple[int, str]]] = {}
+    for src_node_id, text, source_type in _stored_bodies(ctx):
+        produced.setdefault(src_node_id, set()).update(
+            (number, edge_type)
+            for number, edge_type, _ in _parsed_references(
+                text, ctx.settings.target_repo, source_type
+            )
+        )
+
+    rows = ctx.conn.execute(
+        """
+        SELECT id, src_node_id, ref_number, edge_type, extractor, source_ref
+        FROM pending_reference
+        WHERE repo_node_id = %s AND resolved_at IS NULL AND retracted_at IS NULL
+        ORDER BY id
+        """,
+        (ctx.repo_node_id,),
+    ).fetchall()
+
+    retracted = 0
+    for row in rows:
+        current = produced.get(row["src_node_id"])
+        if current is None:
+            # No text to re-read. Not evidence either way; see point 3 above.
+            ctx.stats.note_skip("pending_ref_source_body_absent")
+            continue
+        if (row["ref_number"], row["edge_type"]) in current:
+            continue
+
+        reason = (
+            f"re-parsing the source body with the current extractors no longer yields "
+            f"{row['edge_type']} #{row['ref_number']} (was {row['extractor']})"
+        )
+        ctx.conn.execute(
+            "UPDATE pending_reference SET retracted_at = now(), retraction_reason = %s "
+            "WHERE id = %s",
+            (reason, row["id"]),
+        )
+        retracted += 1
+        log.info(
+            "retracted queued %s #%s from %s: %s",
+            row["edge_type"],
+            row["ref_number"],
+            row["source_ref"] or f"node {row['src_node_id']}",
+            reason,
+        )
+
+    log.info(
+        "stale references: %s retracted, %s still open", retracted, len(rows) - retracted
+    )
+    return retracted
 
 
 def _lookup_by_number(ctx: Context, number: int) -> int | None:
