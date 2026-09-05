@@ -377,7 +377,7 @@ psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
 psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 94 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 105 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -385,14 +385,21 @@ DATABASE_URL=... python -m unittest discover -s tests               # 94 tests
 aborting on its first statement since migration 0011 added a CHECK its fixture violated,
 and all five of its checks were silently dead until something finally ran them (#55).
 
-All SQL suites run in a transaction and roll back. The Python suite runs 79 tests
+**A failing check now fails the run.** CI passes `ON_ERROR_STOP=1`, which turns a SQL
+*error* into a red build; a check that merely recorded `passed = false` was not an error,
+so four of the five suites printed `FAIL` inside a collapsed group and exited 0 — 30 of the
+39 checks could not turn the build red (#62). Each suite now prints its results table and
+then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
+`db/tests/` does, so a suite added later cannot quietly arrive without it.
+
+All SQL suites run in a transaction and roll back. The Python suite runs 90 tests
 standalone. Setting `DATABASE_URL` adds 12 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 and 5 for the trace annotation. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 15 of the 94 quietly skipped — so a
+A run without those is still reported as `OK`, with 15 of the 105 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell
