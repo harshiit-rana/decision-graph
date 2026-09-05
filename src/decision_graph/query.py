@@ -2,8 +2,13 @@
 
 A thin view over Retrieval + Reasoning. It holds no logic of its own — per §6, no
 feature may introduce engine-level behaviour, and formatting a path is presentation.
-The trace it prints is the path data Engine 2 already computed, which is what
-Explainability Mode (Phase 4) will render properly.
+Rendering lives in `render.py`, shared with `dg ask` so the two cannot disagree about
+what an answer looks like.
+
+By default this answers the question once, from the best-matching artifact, and says how
+many other candidates it declined. It used to run every candidate and print three
+separately-headed traversals of what is usually one finding seen from three nodes, which
+left the reader to work out that they were the same (issue #69). `--all` restores that.
 """
 
 from __future__ import annotations
@@ -14,47 +19,63 @@ import os
 import sys
 from datetime import datetime
 
-from . import db, reasoning, retrieval
-from .reasoning import Answer, Mode, Path
+from . import db, reasoning, render, retrieval, trace
+from .reasoning import Answer, Mode
 
-TIER_MARK = {"explicit": "==", "corroborated": "++", "inferred": "~~"}
+# Kept as a module attribute because it was one, and `from .query import TIER_MARK` is the
+# kind of import that exists in someone's script.
+TIER_MARK = trace.TIER_MARK
+
+# How a retrieval tier reads. `exact` and `fuzzy` are the system's words for how the start
+# node was found, and a reader deciding whether the tool understood them needs to know
+# which happened -- a fuzzy match on a paraphrase is a different claim from a title hit.
+_MATCH_MEANING = {
+    "exact": "exact title match",
+    "identifier": "matched by identifier",
+    "prefix": "title starts with your query",
+    "fuzzy": "closest text match",
+}
 
 
-def _label(path: Path, node_id: int) -> str:
-    node_type = path.types.get(node_id) or "?"
-    title = (path.titles.get(node_id) or "").strip()
-    if len(title) > 58:
-        title = title[:55] + "..."
-    return f"{node_type}:{node_id}" + (f' "{title}"' if title else "")
+def render_answer(
+    answer: Answer,
+    *,
+    annotations: dict[int, str] | None = None,
+    statuses: dict[int, str] | None = None,
+    links: dict[str, str] | None = None,
+    verbose: bool = False,
+    out=None,
+) -> None:
+    render.render(
+        answer, annotations=annotations, statuses=statuses, links=links,
+        verbose=verbose, out=out,
+    )
 
 
-def render(answer: Answer, out=sys.stdout) -> None:
-    header = f"{answer.mode.value.upper()}  start=node:{answer.start_node_id}"
-    print(header, file=out)
-    print("-" * len(header), file=out)
+def _decision_facts(
+    conn, answer: Answer
+) -> tuple[dict[int, str], dict[int, str], dict[str, str]]:
+    """What the graph credits each Decision in this answer to (issues #19, #69).
 
-    if not answer.found:
-        print(f"  no answer — {answer.explanation}", file=out)
-        return
-
-    if answer.used_inferred_fallback:
-        # Never let this pass silently: an inferred answer is a different kind of claim.
-        print("  !! INFERRED FALLBACK — no explicit path existed", file=out)
-    print(f"  {answer.explanation}\n", file=out)
-
-    for i, path in enumerate(sorted(answer.paths, key=lambda p: (p.depth, p.target_id)), 1):
-        print(f"  [{i}] tier={path.tier}  depth={path.depth}", file=out)
-        print(f"      {_label(path, path.node_ids[0])}", file=out)
-        for step, node_id in zip(path.steps, path.node_ids[1:]):
-            mark = TIER_MARK.get(step.evidence_tier, "??")
-            arrow = "->" if step.to_node_id == node_id else "<-"
-            print(
-                f"        {mark}{arrow} {step.edge_type} [{step.evidence_tier}]"
-                f" ({step.extractor})",
-                file=out,
-            )
-            print(f"      {_label(path, node_id)}", file=out)
-        print(file=out)
+    A Why-walk stops at the Decision and never traverses `implemented_by`, so without this
+    lookup the only pull request a reader sees is the one inside the `thread_key` -- which
+    names the cluster, and for 6 of 15 Decisions names a pull request that never merged.
+    The evaluation report has printed this since #19; the command people actually run did
+    not.
+    """
+    ids = [
+        nid
+        for path in answer.paths
+        for nid in path.node_ids
+        if path.ref(nid).node_type == "decision"
+    ]
+    if not ids:
+        return {}, {}, {}
+    return (
+        trace.decision_annotations(conn, ids),
+        trace.decision_statuses(conn, ids),
+        trace.decision_links(conn, ids),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -72,10 +93,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--limit", type=int, default=3, help="candidate start nodes to try")
     parser.add_argument(
+        "--all",
+        action="store_true",
+        help="answer from every candidate, not just the best match",
+    )
+    parser.add_argument(
         "--repo", help="owner/name — restrict candidates to this repo (needed once more "
         "than one repo is ingested into the same database)"
     )
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="show node ids and the extractor behind each edge",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -102,19 +131,45 @@ def main(argv: list[str] | None = None) -> int:
         conn, args.query, repo_node_id=repo_node_id, limit=args.limit
     )
     if not candidates:
-        print(f"no candidate start node matched {args.query!r}", file=sys.stderr)
+        print(f"Nothing in the graph matches {args.query!r}.", file=sys.stderr)
+        print(file=sys.stderr)
+        print("  Retrieval tries exact title, then identifier, then prefix, then fuzzy —", file=sys.stderr)
+        print("  so a miss means no artifact in the ingested window resembles this.", file=sys.stderr)
+        print("  Try `#5898` or a commit sha, or check `dg status` for what is ingested.", file=sys.stderr)
         return 1
 
-    print(f"candidates for {args.query!r}:")
-    for c in candidates:
-        print(f"  node:{c.node_id:<5} {c.node_type:<13} {c.match:<11} {(c.title or '')[:56]}")
+    question = "Why did this happen?" if args.mode == Mode.WHY.value else "What does this affect?"
+    print(render.bold(f"{question}   {render.dim(repr(args.query))}"))
     print()
 
-    for c in candidates:
+    chosen = candidates if args.all else candidates[:1]
+    for c in chosen:
+        how = _MATCH_MEANING.get(c.match, c.match)
+        print(
+            f"  starting from  {render.bold(trace.ref(c.node_type, c.external_id))}"
+            f"  {(c.title or '')[:56]}"
+        )
+        print(render.dim(f"                 {how}"))
+        print()
+
         answer = reasoning.reason(
             conn, c.node_id, Mode(args.mode), max_depth=args.depth, as_of=as_of
         )
-        render(answer)
+        annotations, statuses, links = _decision_facts(conn, answer)
+        render_answer(
+            answer, annotations=annotations, statuses=statuses, links=links,
+            verbose=args.verbose,
+        )
+
+    skipped = len(candidates) - len(chosen)
+    if skipped:
+        print(render.dim(
+            f"  {render.plural(skipped, 'other candidate')} matched this query — "
+            "`--all` answers from each of them."
+        ))
+        for c in candidates[len(chosen):]:
+            print(render.dim(f"    {trace.ref(c.node_type, c.external_id)}  {(c.title or '')[:52]}"))
+        print()
 
     conn.close()
     return 0

@@ -14,7 +14,7 @@ from __future__ import annotations
 import unittest
 
 from decision_graph import explain
-from decision_graph.reasoning import Answer, Mode, Path, Step
+from decision_graph.reasoning import Answer, Mode, NodeRef, Path, Step
 
 
 class StubClient:
@@ -64,8 +64,11 @@ def _answer(*, found: bool, tier: str = "explicit", fallback: bool = False) -> A
     path = Path(
         node_ids=[1, 2],
         steps=[step],
-        titles={1: "decision", 2: "the motivating issue"},
-        types={1: "decision", 2: "issue"},
+        nodes={
+            1: NodeRef("decision", "decision", "thread:1:pr-5898"),
+            2: NodeRef("issue", "the motivating issue", "5895",
+                       "https://github.com/pallets/flask/issues/5895"),
+        },
     )
     return Answer(
         mode=Mode.WHY,
@@ -188,21 +191,36 @@ class AskPrintsItsEvidenceTest(unittest.TestCase):
 
     def test_the_trace_is_printed_with_the_prose(self) -> None:
         printed = self._run(_answer(found=True))
-        self.assertIn("motivated_by [explicit]", printed, "no trace was printed")
+        self.assertIn("Evidence trail", printed, "no trace was printed")
+        self.assertIn("[explicit]", printed, "the trace lost its evidence tier")
         self.assertIn("A plain-English summary.", printed)
+
+    def test_the_trace_names_artifacts_the_way_github_does(self) -> None:
+        # The point of #69: a reader checks the claim by opening the artifact, and a
+        # database primary key is not something they can open.
+        printed = self._run(_answer(found=True))
+        self.assertIn("issue #5895", printed)
+        self.assertIn("https://github.com/pallets/flask/issues/5895", printed)
+        self.assertNotIn("issue:2", printed, "a node id leaked into the default output")
 
     def test_an_inferred_answer_says_so_before_the_prose(self) -> None:
         printed = self._run(_answer(found=True, tier="inferred", fallback=True))
-        self.assertIn("INFERRED FALLBACK", printed)
+        self.assertIn("INFERRED", printed)
         self.assertLess(
-            printed.index("INFERRED FALLBACK"),
+            printed.index("INFERRED"),
             printed.index("A plain-English summary."),
             "the warning must reach the reader before the confident paragraph does",
         )
 
-    def test_a_refusal_prints_the_engines_words(self) -> None:
+    def test_a_refusal_says_what_it_means_and_what_to_try(self) -> None:
+        # A refusal is a primary output (8 of the 18 §9 outcomes). "no path found" alone
+        # cannot tell a reader whether they asked the wrong question or found a real gap.
         printed = self._run(_answer(found=False), summary=explain.NO_ANSWER)
-        self.assertIn("no answer", printed)
+        self.assertIn("No answer", printed)
+        self.assertIn("not a failure", printed)
+        self.assertIn("What to try", printed)
+        self.assertIn("engine: no path", printed,
+                      "the engine's own verdict must stay available, not be replaced")
 
 
 if __name__ == "__main__":

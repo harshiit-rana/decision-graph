@@ -71,8 +71,70 @@ Every menu choice maps to one of these, so you can skip the menu once you know t
 .\dg.ps1 query "#5898" --mode impact --depth 2
 ```
 
+An answer states what the graph holds, grades the evidence, shows the traversal that
+produced it, and links every artifact it names:
+
+```
+Why did this happen?   'change default redirect code to 303'
+
+  starting from  issue #5895  change default redirect code to 303
+                 exact title match
+
+  What the graph says
+    issue #5895 "change default redirect code to 303" motivated the decision in this thread
+        that decision is reconstructed, implemented by PR #5898, merged 2026-01-25
+
+  evidence: explicit - stated in the repository itself, a closing keyword, a review, a commit list
+
+  Evidence trail  (1 path)
+  [1] == explicit  1 hop
+      issue #5895 - change default redirect code to 303
+       \- motivated  [explicit]
+      decision - change default redirect code to 303
+          reconstructed, implemented by PR #5898, merged 2026-01-25
+
+  Check it on GitHub
+    issue #5895              https://github.com/pallets/flask/issues/5895
+    pull request #5898       https://github.com/pallets/flask/pull/5898
+```
+
+**The summary sentence is generated from the graph, not by a model.** A Decision with a
+`motivated_by` and an `implemented_by` edge determines that sentence completely; writing it
+is templating, and nothing there is an inference. `dg ask` is the command that involves a
+model, and it prints this same trace beside its prose.
+
+Three things about that output are deliberate:
+
+- **Artifacts are named as GitHub names them.** The trace used to print `issue:620`, a
+  database primary key. The number and the URL have been stored on every node since the
+  first migration and were printed on none of them, while §9's entire method is a human
+  opening the artifact and comparing it to the claim (#69).
+- **`-v` shows node ids and the extractor behind each edge.** Moved, not removed: they are
+  what you query the graph with directly once something looks wrong.
+- **The credited implementer is named and linked**, with its merge date. A Why-walk stops at
+  the Decision and never reaches the pull request that did the work, so the only number a
+  reader used to see was the one inside the `thread_key` — which names the *cluster*, and for
+  6 of 15 Decisions names a pull request that was abandoned (#19).
+
+A refusal is treated as a result, because it is one — 8 of the 18 §9 outcomes are refusals:
+
+```
+  No answer - and that is a result, not a failure
+
+    Nothing in the ingested window records why this happened. The rubric needs
+    a motivating issue and merged work in the same conversation; a change made
+    without an issue leaves nothing to reconstruct a decision from.
+
+    engine: no path found, explicit or inferred
+    the inferred fallback was tried and also found nothing
+
+  What to try
+    - widen the walk:      --depth 3
+    ...
+```
+
 `ingest` and `query` forward any flag they do not recognise to the underlying tools, so
-`--months`, `--resources`, `--max-pages`, `--as-of` and `--limit` all still work.
+`--months`, `--resources`, `--max-pages`, `--as-of`, `--limit` and `--all` all still work.
 
 ### What to expect
 
@@ -460,7 +522,7 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 127 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 146 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -475,14 +537,14 @@ so four of the five suites printed `FAIL` inside a collapsed group and exited 0 
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 105 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 124 tests
 standalone. Setting `DATABASE_URL` adds 19 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 5 for the trace annotation, and 7 for reference retraction. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 22 of the 127 quietly skipped — so a
+A run without those is still reported as `OK`, with 22 of the 146 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell
