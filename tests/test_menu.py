@@ -209,5 +209,59 @@ class LoopTest(unittest.TestCase):
             self.assertEqual(menu.run(argparse.Namespace()), 0)
 
 
+class ExplanationTest(unittest.TestCase):
+    """The new contextual explanations added in #84.
+
+    Each test is a tripwire: if the string changes (or is removed) the failure tells you
+    exactly which explanation broke rather than leaving a reader silently without context.
+    """
+
+    def test_follow_up_hints_mention_mermaid_live(self) -> None:
+        """The diagram hint must tell the reader where to paste the output."""
+        hints = {key: hint for key, _label, hint in menu.FOLLOW_UPS}
+        self.assertIn("mermaid.live", hints["d"])
+
+    def test_follow_up_hint_for_v_mentions_rule_or_extractor(self) -> None:
+        hints = {key: hint for key, _label, hint in menu.FOLLOW_UPS}
+        # "extractor" or "rule" — either word conveys the right meaning
+        self.assertTrue(
+            "rule" in hints["v"] or "extractor" in hints["v"],
+            f"v hint does not mention rule/extractor: {hints['v']!r}",
+        )
+
+    def test_follow_up_hint_for_t_mentions_past_date(self) -> None:
+        hints = {key: hint for key, _label, hint in menu.FOLLOW_UPS}
+        # must convey the time-travel idea, not just "date"
+        self.assertTrue(
+            "past" in hints["t"] or "replay" in hints["t"] or "then" in hints["t"],
+            f"t hint does not convey time-travel: {hints['t']!r}",
+        )
+
+    def test_follow_up_hint_for_s_mentions_both_modes(self) -> None:
+        hints = {key: hint for key, _label, hint in menu.FOLLOW_UPS}
+        self.assertIn("why", hints["s"])
+        self.assertIn("affect", hints["s"])
+
+    def test_tier_strength_covers_all_three_tiers(self) -> None:
+        from decision_graph.trace import TIER_STRENGTH, TIER_MEANING
+        for tier in TIER_MEANING:
+            self.assertIn(tier, TIER_STRENGTH, f"TIER_STRENGTH missing entry for {tier!r}")
+            self.assertTrue(TIER_STRENGTH[tier], f"TIER_STRENGTH[{tier!r}] is empty")
+
+    def test_explicit_is_strong_corroborated_is_strongest(self) -> None:
+        from decision_graph.trace import TIER_STRENGTH
+        self.assertIn("strong", TIER_STRENGTH["explicit"])
+        self.assertIn("strongest", TIER_STRENGTH["corroborated"])
+
+    def test_inferred_tier_strength_warns_it_is_not_a_record(self) -> None:
+        from decision_graph.trace import TIER_STRENGTH
+        label = TIER_STRENGTH["inferred"].lower()
+        self.assertTrue(
+            "weak" in label or "not a record" in label or "lead" in label,
+            f"inferred strength label does not warn reader: {label!r}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
+

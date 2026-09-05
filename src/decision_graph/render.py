@@ -28,6 +28,8 @@ import sys
 
 from . import trace
 from .reasoning import Answer, Mode, Path
+from .trace import TIER_STRENGTH
+
 
 _COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
@@ -185,16 +187,22 @@ def render(
         p(_c("33", bold("  ! INFERRED — no explicit path existed; this is not a record")))
 
     p(bold("  What the graph says"))
+    p(dim("    (a summary built only from the links below — every sentence is traceable to an edge)"))
     for line in summarize(answer, annotations, statuses):
         p(f"    {line}")
     p()
 
     tiers = sorted({path.tier for path in answer.paths}, key=lambda t: len(t))
     for tier in tiers:
-        p(f"  evidence: {_tier_colour(tier, bold(tier))} — {dim(trace.TIER_MEANING[tier])}")
+        strength = TIER_STRENGTH.get(tier, "")
+        strength_label = f"  ({strength})" if strength else ""
+        p(f"  evidence: {_tier_colour(tier, bold(tier))}{dim(strength_label)} — {dim(trace.TIER_MEANING[tier])}")
     p()
 
     p(bold(f"  Evidence trail  ({plural(len(answer.paths), 'path')})"))
+    p(dim("    Each path is an independent chain of links. More paths = more kinds of evidence;"))
+    p(dim("    a corroborated answer has at least 3 independent kinds all pointing the same way."))
+
     for i, path in enumerate(sorted(answer.paths, key=lambda x: (x.depth, x.target_id)), 1):
         _render_path(path, i, annotations, statuses, verbose, p)
 

@@ -30,9 +30,19 @@ TIER_MEANING = {
     "inferred": "the system's own guess; no explicit path existed, so this is not a record",
 }
 
+# A one-word rank printed next to the tier name so a reader does not have to work out which
+# tier is better. Corroborated is printed as "strongest" rather than "better than explicit"
+# because the absolute claim is more useful than a relative one when only one tier appears.
+TIER_STRENGTH = {
+    "explicit": "strong",
+    "corroborated": "strongest",
+    "inferred": "weak — treat as a lead, not a record",
+}
+
 # Kept from the original renderer. Colour is not available when output is piped -- which is
 # every CI log and every `dg query > file` -- so the tier must survive in ASCII too.
 TIER_MARK = {"explicit": "==", "corroborated": "++", "inferred": "~~"}
+
 
 
 def ref(node_type: str | None, external_id: str | None) -> str:

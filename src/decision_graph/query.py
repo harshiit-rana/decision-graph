@@ -171,6 +171,12 @@ def main(argv: list[str] | None = None) -> int:
             # which reads as a drawing failure and not as "the graph holds no answer".
             drawn = diagram.emit(answer, args.format)
             if drawn:
+                if args.format == "mermaid":
+                    print("# paste at https://mermaid.live  or into any GitHub comment/issue/PR",
+                          file=sys.stderr)
+                elif args.format == "dot":
+                    print("# paste at https://dreampuf.github.io/GraphvizOnline or pipe to dot -Tpng",
+                          file=sys.stderr)
                 print(drawn)
             else:
                 print(
@@ -178,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
             continue
+
 
         annotations, statuses, links = _decision_facts(conn, answer)
         render_answer(
