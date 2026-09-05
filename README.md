@@ -86,7 +86,7 @@ fetch — that signal sat unnoticed through an entire evaluation cycle once, whi
 `dg status` now prints it.
 
 **Few or no Decisions is a real answer, not a failure.** The rubric needs a motivating
-issue *and* merged work in the same thread. On flask, 235 thread clusters yield 13
+issue *and* merged work in the same thread. On flask, 238 thread clusters yield 15
 Decisions. A repo that does not reference issues from pull requests will yield fewer.
 
 ### When something breaks
@@ -377,13 +377,13 @@ Accepted deliberately rather than fixed by switching repos:
   evaluation set cannot include ownership queries against flask.**
 - **`has_wiki: false`.** The `wiki_page` extractor no-ops. On this repo `motivated_by`
   therefore resolves only to issues and PR bodies, never wiki pages.
-- **The `corroborated` tier is sparse: 7 of 235 threads.**
-  flask merges largely without formal GitHub reviews — 14 `reviewed` edges across 219
-  PRs, and only 7 threads carry any review at all; 3 threads appear in release notes.
+- **The `corroborated` tier is sparse: 8 of 238 threads.**
+  flask merges largely without formal GitHub reviews — 14 `reviewed` edges across 224
+  PRs, and only 8 threads carry any review at all; 3 threads appear in release notes.
   The rubric was chosen on independence grounds and not tuned to raise this number, so
   §9 should report the tier as under-exercised on this repo rather than as a rubric
   weakness. A repo with mandatory review would populate it heavily.
-- **Explicit-status Decisions are limited to what release notes itemise** (3 of 13).
+- **Explicit-status Decisions are limited to what release notes itemise** (3 of 15).
   flask's changelog lives in `CHANGES.rst`, a repo file, and file-content ingestion is
   not built.
 - Cross-references to artifacts **outside** the 12-month window are skipped rather than
@@ -395,7 +395,16 @@ Accepted deliberately rather than fixed by switching repos:
 ```bash
 DATABASE_URL=... python -m decision_graph.evaluation   # runs eval/query_set.json
 python eval/render_report.py                            # -> eval/report.html
+psql "$DATABASE_URL" -f eval/figures.sql                # every figure quoted below
+psql "$DATABASE_URL" -f eval/recall_audit.sql           # the coverage buckets
 ```
+
+**Every repository figure in this README was measured on 2026-09-05 and is reproducible by
+running `eval/figures.sql`.** It exists because they were not, and drifted: an ingestion run
+moved the corpus and the README went on quoting a coverage ratio whose denominator was two
+measurements out of date while its numerator was current (#67). A number produced by a query
+nobody wrote down can only be re-derived, never checked — the argument `eval/recall_audit.sql`
+already makes for the audit (#46), one level out.
 
 18 queries — 2 flagship plus 16 harder cases spanning causal reconstruction, impact,
 retrieval by identifier and paraphrase, point-in-time, and four **correct-refusal** cases.
@@ -412,12 +421,13 @@ for the figure with its disclosures.** Read them before quoting the number. 8 of
 correct outcomes are the system returning nothing, so a degenerate engine that always
 returned nothing would score 8/18 on this set; the query set was curated by the person who
 built the system; and the graph holds zero inferred edges, so nothing here measures
-inference. 15 Decisions out of 231 threads — coverage, not precision, is the binding limit,
-and this measures precision only. That ratio is the completed window, re-measured (#46): the
-corpus grew by 45% after this figure was first taken and produced no new Decision at all. The
-fourteenth and fifteenth came instead from a parser fix (#50) — two merged PRs named their
-motivating issue by URL rather than by `#N`, and the reference was being dropped. The 18
-adjudicated outcomes predate both and are unchanged by them.
+inference. 15 Decisions out of 238 threads — coverage, not precision, is the binding limit,
+and this measures precision only. That ratio has now been taken three times against three
+different corpora (#46, #48, #67), and the numerator has not moved once: the window grew by
+45%, then by another 7 clusters, and produced no new Decision either time. The fourteenth and
+fifteenth came instead from a parser fix (#50) — two merged PRs named their motivating issue
+by URL rather than by `#N`, and the reference was being dropped. The 18 adjudicated outcomes
+predate all of it and are unchanged by any of it.
 
 Most usefully: **neither defect found during the evaluation cycle was caught by the
 evaluation set.** Both #16/#17 and #19 were found by a human comparing a trace to GitHub,
@@ -433,8 +443,9 @@ Decision across `motivated_by` stops there and never traverses `implemented_by`,
 only PR number on the page used to be the one inside the `thread_key` — and that key names
 the *cluster*, chosen order-independently as PR-preferring-then-lowest-number. Where a
 change took two attempts it names the abandoned one: decision 928 sits in
-`thread:30:pr-5867`, but 5867 was never merged and PR 5899 did the work. 3 of 13 Decisions
-read that way. The graph was right and the report was misleading, which is the worse
+`thread:30:pr-5867`, but 5867 was never merged and PR 5899 did the work. 6 of 15 Decisions
+read that way today, and 3 of 13 did when this was found (#19) — the share grew with the
+corpus rather than being a quirk of the first few. The graph was right and the report was misleading, which is the worse
 failure of the two — it made a stale label and a stale edge indistinguishable on sight,
 and telling those apart is the whole job during adjudication. Traces now carry the current
 `implemented_by` target and its merge date, every one of them if there is more than one,

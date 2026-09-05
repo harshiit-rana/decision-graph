@@ -314,10 +314,45 @@ hand in §9 and are unchanged — same 13 nodes, all still passing `decision_rub
 new Decision appeared to verify, so nothing here re-tests whether the rubric admits a wrong
 one.
 
+## Re-measured again on 2026-09-05 (#67)
+
+An ingestion run on 2026-09-03 grew the corpus a third time. The buckets were re-run from
+`eval/recall_audit.sql` with no changes to it:
+
+| | after #51 (recorded above) | 2026-09-05 |
+|---|---|---|
+| threads | 231 | **238** |
+| Decisions | 15 | **15** |
+| A — no issue in the thread | 153 | 157 |
+| B — in-thread `closes`, nothing merged | 11 | 13 |
+| D — singleton issue | 52 | 53 |
+| C / E / F | 0 | 0 |
+| pull requests | 217 | 224 |
+| issues | 80 | 81 |
+
+**Seven more clusters, no new Decision.** That is the third consecutive growth of the corpus
+to produce none — 145→217 pull requests (#46), the parser fix that found two the extraction
+was dropping (#51), and now this. The Decisions have moved once in three re-measurements,
+and that once was a bug fix rather than new data.
+
+Read it as coverage, not as a rubric verdict. The four threads added to bucket A have no
+issue in them at all, so no Motivation exists for the rubric to find; the two added to B have
+one and nothing merged. Both are the buckets that were already the population, and neither
+is a case the rubric refused on a judgement it could have made differently.
+
+`C = E = F = 0` still holds, which is the check that matters most here: a nonzero F would be
+a thread passing every mechanical clause and producing no Decision anyway, and that would be
+a rubric bug rather than a coverage limit.
+
+This measurement is why `eval/figures.sql` exists. The bucket numbers above were
+re-runnable and so could be corrected in a command; the figures quoted in the README beside
+them were not, and had drifted silently since before #51.
+
 ## Reproducing
 
 ```
 psql -U postgres -d dg -v repo=1 -f eval/recall_audit.sql
+psql -U postgres -d dg -v repo=1 -f eval/figures.sql
 ```
 
 `eval/recall_audit.sql` is the bucket classification, the E check, and the bucket A and B
