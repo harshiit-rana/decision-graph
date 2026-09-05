@@ -43,12 +43,13 @@ def render_answer(
     annotations: dict[int, str] | None = None,
     statuses: dict[int, str] | None = None,
     links: dict[str, str] | None = None,
+    as_of=None,
     verbose: bool = False,
     out=None,
 ) -> None:
     render.render(
         answer, annotations=annotations, statuses=statuses, links=links,
-        verbose=verbose, out=out,
+        as_of=as_of, verbose=verbose, out=out,
     )
 
 
@@ -181,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
         annotations, statuses, links = _decision_facts(conn, answer)
         render_answer(
             answer, annotations=annotations, statuses=statuses, links=links,
-            verbose=args.verbose,
+            as_of=as_of, verbose=args.verbose,
         )
 
     skipped = len(candidates) - len(chosen)

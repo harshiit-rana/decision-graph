@@ -165,6 +165,7 @@ def render(
     annotations: dict[int, str] | None = None,
     statuses: dict[int, str] | None = None,
     links: dict[str, str] | None = None,
+    as_of=None,
     verbose: bool = False,
     out=None,
 ) -> None:
@@ -175,7 +176,7 @@ def render(
     p = lambda s="": print(s, file=out)  # noqa: E731
 
     if not answer.found:
-        _render_refusal(answer, p)
+        _render_refusal(answer, p, as_of)
         return
 
     if answer.used_inferred_fallback:
@@ -251,15 +252,28 @@ def _urls(answer: Answer) -> list[tuple[str, str]]:
     return list(seen.items())
 
 
-def _render_refusal(answer: Answer, p) -> None:
+def _render_refusal(answer: Answer, p, as_of=None) -> None:
     """Say what was looked for and what that means -- refusals are a primary output.
 
     The distinction that matters is between "you asked the wrong question" and "the graph
     genuinely holds no evidence", and only the second is a finding. Neither the engine's
     one-line explanation nor a bare "no answer" separates them.
+
+    A point-in-time query adds a third case, and it is the one most easily misread: the
+    evidence exists but did not exist YET. Saying "nothing records why this happened" to
+    someone who asked as of last June states something false about the graph, so the
+    timestamp is named before anything else.
     """
     p(bold("  No answer — and that is a result, not a failure"))
     p()
+    if as_of is not None:
+        p(f"    Asked as of {as_of:%Y-%m-%d}. Nothing that answers this existed in the")
+        p("    graph at that moment — edges are time-versioned, so this says when the")
+        p("    evidence appeared, not that it is absent now. Drop --as-of to ask about today.")
+        p()
+        p(dim(f"    engine: {answer.explanation}"))
+        p()
+        return
     if answer.mode is Mode.WHY:
         p("    Nothing in the ingested window records why this happened. The rubric needs")
         p("    a motivating issue and merged work in the same conversation; a change made")
