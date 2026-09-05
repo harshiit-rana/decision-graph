@@ -29,12 +29,30 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 
 from . import trace
 from .reasoning import Answer, Mode
 
-MODEL = "meta/llama-3.1-70b-instruct"
+# The default model, overridable with DG_NLP_MODEL in .env.
+#
+# It is configurable because the previous value stopped existing: NIM retired
+# meta/llama-3.1-70b-instruct on 2026-08-26 and every `dg ask` began failing with a 410
+# and a traceback. A hosted model id is not a constant -- it has an end-of-life date the
+# code cannot see -- so pinning one in source guarantees the same failure again, and the
+# fix should not require editing Python and rebuilding an image.
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
+
+
+def model() -> str:
+    return os.environ.get("DG_NLP_MODEL") or DEFAULT_MODEL
+
+
+# Kept as a module attribute because the CLI prints it as the byline on a generated
+# paragraph, and a reader deciding how much to trust that paragraph should be told which
+# model wrote it -- especially now that it can be changed without touching the code.
+MODEL = model()
 
 # Returned verbatim when the graph found nothing. Deliberately a constant: see rule 1.
 NO_ANSWER = (
@@ -78,6 +96,59 @@ def get_client():
     return OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
 
 
+def _diagnose(exc: Exception) -> str:
+    """Turn a provider error into something the reader can act on.
+
+    Every one of these was previously a 40-line traceback out of the CLI. The status codes
+    are read by attribute rather than by catching openai's exception classes, because
+    `openai` is an optional extra here and this module must import without it.
+    """
+    status = getattr(exc, "status_code", None) or getattr(
+        getattr(exc, "response", None), "status_code", None
+    )
+    current = model()
+    if status == 410:
+        return (
+            f"Nvidia has retired the model '{current}'. Pick a current one from "
+            "https://build.nvidia.com and set DG_NLP_MODEL=<id> in .env -- no rebuild "
+            "needed. Every other command works without this."
+        )
+    if status in (401, 403):
+        return (
+            "Nvidia rejected the API key. Check NVIDIA_API_KEY in .env, or get a new one "
+            "at https://build.nvidia.com"
+        )
+    if status == 404:
+        return (
+            f"Nvidia has no model '{current}' available to this key. Set DG_NLP_MODEL in "
+            ".env to one listed at https://build.nvidia.com"
+        )
+    if status == 429:
+        return "Nvidia rate-limited this key. Wait a moment and try again."
+    first_line = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+    return f"the request to Nvidia failed: {first_line}"
+
+
+def _complete(client, **kwargs):
+    """One chat completion, with provider failures reported rather than raised raw."""
+    try:
+        return client.chat.completions.create(**kwargs)
+    except ExplainError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - deliberately broad; see _diagnose
+        raise ExplainError(_diagnose(exc)) from exc
+
+
+# A model asked for "JSON only" routinely returns JSON with prose around it -- the model
+# this now defaults to answers `We need to output JSON only: {"query": ...}` even with
+# response_format set, and a reasoning model puts a whole plan first. Requiring the entire
+# reply to parse made the feature depend on a courtesy no provider actually guarantees.
+#
+# Greedy from the first brace to the last: the schema here is flat and single-object, so
+# the widest span is the object. A reply with no braces at all is still an error, loudly.
+_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+
 def parse_intent(question: str, client=None) -> tuple[str, str]:
     """Turn a question into (search term, mode).
 
@@ -103,16 +174,22 @@ Output valid JSON ONLY in this format:
 
 User question: {question}
 """
-    response = client.chat.completions.create(
-        model=MODEL,
+    response = _complete(
+        client,
+        model=model(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         response_format={"type": "json_object"},
     )
     content = response.choices[0].message.content or ""
 
+    match = _JSON_OBJECT_RE.search(content)
+    if not match:
+        raise ExplainError(
+            f"the model did not return JSON: {content.strip()[:120]!r}"
+        )
     try:
-        result = json.loads(content)
+        result = json.loads(match.group(0))
     except json.JSONDecodeError as exc:
         raise ExplainError(
             f"the model did not return JSON: {content.strip()[:120]!r}"
@@ -202,8 +279,9 @@ Explain the result of this query clearly and concisely in plain English.
 - Name the evidence tier of what you assert. "explicit" and "corroborated" are recorded
   facts; "inferred" is the system's own guess and must be labelled as one.
 """
-    response = client.chat.completions.create(
-        model=MODEL,
+    response = _complete(
+        client,
+        model=model(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
