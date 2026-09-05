@@ -4,3 +4,8 @@ venv/
 __pycache__/
 *.pyc
 *.egg-info/
+
+# `dg report` writes here by default. It is a rendering of the graph in the project
+# directory (the only path that exists on both sides of the container bind mount), so it
+# lands where a stray `git add .` would pick it up.
+decision-graph-report.html
