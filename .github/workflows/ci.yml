@@ -110,12 +110,29 @@ jobs:
 
       - name: SQL suites
         # Each file opens a transaction and rolls back, so order does not matter and the
-        # database is unchanged afterwards. ON_ERROR_STOP is what turns a failed check into
-        # a failed job; without it psql reports success on a suite that aborted.
+        # database is unchanged afterwards. ON_ERROR_STOP is what turns an aborted suite into
+        # a failed job, and each suite now also raises on a check that merely recorded a
+        # failure (#62) -- without that, a FAIL row printed inside a collapsed group and the
+        # build stayed green.
         run: |
           set -euo pipefail
           for f in db/tests/*.sql; do
             echo "::group::$f"
             psql -h localhost -U postgres -d dg -v ON_ERROR_STOP=1 -f "$f"
+            echo "::endgroup::"
+          done
+
+      - name: Measurement scripts still run
+        # These produce the figures the README and eval/ documents quote. They assert
+        # nothing -- the database here is empty, so every count is zero and that is fine.
+        # What is being checked is that they still EXECUTE: a renamed column or a dropped
+        # view would otherwise surface only when someone next tried to re-measure, which is
+        # exactly when a stale figure is being chased and the tooling should not also be
+        # broken (#67).
+        run: |
+          set -euo pipefail
+          for f in eval/*.sql; do
+            echo "::group::$f"
+            psql -h localhost -U postgres -d dg -v ON_ERROR_STOP=1 -v repo=1 -f "$f"
             echo "::endgroup::"
           done
