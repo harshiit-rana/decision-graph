@@ -34,8 +34,18 @@ if ($LASTEXITCODE -ne 0) {
 
 # Build once. Docker caches layers, so a rebuild after a Dockerfile change is quick, but
 # doing it on every command would add seconds to every query.
-$image = docker compose images -q app 2>$null
-if ([string]::IsNullOrWhiteSpace($image) -or $args[0] -eq 'rebuild') {
+#
+# Ask about the IMAGE, not about a container. `docker compose images -q app` lists images
+# for a service's containers, and `app` only ever runs under `compose run --rm`, so it has
+# no container and that check was empty every time -- meaning the guard never fired and
+# every single command rebuilt and announced itself as the first run (issue #75).
+#
+# The name is the compose project name plus the service. If someone overrides the project
+# name the inspect misses and it rebuilds, which is exactly what happens today, so the
+# failure direction is unchanged.
+docker image inspect decision-graph-app:latest 2>&1 | Out-Null
+$imageMissing = ($LASTEXITCODE -ne 0)
+if ($imageMissing -or $args[0] -eq 'rebuild') {
     Write-Host "Building the decision-graph image (first run only)..." -ForegroundColor Cyan
     docker compose build app
     if ($LASTEXITCODE -ne 0) { Fail "Image build failed." "Scroll up for the build error." }

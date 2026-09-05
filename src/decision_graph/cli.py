@@ -777,7 +777,15 @@ def cmd_report(args: argparse.Namespace) -> int:
     out = Path(args.output) if args.output else PROJECT_DIR / "decision-graph-report.html"
     out.write_text(report.render_html(data, repo), encoding="utf-8")
 
-    print(f"{green('wrote')} {out}")
+    # `/work/decision-graph-report.html` is the path inside the container and means nothing
+    # on the host, where the reader is. The bind mount makes it the project directory, so
+    # say that instead of leaking a path they cannot open (issue #75).
+    try:
+        shown = out.relative_to(PROJECT_DIR)
+        where = f"{shown}  {dim('(in your project folder, next to .env)')}"
+    except ValueError:
+        where = str(out)
+    print(f"{green('wrote')} {where}")
     print(dim(f"  {len(data['decisions'])} decisions from "
               f"{data['coverage']['clusters']} clusters"))
     if args.open:
