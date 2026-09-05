@@ -41,18 +41,64 @@ token or repo.
 
 ### Just run it
 
-Run `dg` with no command and it opens an interactive menu — a banner, a live status line
-(is the database up? is the graph empty?), and a numbered list you pick from. Nothing to
-memorise; it asks for what a command would need. On a pipe or in a script it prints help
-instead, so it never blocks waiting for input.
-
 ```powershell
 .\dg.ps1
 ```
 
+No command, and **nothing to memorise** — a banner, a live status line (is the database up?
+is the graph empty?), and a numbered list:
+
+```
+  1  Browse decisions      see what was found, then drill into one
+  2  Ask why               why did a change happen?
+  3  Trace impact          what does a change affect, downstream?
+  4  Natural Language Q&A  ask in plain English (requires an Nvidia API key)
+  5  Report to HTML        every decision and its evidence, as a page
+  6  Repository status     counts, cursors, decisions
+  7  Health check          what works, and how to fix what does not
+  8  Ingest a repository   pull the last 12 months into the graph
+  i  Setup / reconfigure   token, target repo, migrations (safe to re-run)
+```
+
+**Browsing comes first because it is the only entry that asks nothing of you.** Every other
+question starts by wanting the name of something — `what changed?` — which is precisely what
+a newcomer does not have. Option 1 lists what was actually found and you pick a number:
+
+```
+  15 decisions, newest first:
+
+   1  2026-08-11  #6093   reconstructed  IPv6 addresses parsed incorrectly because of
+   ...
+   8  2026-01-25  #5895   reconstructed  change default redirect code to 303
+  12  2025-08-19  #5774   explicit       `stream_with_context` does not work with async
+
+  pick a number (or Enter to go back): 8
+```
+
+Pressing Enter at any `what changed?` prompt drops you into that same list rather than
+giving up.
+
+**Every answer then offers what used to be a flag**, in context, one keystroke each — and
+they are toggles, so the bar shows what is currently on:
+
+```
+  ------------------------------------------------------------------
+  d  diagram       [on]          as a mermaid graph you can paste into GitHub
+  v  details                     node ids and the extractor behind every edge
+  a  all matches                 answer from every candidate, not just the best
+  t  as of a date  [2025-06-01]  what the graph knew at a point in time
+  s  switch mode   [why]         ask the other question about the same thing
+  Enter  back
+```
+
+Each one re-runs the same `dg query` the flags would have run, so the menu cannot drift from
+what the command prints — it *is* what the command prints. On a pipe or in a script `dg`
+prints help instead, so it never blocks waiting for input that will not come.
+
 ### The commands
 
-Every menu choice maps to one of these, so you can skip the menu once you know them.
+Every menu choice maps to one of these. The flags are the scripting interface; you never
+need to type one to use the tool.
 
 | command | what it does |
 |---|---|
@@ -600,7 +646,7 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 178 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 189 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -615,7 +661,7 @@ so four of the five suites printed `FAIL` inside a collapsed group and exited 0 
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 154 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 165 tests
 standalone. Setting `DATABASE_URL` adds 21 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 5 for the trace annotation, 7 for reference retraction, and 2 that run every `dg report`
@@ -623,7 +669,7 @@ query against the real schema, which is the half a fixture cannot check. Docker 
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 24 of the 178 quietly skipped — so a
+A run without those is still reported as `OK`, with 24 of the 189 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell

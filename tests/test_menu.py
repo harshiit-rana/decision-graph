@@ -39,6 +39,92 @@ class ActionTableTest(unittest.TestCase):
         self.assertIn("Ask why", labels)
         self.assertIn("Trace impact", labels)
 
+    def test_browsing_needs_no_prior_knowledge_and_comes_first(self) -> None:
+        # Every other query action opens by asking you to name something. Browsing is the
+        # only entry that asks nothing, so it is the one a first-time reader must land on
+        # (issue #78).
+        self.assertEqual(menu.ACTIONS[0].label, "Browse decisions")
+
+    def test_no_capability_is_reachable_only_by_a_flag(self) -> None:
+        # The point of #78: diagram, details, all-matches, point-in-time and mode-switching
+        # were reachable only by knowing a flag existed before you ran anything.
+        offered = {label for _key, label, _hint in menu.FOLLOW_UPS}
+        self.assertEqual(
+            offered,
+            {"diagram", "details", "all matches", "as of a date", "switch mode"},
+        )
+
+
+class ViewTest(unittest.TestCase):
+    """The follow-up toggles (issue #78).
+
+    These map keystrokes to `dg query` flags, and a key that quietly set the wrong flag
+    would answer a different question than the one on screen while looking entirely
+    plausible doing it. The first implementation accumulated flags instead of toggling,
+    which left "diagram" stuck on with no way back except leaving the answer.
+    """
+
+    def test_the_default_view_is_a_plain_why_answer(self) -> None:
+        self.assertEqual(menu.View("why").flags(), ["--mode", "why"])
+
+    def test_each_toggle_adds_its_flag(self) -> None:
+        for key, expected in [
+            ("d", ["--format", "mermaid"]),
+            ("v", ["-v"]),
+            ("a", ["--all"]),
+        ]:
+            with self.subTest(key=key):
+                view = menu.View("why")
+                self.assertTrue(view.toggle(key))
+                self.assertEqual(view.flags(), ["--mode", "why"] + expected)
+
+    def test_a_toggle_turns_back_off(self) -> None:
+        view = menu.View("why")
+        view.toggle("d")
+        view.toggle("d")
+        self.assertEqual(view.flags(), ["--mode", "why"])
+
+    def test_switch_mode_flips_and_flips_back(self) -> None:
+        view = menu.View("why")
+        view.toggle("s")
+        self.assertIn("impact", view.flags())
+        view.toggle("s")
+        self.assertIn("why", view.flags())
+
+    def test_as_of_prompts_and_can_be_cleared(self) -> None:
+        # Time travel you cannot leave is the toggle where being stuck is least obvious:
+        # every later answer would be about a past the reader has stopped thinking about.
+        view = menu.View("why")
+        view.toggle("t", ask=lambda _prompt: "2025-06-01")
+        self.assertIn("--as-of", view.flags())
+        self.assertIn("2025-06-01T00:00:00Z", view.flags())
+        view.toggle("t")
+        self.assertNotIn("--as-of", view.flags())
+
+    def test_cancelling_the_date_prompt_changes_nothing(self) -> None:
+        view = menu.View("why")
+        view.toggle("t", ask=lambda _prompt: "")
+        self.assertEqual(view.flags(), ["--mode", "why"])
+
+    def test_an_unknown_key_is_refused_rather_than_ignored(self) -> None:
+        # The loop prints "not an option" on False; silently swallowing it would look like
+        # the tool had done something.
+        self.assertFalse(menu.View("why").toggle("z"))
+
+    def test_the_bar_reports_what_is_already_on(self) -> None:
+        view = menu.View("why")
+        self.assertEqual(view.label("d"), "")
+        view.toggle("d")
+        self.assertEqual(view.label("d"), "on")
+        self.assertEqual(view.label("s"), "why")
+
+    def test_every_advertised_follow_up_is_a_real_toggle(self) -> None:
+        # The bar and the handler are two lists that must not drift: a row advertised with
+        # no handler behind it reads as a broken key.
+        for key, _label, _hint in menu.FOLLOW_UPS:
+            with self.subTest(key=key):
+                self.assertTrue(menu.View("why").toggle(key, ask=lambda _p: ""))
+
 
 class LoopTest(unittest.TestCase):
     def _run_with_input(self, lines: list[str]) -> int:
