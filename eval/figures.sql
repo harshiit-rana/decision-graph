@@ -90,6 +90,22 @@ SELECT
       WHERE e.edge_type = 'deployed_by' AND sn.thread_key IS NOT NULL) AS threads_in_release_notes;
 
 \echo
+\echo == Decisions whose thread_key names a pull request that never merged ==
+\echo    not a defect in the graph -- the key names the CLUSTER, chosen order-independently
+\echo    as PR-preferring-then-lowest-number, and where a change took two attempts that is
+\echo    the abandoned one. It is why a trace must print the credited implementer (#19).
+
+SELECT count(*) FILTER (WHERE dn.thread_key ~ 'pr-[0-9]+')            AS pr_keyed_decisions,
+       count(*) FILTER (WHERE dn.thread_key ~ 'pr-[0-9]+' AND NOT EXISTS (
+           SELECT 1 FROM pull_request p JOIN node pn ON pn.id = p.node_id
+            WHERE pn.external_id = substring(dn.thread_key from 'pr-([0-9]+)')
+              AND pn.repo_node_id = dn.repo_node_id
+              AND p.merged_at IS NOT NULL))                           AS names_an_unmerged_pr
+FROM decision d
+JOIN node dn ON dn.id = d.node_id
+WHERE dn.repo_node_id = :repo;
+
+\echo
 \echo == Issue outcomes ==
 \echo    not_planned is the rejected-decision category the roadmap note is about: real
 \echo    decisions v1 cannot express, because 5.1 Validation requires that work landed

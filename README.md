@@ -443,8 +443,9 @@ Decision across `motivated_by` stops there and never traverses `implemented_by`,
 only PR number on the page used to be the one inside the `thread_key` — and that key names
 the *cluster*, chosen order-independently as PR-preferring-then-lowest-number. Where a
 change took two attempts it names the abandoned one: decision 928 sits in
-`thread:30:pr-5867`, but 5867 was never merged and PR 5899 did the work. 3 of 13 Decisions
-read that way. The graph was right and the report was misleading, which is the worse
+`thread:30:pr-5867`, but 5867 was never merged and PR 5899 did the work. 6 of 15 Decisions
+read that way today, and 3 of 13 did when this was found (#19) — the share grew with the
+corpus rather than being a quirk of the first few. The graph was right and the report was misleading, which is the worse
 failure of the two — it made a stale label and a stale edge indistinguishable on sight,
 and telling those apart is the whole job during adjudication. Traces now carry the current
 `implemented_by` target and its merge date, every one of them if there is more than one,
