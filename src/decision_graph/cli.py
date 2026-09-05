@@ -896,7 +896,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     # Read the Decision facts before closing: they are a second query against the same
     # connection, and the whole point of them is that a Why-walk stops at the Decision and
     # never reaches the pull request that did the work (#19).
-    annotations, statuses, links = query._decision_facts(conn, answer)
+    annotations, statuses, links, bodies = query._decision_facts(conn, answer)
     conn.close()
 
     # The evidence, in the same form `dg query` prints it -- one renderer, so the prose and
@@ -904,11 +904,15 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     # rather than left to a default, which would bind at import and ignore any later
     # redirection, including the one the test for this uses.
     query.render_answer(
-        answer, annotations=annotations, statuses=statuses, links=links, out=sys.stdout
+        answer, annotations=annotations, statuses=statuses, links=links, bodies=bodies, out=sys.stdout
     )
 
     try:
-        explanation = explain.summarize_answer(args.question, answer)
+        explanation = explain.summarize_answer(
+            args.question, answer, bodies=bodies, annotations=annotations
+        )
+
+
     except explain.ExplainError as exc:
         # The traversal is already on screen and is the part that carries evidence, so a
         # missing key or an unreachable endpoint costs the paragraph, not the answer.

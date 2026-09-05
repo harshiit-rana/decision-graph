@@ -43,20 +43,21 @@ def render_answer(
     annotations: dict[int, str] | None = None,
     statuses: dict[int, str] | None = None,
     links: dict[str, str] | None = None,
+    bodies: dict[int, str] | None = None,
     as_of=None,
     verbose: bool = False,
     out=None,
 ) -> None:
     render.render(
         answer, annotations=annotations, statuses=statuses, links=links,
-        as_of=as_of, verbose=verbose, out=out,
+        bodies=bodies, as_of=as_of, verbose=verbose, out=out,
     )
 
 
 def _decision_facts(
     conn, answer: Answer
-) -> tuple[dict[int, str], dict[int, str], dict[str, str]]:
-    """What the graph credits each Decision in this answer to (issues #19, #69).
+) -> tuple[dict[int, str], dict[int, str], dict[str, str], dict[int, str]]:
+    """What the graph credits each Decision in this answer to, plus artifact bodies (issues #19, #69).
 
     A Why-walk stops at the Decision and never traverses `implemented_by`, so without this
     lookup the only pull request a reader sees is the one inside the `thread_key` -- which
@@ -64,6 +65,9 @@ def _decision_facts(
     The evaluation report has printed this since #19; the command people actually run did
     not.
     """
+    all_ids = [nid for path in answer.paths for nid in path.node_ids]
+    bodies = trace.artifact_bodies(conn, all_ids) if all_ids else {}
+
     ids = [
         nid
         for path in answer.paths
@@ -71,12 +75,14 @@ def _decision_facts(
         if path.ref(nid).node_type == "decision"
     ]
     if not ids:
-        return {}, {}, {}
+        return {}, {}, {}, bodies
     return (
         trace.decision_annotations(conn, ids),
         trace.decision_statuses(conn, ids),
         trace.decision_links(conn, ids),
+        bodies,
     )
+
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -186,11 +192,12 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
 
-        annotations, statuses, links = _decision_facts(conn, answer)
+        annotations, statuses, links, bodies = _decision_facts(conn, answer)
         render_answer(
             answer, annotations=annotations, statuses=statuses, links=links,
-            as_of=as_of, verbose=args.verbose,
+            bodies=bodies, as_of=as_of, verbose=args.verbose,
         )
+
 
     skipped = len(candidates) - len(chosen)
     if skipped and not graphical:

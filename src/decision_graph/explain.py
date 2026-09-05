@@ -238,7 +238,36 @@ def render_paths(answer: Answer) -> str:
     return "\n\n".join(blocks)
 
 
-def summarize_answer(question: str, answer: Answer, client=None) -> str:
+def render_context(answer: Answer, bodies: dict[int, str] | None = None) -> str:
+    """The source artifact descriptions / problem statements for the prompt."""
+    if not bodies:
+        return ""
+    blocks: list[str] = []
+    seen: set[int] = set()
+    for path in answer.paths:
+        for nid in path.node_ids:
+            if nid in seen:
+                continue
+            seen.add(nid)
+            body = bodies.get(nid)
+            if body and body.strip():
+                ref = path.ref(nid)
+                title = f' "{ref.title}"' if ref.title else ""
+                label = f"{trace.ref(ref.node_type, ref.external_id)}{title}"
+                text = body.strip()
+                if len(text) > 1500:
+                    text = text[:1500].rsplit(" ", 1)[0] + "..."
+                blocks.append(f"Artifact {label}:\n\"\"\"\n{text}\n\"\"\"")
+    return "\n\n".join(blocks)
+
+
+def summarize_answer(
+    question: str,
+    answer: Answer,
+    client=None,
+    bodies: dict[int, str] | None = None,
+    annotations: dict[int, str] | None = None,
+) -> str:
     """Explain what the engine found, in prose. Refusals are not sent to the model.
 
     `answer.found` is the engine's own verdict, and when it is false there is nothing to
@@ -260,25 +289,45 @@ def summarize_answer(question: str, answer: Answer, client=None) -> str:
         else ""
     )
 
+    context_text = render_context(answer, bodies)
+    context_section = (
+        f"\nHere is the context and problem description written by the author in the repository artifacts:\n{context_text}\n"
+        if context_text
+        else ""
+    )
+
+    facts_section = ""
+    if annotations:
+        facts_lines = []
+        for nid, note in annotations.items():
+            for path in answer.paths:
+                if nid in path.node_ids:
+                    ref = path.ref(nid)
+                    title = f' "{ref.title}"' if ref.title else ""
+                    facts_lines.append(f"- Decision{title}: {note}")
+                    break
+        if facts_lines:
+            facts_section = f"\nRecorded implementation facts from the repository:\n" + "\n".join(facts_lines) + "\n"
+
     prompt = f"""You are an Organizational Intelligence Engine explaining a decision graph to an engineer.
 The user asked: "{question}"
 
 Here are the raw graph traversal paths found in the database:
 {render_paths(answer)}
-
+{facts_section}{context_section}
 The evidence tiers present are: {', '.join(tiers)}.
 {caveat}
 Task:
-Explain the result of this query clearly and concisely in plain English.
-- Do not just read the paths back mechanically. Synthesize them.
-- If multiple paths lead to the same decision, group them.
-- State clearly what motivated the change, or what the change impacts.
-- Use ONLY what the paths above contain. Do not add context about the project, the
-  library, or the wider ecosystem from your own knowledge, however plausible: everything
-  you write must be checkable against the trace printed beside your answer.
+Explain the result of this query clearly, thoroughly, and informatively in plain English.
+- Synthesize both the traversal graph and the artifact context (issue/PR descriptions) above.
+- Clearly explain the underlying MOTIVATION or PROBLEM that prompted this change (what was wrong or what was requested).
+- Explain WHAT was decided and HOW it was implemented (identifying key pull requests or commits).
+- If multiple paths lead to the same decision, group them logically.
+- Base your explanation strictly on the evidence and artifact text provided above.
 - Name the evidence tier of what you assert. "explicit" and "corroborated" are recorded
   facts; "inferred" is the system's own guess and must be labelled as one.
 """
+
     response = _complete(
         client,
         model=model(),
@@ -286,6 +335,7 @@ Explain the result of this query clearly and concisely in plain English.
         temperature=0.2,
     )
     return (response.choices[0].message.content or "").strip()
+
 
 
 def _fail(exc: ExplainError) -> int:

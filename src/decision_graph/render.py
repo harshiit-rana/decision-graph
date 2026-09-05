@@ -106,11 +106,15 @@ def inline(path: Path, node_id: int) -> str:
     """
     ref = path.ref(node_id)
     if ref.node_type == "decision":
-        # Synthesis gives a Decision the title of the issue that motivated it, so
-        # `issue #5895 "X" motivated decision "X"` states the same thing twice and reads as
-        # though two separate artifacts were found. What the decision IS follows on the
-        # next line, where it can be said once and properly.
-        return "the decision in this thread"
+        # If this decision has the same title as the start node, it's the thread's own decision.
+        # Otherwise, name the distinct decision reached via cross-references.
+        start_ref = path.ref(path.node_ids[0])
+        if start_ref.node_type == "decision" or (
+            start_ref.title and ref.title and start_ref.title.strip() == ref.title.strip()
+        ):
+            return "the decision in this thread"
+        title = _clip(ref.title, 52)
+        return f'decision "{title}"' if title else "decision"
     head = trace.ref(ref.node_type, ref.external_id)
     title = _clip(ref.title, 52)
     return f'{head} "{title}"' if title else head
@@ -126,6 +130,40 @@ def _clip(text: str | None, limit: int) -> str:
     return text[: limit - 3] + "..." if len(text) > limit else text
 
 
+def _clean_body_excerpt(body: str, max_lines: int = 5, max_chars: int = 420) -> list[str]:
+    """Extract a clean, readable opening excerpt from a markdown issue/PR body."""
+    import re
+    import textwrap
+
+    clean_lines = []
+    for line in body.strip().splitlines():
+        line_s = line.strip()
+        if not line_s:
+            if clean_lines and sum(len(l) for l in clean_lines) > 80:
+                break
+            continue
+        if line_s.startswith(("#", "<!--", "![")):
+            continue
+        if set(line_s) <= {"-", "*", "="} and len(line_s) >= 3:
+            continue
+        clean_lines.append(line_s)
+        if len(clean_lines) >= max_lines:
+            break
+
+    combined = " ".join(clean_lines).strip()
+    if not combined:
+        return []
+
+    # Strip markdown link syntax: [label](url) -> label
+    combined = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", combined)
+
+    if len(combined) > max_chars:
+        combined = combined[:max_chars].rsplit(" ", 1)[0] + "..."
+
+    return textwrap.wrap(combined, width=72)
+
+
+
 def summarize(answer: Answer, annotations: dict[int, str], statuses: dict[int, str]) -> list[str]:
     """The answer in sentences, built only from what the paths contain.
 
@@ -138,20 +176,43 @@ def summarize(answer: Answer, annotations: dict[int, str], statuses: dict[int, s
 
     lines: list[str] = []
     seen: set[tuple[int, str]] = set()
+
+    # Decisions directly motivated by the start node (1 hop)
+    motivated_decisions: set[int] = {
+        path.target_id
+        for path in answer.paths
+        if path.depth == 1 and path.steps and path.steps[0].edge_type == "motivated_by"
+    }
+
     for path in sorted(answer.paths, key=lambda p: (p.depth, p.target_id)):
         target = path.target_id
         step = path.steps[-1] if path.steps else None
         if step is None:
             continue
         forward = step.to_node_id == target
+
+        # If this decision was already motivated by the start node in Path 1, an indirect
+        # multi-hop path reaching it via implemented_by should not state that the issue
+        # implemented the decision.
+        if path.depth > 1 and target in motivated_decisions and step.edge_type == "implemented_by":
+            continue
+
         key = (target, step.edge_type)
         if key in seen:
             continue
         seen.add(key)
 
-        subject = inline(path, path.node_ids[0])
-        verb = phrase(step.edge_type, forward)
-        lines.append(f"{subject} {bold(verb)} {inline(path, target)}")
+        if path.depth == 1:
+            subject = inline(path, path.node_ids[0])
+            verb = phrase(step.edge_type, forward)
+            lines.append(f"{subject} {bold(verb)} {inline(path, target)}")
+        else:
+            # Multi-hop: the penultimate node executed the step reaching target
+            start_node = inline(path, path.node_ids[0])
+            actor_node = inline(path, path.node_ids[-2])
+            verb = phrase(step.edge_type, forward)
+            target_node = inline(path, target)
+            lines.append(f"{start_node} links to {actor_node}, which {bold(verb)} {target_node}")
 
         note = annotations.get(target)
         status = statuses.get(target)
@@ -161,12 +222,14 @@ def summarize(answer: Answer, annotations: dict[int, str], statuses: dict[int, s
     return lines
 
 
+
 def render(
     answer: Answer,
     *,
     annotations: dict[int, str] | None = None,
     statuses: dict[int, str] | None = None,
     links: dict[str, str] | None = None,
+    bodies: dict[int, str] | None = None,
     as_of=None,
     verbose: bool = False,
     out=None,
@@ -175,6 +238,7 @@ def render(
     annotations = annotations or {}
     statuses = statuses or {}
     links = links or {}
+    bodies = bodies or {}
     p = lambda s="": print(s, file=out)  # noqa: E731
 
     if not answer.found:
@@ -192,7 +256,36 @@ def render(
         p(f"    {line}")
     p()
 
+    if bodies:
+        context_nid = None
+        if answer.start_node_id in bodies and bodies[answer.start_node_id]:
+            context_nid = answer.start_node_id
+        else:
+            for path in answer.paths:
+                for nid in path.node_ids:
+                    if nid in bodies and bodies[nid] and path.ref(nid).node_type in ("issue", "pull_request"):
+                        context_nid = nid
+                        break
+                if context_nid:
+                    break
+
+        if context_nid and bodies.get(context_nid):
+            ref_obj = None
+            for path in answer.paths:
+                if context_nid in path.node_ids:
+                    ref_obj = path.ref(context_nid)
+                    break
+            if ref_obj:
+                excerpt_lines = _clean_body_excerpt(bodies[context_nid])
+                if excerpt_lines:
+                    artifact_label = trace.ref(ref_obj.node_type, ref_obj.external_id)
+                    p(bold(f"  Motivation & Context  (from {artifact_label})"))
+                    for eline in excerpt_lines:
+                        p(f"    {dim(eline)}")
+                    p()
+
     tiers = sorted({path.tier for path in answer.paths}, key=lambda t: len(t))
+
     for tier in tiers:
         strength = TIER_STRENGTH.get(tier, "")
         strength_label = f"  ({strength})" if strength else ""
