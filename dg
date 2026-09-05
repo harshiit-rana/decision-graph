@@ -33,7 +33,17 @@ docker compose version >/dev/null 2>&1 || fail \
 
 # Build once. Docker caches layers, so rebuilding after a Dockerfile change is quick, but
 # doing it on every command would add seconds to every query.
-if [ -z "$(docker compose images -q app 2>/dev/null)" ] || [ "${1:-}" = "rebuild" ]; then
+#
+# Ask about the IMAGE, not about a container. `docker compose images -q app` lists images
+# for a service's containers, and `app` only ever runs under `compose run --rm`, so it has
+# no container and that check was empty every time -- meaning the guard never fired and
+# every single command rebuilt and announced itself as the first run (issue #75).
+#
+# The name is the compose project name plus the service. If someone overrides the project
+# name the inspect misses and it rebuilds, which is exactly what happens today, so the
+# failure direction is unchanged.
+if ! docker image inspect decision-graph-app:latest >/dev/null 2>&1 \
+   || [ "${1:-}" = "rebuild" ]; then
     printf '\033[36mBuilding the decision-graph image (first run only)...\033[0m\n'
     docker compose build app || fail "Image build failed." "Scroll up for the build error."
     if [ "${1:-}" = "rebuild" ]; then printf '\033[32mRebuilt.\033[0m\n'; exit 0; fi
