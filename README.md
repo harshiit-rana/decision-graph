@@ -62,6 +62,7 @@ Every menu choice maps to one of these, so you can skip the menu once you know t
 | `dg ingest --repo owner/name` | pulls the last 12 months into the graph |
 | `dg status` | what is ingested: counts by type, per repo, cursor positions |
 | `dg query "..." --mode why` | ask why something happened, or what a change affects |
+| `dg ask "..."` | the same, asked in plain English — needs an Nvidia NIM key |
 
 ```powershell
 .\dg.ps1 ingest --repo pallets/flask
@@ -303,6 +304,41 @@ dg-query "#5898" --mode impact --depth 2
 dg-query "send_file type annotations" --mode why --as-of 2026-03-01T00:00:00Z
 ```
 
+## Asking in English (`dg ask`)
+
+`dg query` takes a title, a `#number`, or a sha. `dg ask` takes a sentence, uses a model to
+turn it into one of those plus a mode, runs the *same* engines, and writes the result up in
+prose:
+
+```powershell
+.\dg.ps1 ask "why did we change the default redirect code?"
+```
+
+It needs `NVIDIA_API_KEY` in `.env` (get one at <https://build.nvidia.com>) and calls
+`meta/llama-3.1-70b-instruct` through Nvidia NIM. **The question and the traversal paths
+leave your machine**; nothing else does, and no other command in this repository calls any
+service but GitHub. `dg doctor` reports whether the key and the package are present, so you
+find out before typing a question rather than after. Everything else works without it.
+
+**The model does not decide anything.** Which paths exist, what tier each carries, and
+whether there is an answer at all come from the graph. Three rules keep it that way (#65):
+
+- **The trace prints with the prose**, in the same tier-marked form `dg query` uses, above
+  it. §7 requires every answer to carry the traversal that produced it, and prose that
+  cannot be checked against the graph is the one output this system should not print — an
+  English paragraph reads identically whether it rests on four corroborated edges or one
+  inferred guess.
+- **A refusal is never generated.** When the engine finds nothing, the answer is a fixed
+  sentence from the code and the model is never called. 8 of the 18 §9 outcomes are
+  refusals; they are this system's most load-bearing output, and a model asked to *"politely
+  state that the graph does not contain the answer"* is not making the same claim the engine
+  is. It also means a missing key cannot turn a correct refusal into a crash.
+- **The tier travels into the prompt**, which is told to name it and to use nothing but the
+  paths — and an inferred fallback is flagged in the first sentence.
+
+Installed by default in the Docker image. On a host install it is the optional extra:
+`pip install 'decision-graph[nlp]'`.
+
 ## Evidence Ranking (Phase 3)
 
 An explicit edge upgrades to `corroborated` iff (1) its `edge_type` is evidence-carrying,
@@ -413,7 +449,7 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 112 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 127 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -428,14 +464,14 @@ so four of the five suites printed `FAIL` inside a collapsed group and exited 0 
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 90 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 105 tests
 standalone. Setting `DATABASE_URL` adds 19 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 5 for the trace annotation, and 7 for reference retraction. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 22 of the 112 quietly skipped — so a
+A run without those is still reported as `OK`, with 22 of the 127 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell

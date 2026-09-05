@@ -10,6 +10,8 @@ RUN apt-get update \
 # Dependencies are baked into the image; the source is bind-mounted at /work. That split
 # is deliberate — deps change rarely, so the layer stays cached, while editing the code
 # takes effect immediately with no rebuild.
+# Mirrors pyproject: the two runtime dependencies plus the `nlp` extra, which is
+# optional on the host and always present here so `dg ask` works out of the box.
 RUN pip install --no-cache-dir "psycopg[binary]>=3.1" "httpx>=0.27" "openai>=1.0"
 
 ENV PYTHONPATH=/work/src \
