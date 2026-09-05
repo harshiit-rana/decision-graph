@@ -10,6 +10,14 @@ dependencies = [
     "httpx>=0.27",
 ]
 
+# `dg ask` only. Optional because it is the one feature that calls a third-party service,
+# and every other command works without it -- but declared, because the Dockerfile was
+# installing it while this file was not, so `pip install -e .` produced an installation
+# where that command could not run and advised rebuilding a Docker image the user might
+# not be using (issue #65).
+[project.optional-dependencies]
+nlp = ["openai>=1.0"]
+
 [project.scripts]
 dg = "decision_graph.cli:main"
 dg-ingest = "decision_graph.run:main"

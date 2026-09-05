@@ -425,6 +425,33 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     else:
         states.append(check(WARN, "TARGET_REPO not set", fix="pass `--repo owner/name` per command"))
 
+    # `dg ask` is optional, so both of these warn rather than fail — but they warn HERE,
+    # rather than exiting after the user has typed a question, which is where the menu's
+    # sixth option used to deliver the news (issue #65).
+    try:
+        import openai  # noqa: F401
+
+        states.append(check(PASS, "openai package available (for `dg ask`)"))
+    except ImportError:
+        states.append(
+            check(
+                WARN,
+                "openai not installed — `dg ask` unavailable",
+                fix="run `dg rebuild`, or outside Docker: pip install 'decision-graph[nlp]'",
+            )
+        )
+    if os.environ.get("NVIDIA_API_KEY"):
+        states.append(check(PASS, "NVIDIA_API_KEY set (for `dg ask`)"))
+    else:
+        states.append(
+            check(
+                WARN,
+                "NVIDIA_API_KEY not set — `dg ask` unavailable",
+                "every other command works without it",
+                "add it to .env; get one at https://build.nvidia.com",
+            )
+        )
+
     heading("Database")
     dsn = os.environ.get("DATABASE_URL", "")
     if not dsn:
@@ -702,10 +729,21 @@ def cmd_query(args: argparse.Namespace, extra: list[str]) -> int:
 
 
 def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
-    from . import explain, db, retrieval, reasoning
+    """Natural-language front door to the same engines `dg query` uses.
+
+    The prose comes last and the trace comes first, in that order deliberately. §7 requires
+    every Why/Impact answer to carry the traversal that produced it; an English paragraph
+    with no evidence beside it is the one output this system should not print, since it
+    reads identically whether it rests on four corroborated edges or one inferred guess
+    (issue #65). The trace is the answer; the paragraph is a reading of it.
+    """
+    from . import explain, db, query, retrieval, reasoning
 
     print(f"Parsing intent for: {args.question!r}")
-    query_str, mode = explain.parse_intent(args.question)
+    try:
+        query_str, mode = explain.parse_intent(args.question)
+    except explain.ExplainError as exc:
+        return explain._fail(exc)
     print(f"-> Parsed intent: Search for {query_str!r}, Mode: {mode}\n")
 
     dsn = os.environ.get("DATABASE_URL")
@@ -717,21 +755,33 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     candidates = retrieval.find_candidates(conn, query_str, limit=1)
     if not candidates:
         print(f"No match found for extracted search term {query_str!r}.", file=sys.stderr)
+        conn.close()
         return 1
 
     c = candidates[0]
-    print(f"Found candidate: node:{c.node_id} {c.node_type} \"{c.title[:56]}\"\n")
-    print("Traversing the graph...")
+    print(f"Found candidate: node:{c.node_id} {c.node_type} \"{(c.title or '')[:56]}\"\n")
+    print("Traversing the graph...\n")
     answer = reasoning.reason(conn, c.node_id, reasoning.Mode(mode))
-
-    print("Generating explanation...\n")
-    explanation = explain.summarize_answer(args.question, answer)
-
-    print("-" * 40)
-    print(explanation)
-    print("-" * 40)
-
     conn.close()
+
+    # The evidence, in the same form `dg query` prints it, tier marks and all. `sys.stdout`
+    # is passed rather than left to render's default, which binds at import and so ignores
+    # any later redirection -- including the one the test for this uses.
+    query.render(answer, sys.stdout)
+
+    try:
+        explanation = explain.summarize_answer(args.question, answer)
+    except explain.ExplainError as exc:
+        # The traversal is already on screen and is the part that carries evidence, so a
+        # missing key or an unreachable endpoint costs the paragraph, not the answer.
+        print(dim("(no plain-English summary: " + str(exc) + ")"))
+        return 2
+
+    heading("In plain English")
+    print(explanation)
+    print()
+    print(dim("Written by " + explain.MODEL + " from the trace above, which is the"))
+    print(dim("evidence. Where the two disagree, the trace is what the graph holds."))
     return 0
 
 
