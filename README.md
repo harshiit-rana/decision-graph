@@ -63,6 +63,7 @@ Every menu choice maps to one of these, so you can skip the menu once you know t
 | `dg status` | what is ingested: counts by type, per repo, cursor positions |
 | `dg query "..." --mode why` | ask why something happened, or what a change affects |
 | `dg ask "..."` | the same, asked in plain English — needs an Nvidia NIM key |
+| `dg query ... --format mermaid` | the same answer as a diagram (`dot` also available) |
 
 ```powershell
 .\dg.ps1 ingest --repo pallets/flask
@@ -133,8 +134,49 @@ A refusal is treated as a result, because it is one — 8 of the 18 §9 outcomes
     ...
 ```
 
+### Answers as diagrams
+
+`--format mermaid` (or `dot`) emits the traversal as a graph instead of prose. Raw, no code
+fence, so it pipes into a file:
+
+```powershell
+.\dg.ps1 query "#5898" --mode impact --format mermaid > answer.mmd
+```
+
+```
+graph LR
+  n656["pull request #5898<br/>redirect defaults to 303"]
+  n620(["issue #5895<br/>change default redirect code to 303"])
+  n658(("commit eca5fd1<br/>redirect defaults to 303"))
+  n1648{{"decision<br/>change default redirect code to 303"}}
+  n656 -->|"closes . explicit"| n620
+  n656 -->|"implements . explicit"| n658
+  n1648 -->|"was implemented by . explicit"| n656
+  classDef decision fill:#fde68a,stroke:#b45309,stroke-width:2px;
+  class n1648 decision;
+```
+
+Paste it into a ```` ```mermaid ```` block on GitHub and it renders there. `--format dot`
+gives Graphviz instead, with each node carrying its GitHub URL so a rendered SVG is
+clickable.
+
+Two constraints the diagram keeps, both about not claiming more than the walk did:
+
+- **Only edges the engine actually traversed are drawn.** The credited implementer is named
+  in the text output and is deliberately absent from the picture, because a Why-walk stops at
+  the Decision and never crosses `implemented_by`. A diagram is read as the whole story, so
+  it may contain nothing but the story.
+- **The tier survives the translation** — solid explicit, thick corroborated, dashed
+  inferred — *and* is written on every edge label. Line weight is a hint; the word is the
+  claim, and a picture that renders a guess and a record identically undoes the tiering at
+  the last step.
+
+Edges are drawn along the graph's own direction rather than the walker's, so a Why-walk that
+crosses `motivated_by` backwards still shows the arrow the edge actually has.
+
 `ingest` and `query` forward any flag they do not recognise to the underlying tools, so
-`--months`, `--resources`, `--max-pages`, `--as-of`, `--limit` and `--all` all still work.
+`--months`, `--resources`, `--max-pages`, `--as-of`, `--limit`, `--all` and `--format` all
+still work.
 
 ### What to expect
 
@@ -522,7 +564,7 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 146 tests
+DATABASE_URL=... python -m unittest discover -s tests               # 161 tests
 ```
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
@@ -537,14 +579,14 @@ so four of the five suites printed `FAIL` inside a collapsed group and exited 0 
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 124 tests
+All SQL suites run in a transaction and roll back. The Python suite runs 139 tests
 standalone. Setting `DATABASE_URL` adds 19 integration tests — 7 for the traversal
 fallback, which seed their own fixture because the real graph holds no inferred edges,
 5 for the trace annotation, and 7 for reference retraction. Docker adds 3 more that compile the whole package on the
 oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
 one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 22 of the 146 quietly skipped — so a
+A run without those is still reported as `OK`, with 22 of the 161 quietly skipped — so a
 local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell
