@@ -19,7 +19,7 @@ import os
 import sys
 from datetime import datetime
 
-from . import db, reasoning, render, retrieval, trace
+from . import db, diagram, reasoning, render, retrieval, trace
 from .reasoning import Answer, Mode
 
 # Kept as a module attribute because it was one, and `from .query import TIER_MARK` is the
@@ -105,6 +105,12 @@ def main(argv: list[str] | None = None) -> int:
         "-v", "--verbose", action="store_true",
         help="show node ids and the extractor behind each edge",
     )
+    parser.add_argument(
+        "--format",
+        choices=["text", *sorted(diagram.FORMATS)],
+        default="text",
+        help="text (default), or a diagram of the walk: mermaid, dot",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -138,23 +144,40 @@ def main(argv: list[str] | None = None) -> int:
         print("  Try `#5898` or a commit sha, or check `dg status` for what is ingested.", file=sys.stderr)
         return 1
 
+    graphical = args.format != "text"
     question = "Why did this happen?" if args.mode == Mode.WHY.value else "What does this affect?"
-    print(render.bold(f"{question}   {render.dim(repr(args.query))}"))
-    print()
+    if not graphical:
+        print(render.bold(f"{question}   {render.dim(repr(args.query))}"))
+        print()
 
     chosen = candidates if args.all else candidates[:1]
     for c in chosen:
-        how = _MATCH_MEANING.get(c.match, c.match)
-        print(
-            f"  starting from  {render.bold(trace.ref(c.node_type, c.external_id))}"
-            f"  {(c.title or '')[:56]}"
-        )
-        print(render.dim(f"                 {how}"))
-        print()
+        if not graphical:
+            how = _MATCH_MEANING.get(c.match, c.match)
+            print(
+                f"  starting from  {render.bold(trace.ref(c.node_type, c.external_id))}"
+                f"  {(c.title or '')[:56]}"
+            )
+            print(render.dim(f"                 {how}"))
+            print()
 
         answer = reasoning.reason(
             conn, c.node_id, Mode(args.mode), max_depth=args.depth, as_of=as_of
         )
+        if graphical:
+            # Raw, so it pipes into a .mmd or .dot file. A refusal produces nothing at all
+            # rather than an empty diagram: an empty `graph LR` renders as a blank box,
+            # which reads as a drawing failure and not as "the graph holds no answer".
+            drawn = diagram.emit(answer, args.format)
+            if drawn:
+                print(drawn)
+            else:
+                print(
+                    f"# no answer to draw: {answer.explanation}",
+                    file=sys.stderr,
+                )
+            continue
+
         annotations, statuses, links = _decision_facts(conn, answer)
         render_answer(
             answer, annotations=annotations, statuses=statuses, links=links,
@@ -162,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     skipped = len(candidates) - len(chosen)
-    if skipped:
+    if skipped and not graphical:
         print(render.dim(
             f"  {render.plural(skipped, 'other candidate')} matched this query — "
             "`--all` answers from each of them."
