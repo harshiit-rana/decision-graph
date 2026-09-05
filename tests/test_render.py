@@ -176,6 +176,19 @@ class RefusalTest(unittest.TestCase):
         self.assertIn("records why this happened", why)
         self.assertIn("records what this affects", impact)
 
+    def test_a_point_in_time_refusal_names_the_moment(self) -> None:
+        # The most easily misread refusal: the evidence exists but did not exist YET.
+        # "Nothing records why this happened" is false when the caller asked about a date
+        # before the work landed, and it is the answer a temporal control depends on.
+        from datetime import datetime
+
+        printed = render_to_string(answer(found=False), as_of=datetime(2025, 6, 1))
+        self.assertIn("as of 2025-06-01", printed)
+        self.assertIn("not that it is absent now", printed)
+
+    def test_an_ordinary_refusal_does_not_mention_time(self) -> None:
+        self.assertNotIn("as of", render_to_string(answer(found=False)))
+
     def test_a_tried_fallback_is_reported(self) -> None:
         # "Nothing found" and "nothing found even after admitting guesses" are different
         # statements about how hard the engine looked.
