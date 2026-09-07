@@ -34,6 +34,31 @@ def run_query(argv: list[str]) -> tuple[int, str]:
 
 @unittest.skipUnless(DSN, "DATABASE_URL not set")
 class QueryArgumentTest(unittest.TestCase):
+    def assertAccepted(self, argv: list[str]) -> str:
+        """Assert these arguments passed validation, whatever the graph happens to hold.
+
+        The positive controls need this because they cannot assert an answer. Exit 0 means
+        the query was answered, which is true only where `pallets/flask` has been ingested
+        -- CI applies the migrations but deliberately never calls the GitHub API, so
+        `#5898` resolves to nothing there and the command exits 1 for a reason that has
+        nothing to do with the argument under test. Asserting 0 made these two pass on one
+        machine and fail everywhere else.
+
+        Exit 2 is the code argument validation produces, and it is the one thing these
+        tests are guarding against.
+        """
+        code, text = run_query(argv)
+        self.assertNotEqual(code, 2, f"the argument was rejected: {text}")
+        if code == 1:
+            self.assertIn(
+                "Nothing in the graph matches",
+                text,
+                "exited 1 for some reason other than an unpopulated graph",
+            )
+        else:
+            self.assertEqual(code, 0, text)
+        return text
+
     def test_a_non_timestamp_as_of_is_reported_not_raised(self) -> None:
         # `datetime.fromisoformat` raised straight out of the standard library, past every
         # error path this CLI has.
@@ -44,8 +69,7 @@ class QueryArgumentTest(unittest.TestCase):
     def test_a_bare_date_is_still_accepted(self) -> None:
         # The fix must not narrow what works: YYYY-MM-DD is what the error message tells
         # people to use, so it had better parse.
-        code, _text = run_query(["#5898", "--as-of", "2026-03-01"])
-        self.assertEqual(code, 0)
+        self.assertAccepted(["#5898", "--as-of", "2026-03-01"])
 
     def test_depth_zero_is_refused_rather_than_answered_with_nothing(self) -> None:
         code, text = run_query(["#5898", "--depth", "0"])
@@ -58,8 +82,7 @@ class QueryArgumentTest(unittest.TestCase):
         self.assertEqual(code, 2)
 
     def test_depth_one_still_works(self) -> None:
-        code, _text = run_query(["#5898", "--depth", "1"])
-        self.assertEqual(code, 0)
+        self.assertAccepted(["#5898", "--depth", "1"])
 
 
 class AskArgumentTest(unittest.TestCase):
