@@ -97,13 +97,28 @@ def to_mermaid(answer: Answer) -> str:
     if not nodes:
         return ""
 
-    lines = ["graph LR"]
+    # Force the base (light) theme so the diagram is readable regardless of which theme
+    # mermaid.live or GitHub happens to default to. The dark theme turns every non-decision
+    # node into a dark gray box with white text on a dark background -- invisible on a dark
+    # page and low-contrast on a light one. `base` gives a white canvas and lets classDef
+    # control every fill, so the colors here are exactly what the reader sees.
+    lines = [
+        "%%{init: {"
+        "'theme': 'base',"
+        " 'themeVariables': {"
+        "'primaryColor': '#ffffff',"
+        " 'primaryTextColor': '#1a1a1a',"
+        " 'primaryBorderColor': '#888888',"
+        " 'lineColor': '#555555',"
+        " 'edgeLabelBackground': '#f0f0f0',"
+        " 'tertiaryColor': '#f9f9f9'"
+        "}}}%%",
+        "graph LR",
+    ]
+
     for node_id, (node_type, title, external_id, _url) in nodes.items():
         open_, close = _MERMAID_SHAPE.get(node_type or "", ("[", "]"))
         head, short = _title(node_type, external_id, title)
-        # Escape the two halves separately, then join with the line break: `<br/>` is
-        # markup this module is adding, not content the repository wrote, so it must not
-        # pass through the escaper that would neutralise it.
         text = _escape_mermaid(head)
         if short:
             text += "<br/>" + _escape_mermaid(short)
@@ -111,21 +126,36 @@ def to_mermaid(answer: Answer) -> str:
 
     for _edge_id, (src, dst, step) in edges.items():
         arrow = _MERMAID_LINK.get(step.evidence_tier, "-->")
-        # Always drawn along the graph's own direction, so the outward phrasing is always
-        # the right one -- a Why-walk crosses `motivated_by` backwards, but the edge still
-        # runs decision -> issue and the picture should say what the edge says, not what
-        # order the walker happened to visit it in.
         verb = render.phrase(step.edge_type, True)
         label = _escape_mermaid(f"{verb} · {step.evidence_tier}")
         lines.append(f'  n{src} {arrow}|"{label}"| n{dst}')
 
-    # A Decision is the assertion this whole system exists to make, so it is the one node
-    # that is styled rather than left to the default.
-    decisions = [f"n{nid}" for nid, (t, _, _, _) in nodes.items() if t == "decision"]
-    if decisions:
-        lines.append("  classDef decision fill:#fde68a,stroke:#b45309,stroke-width:2px;")
-        lines.append(f"  class {','.join(decisions)} decision;")
+    # Per-type class definitions. Colors are chosen for contrast on white and for
+    # distinctiveness from each other: decision=amber, issue=blue, PR=green,
+    # commit=indigo, release=teal. All have dark text (#1a1a1a) so readability does not
+    # depend on the reader knowing which tier maps to which shade.
+    lines.append("  classDef decision  fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#1a1a1a;")
+    lines.append("  classDef issue      fill:#dbeafe,stroke:#1d4ed8,stroke-width:1.5px,color:#1e3a5f;")
+    lines.append("  classDef pr         fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#14532d;")
+    lines.append("  classDef commit     fill:#ede9fe,stroke:#6d28d9,stroke-width:1.5px,color:#3b0764;")
+    lines.append("  classDef release    fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a;")
+    lines.append("  classDef person     fill:#fef9c3,stroke:#a16207,stroke-width:1px,color:#713f12;")
+    lines.append("  classDef other      fill:#f3f4f6,stroke:#6b7280,stroke-width:1px,color:#1a1a1a;")
+
+    _TYPE_CLASS = {
+        "decision": "decision",
+        "issue": "issue",
+        "pull_request": "pr",
+        "commit": "commit",
+        "release": "release",
+        "person": "person",
+    }
+    for node_id, (node_type, _, _, _) in nodes.items():
+        cls = _TYPE_CLASS.get(node_type or "", "other")
+        lines.append(f"  class n{node_id} {cls};")
+
     return "\n".join(lines)
+
 
 
 def to_dot(answer: Answer) -> str:

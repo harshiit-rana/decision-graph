@@ -58,7 +58,8 @@ def one_hop(tier="explicit", title="change default redirect code to 303") -> Ans
 class MermaidTest(unittest.TestCase):
     def test_nodes_and_edges_are_emitted(self) -> None:
         out = diagram.to_mermaid(one_hop())
-        self.assertTrue(out.startswith("graph LR"))
+        # The diagram now starts with the %%{init}%% theme directive; graph LR follows.
+        self.assertIn("graph LR", out)
         self.assertIn("issue #5895", out)
         self.assertIn("n1 -->", out)
 
@@ -66,7 +67,7 @@ class MermaidTest(unittest.TestCase):
         # Line weight is a hint; the word is the claim. A reader who cannot see the
         # difference between a dashed and a solid line must still be told.
         inferred = diagram.to_mermaid(one_hop(tier="inferred"))
-        self.assertIn("-.->", inferred)
+        self.assertIn("-.->" , inferred)
         self.assertIn("inferred", inferred)
 
         corroborated = diagram.to_mermaid(one_hop(tier="corroborated"))
@@ -74,7 +75,7 @@ class MermaidTest(unittest.TestCase):
 
         explicit = diagram.to_mermaid(one_hop())
         self.assertIn("-->", explicit)
-        self.assertNotIn("-.->", explicit)
+        self.assertNotIn("-.->" , explicit)
 
     def test_a_quote_in_a_title_cannot_break_the_label(self) -> None:
         # Mermaid signals a broken label by rendering nothing, so this fails silently and
@@ -115,6 +116,28 @@ class MermaidTest(unittest.TestCase):
         # diagram rather than as "the graph holds no answer".
         self.assertEqual(diagram.to_mermaid(answer([])), "")
 
+    def test_every_node_type_gets_a_distinct_class(self) -> None:
+        """Node types must not all render in the same default gray."""
+        out = diagram.to_mermaid(one_hop())
+        # At minimum: decision and issue are both in the one-hop fixture
+        self.assertIn("classDef issue", out)
+        self.assertIn("classDef decision", out)
+
+    def test_light_theme_init_directive_is_present(self) -> None:
+        """The init directive forces the base (light) theme so the diagram is readable
+        regardless of whether mermaid.live or GitHub default to a dark theme."""
+        out = diagram.to_mermaid(one_hop())
+        self.assertIn("%%{init:", out)
+        self.assertIn("'theme': 'base'", out)
+
+    def test_decision_nodes_have_explicit_dark_text_color(self) -> None:
+        """Decision classDef must set color so text is visible on the amber fill."""
+        out = diagram.to_mermaid(one_hop())
+        decision_line = next(ln for ln in out.splitlines() if "classDef decision" in ln)
+        self.assertIn("color:", decision_line)
+
+
+
 
 class DotTest(unittest.TestCase):
     def test_it_is_a_digraph_with_labelled_edges(self) -> None:
@@ -154,7 +177,15 @@ class OnlyWhatWasWalkedTest(unittest.TestCase):
         # engine never made, and a picture is read as the whole story.
         out = diagram.to_mermaid(one_hop())
         self.assertEqual(out.count("-->"), 1)
-        self.assertEqual(len([ln for ln in out.splitlines() if ln.strip().startswith("n")]), 3)
+        # Count only node *definition* lines (they contain a shape-bracket pair like ([, {{, [)
+        # not the per-node `class nXXX type;` assignment lines added for styling.
+        node_def_lines = [
+            ln for ln in out.splitlines()
+            if any(marker in ln for marker in ("([", "{{", "))"))
+            or (ln.strip().startswith("n") and "-->" not in ln and "class" not in ln and "classDef" not in ln)
+        ]
+        self.assertEqual(len(node_def_lines), 2, f"expected 2 node definitions, got: {node_def_lines}")
+
 
 
 if __name__ == "__main__":

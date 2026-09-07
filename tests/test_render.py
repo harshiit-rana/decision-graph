@@ -198,5 +198,50 @@ class RefusalTest(unittest.TestCase):
         )
 
 
+class ContextAndMultiHopTest(unittest.TestCase):
+    def test_multi_hop_does_not_claim_issue_implemented_decision(self) -> None:
+        """An issue never implements a decision; a pull request does.
+        Multi-hop paths must attribute the implementation to the actor node, not the start node."""
+        path = Path(
+            node_ids=[1, 2, 3],
+            steps=[
+                Step(1, "references", "explicit", "explicit", 1, 2, "extractor", None),
+                Step(2, "implemented_by", "explicit", "explicit", 3, 2, "extractor", None),
+            ],
+            nodes={
+                1: NodeRef("issue", "pass context internally", "5815"),
+                2: NodeRef("pull_request", "merge app and request context", "5812"),
+                3: NodeRef("decision", "merge app and request contexts", "thread:1:pr-5812"),
+            },
+        )
+        ans = Answer(
+            mode=Mode.WHY,
+            start_node_id=1,
+            paths=[path],
+            used_inferred_fallback=False,
+            explanation="test",
+        )
+        lines = render.summarize(ans, {}, {})
+        self.assertEqual(len(lines), 1)
+        # Must NOT claim issue 5815 implemented anything
+        self.assertNotIn('issue #5815 "pass context internally" implemented', lines[0])
+        # Must clearly indicate the linking relationship
+        self.assertIn("links to pull request #5812", lines[0])
+        self.assertIn("which implemented", lines[0])
+
+    def test_motivation_and_context_block_is_printed_when_bodies_provided(self) -> None:
+        ans = answer()
+        body_text = (
+            "Flask and Werkzeug redirect currently defaults to a 302. Routing uses 307 "
+            "since that preserves method consistently. We didn't change redirect default to 307 "
+            "since that would break the common pattern of GET form, POST form, redirect to GET result."
+        )
+        printed = render_to_string(ans, bodies={2: body_text})
+        self.assertIn("Motivation & Context", printed)
+        self.assertIn("Flask and Werkzeug redirect currently defaults to a 302", printed)
+
+
+
 if __name__ == "__main__":
     unittest.main()
+

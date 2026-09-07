@@ -233,6 +233,21 @@ class SummarizeTest(unittest.TestCase):
         explain.summarize_answer("why?", _answer(found=True), client)
         self.assertNotIn("INFERRED", client.prompts[0])
 
+    def test_artifact_bodies_are_included_in_the_prompt(self) -> None:
+        client = StubClient("A detailed summary.")
+        ans = _answer(found=True)
+        bodies = {2: "302 breaks form redirects; 303 always converts to GET."}
+        explain.summarize_answer("why?", ans, client, bodies=bodies)
+        prompt = client.prompts[0]
+        self.assertIn("302 breaks form redirects; 303 always converts to GET.", prompt)
+        self.assertIn("MOTIVATION or PROBLEM", prompt)
+
+    def test_render_context_returns_empty_when_no_bodies(self) -> None:
+        ans = _answer(found=True)
+        self.assertEqual(explain.render_context(ans, None), "")
+        self.assertEqual(explain.render_context(ans, {}), "")
+
+
 
 class RenderPathsTest(unittest.TestCase):
     def test_every_edge_line_names_its_tier(self) -> None:

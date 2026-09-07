@@ -125,7 +125,9 @@ def _status_block() -> None:
         print(
             f"    {green('/')} graph: {bold(f'{nodes:,}')} artifacts, "
             f"{bold(str(decisions))} decisions"
+            f"{dim(' (architectural choices reconstructed from history)')}"
         )
+
     else:
         hint = f" --repo {repo}" if repo else ""
         print(f"    {yellow('!')} graph is empty -- run an {bold('ingest')} (menu 1){dim(hint)}")
@@ -197,13 +199,28 @@ class View:
         """Apply one keystroke. Returns False if the key means nothing here.
 
         `ask` is injected so the date prompt can be driven by a test without a terminal.
+
+        Diagram and prose views are mutually exclusive: `--format mermaid` causes query.py
+        to emit the graph and skip every prose block, so v/a/t have no visible effect while
+        diagram is on, and vice versa. Activating one side clears the other so the user is
+        never silently in a state where a toggle appears active but its output is suppressed.
         """
         if key == "d":
             self.diagram = not self.diagram
+            if self.diagram:
+                # Entering diagram mode: prose-only views become invisible, so clear them
+                # rather than leaving the bar showing flags that do nothing.
+                self.details = False
+                self.all_matches = False
+                self.as_of = None
         elif key == "v":
             self.details = not self.details
+            if self.details:
+                self.diagram = False  # details are prose; mermaid would suppress them
         elif key == "a":
             self.all_matches = not self.all_matches
+            if self.all_matches:
+                self.diagram = False  # all-matches is prose; mermaid would suppress it
         elif key == "s":
             self.mode = "impact" if self.mode == "why" else "why"
         elif key == "t":
@@ -216,18 +233,20 @@ class View:
                 when = (ask or _ask)("as of when? (YYYY-MM-DD, or Enter to cancel)")
                 if when:
                     self.as_of = when
+                    self.diagram = False  # as-of is prose; mermaid would suppress it
         else:
             return False
         return True
 
 
 FOLLOW_UPS = [
-    ("d", "diagram", "as a mermaid graph you can paste into GitHub"),
-    ("v", "details", "node ids and the extractor behind every edge"),
-    ("a", "all matches", "answer from every candidate, not just the best"),
-    ("t", "as of a date", "what the graph knew at a point in time"),
-    ("s", "switch mode", "ask the other question about the same thing"),
+    ("d", "diagram", "draw the answer as a graph (paste at mermaid.live or into GitHub)"),
+    ("v", "details", "show what rule produced each link, and the internal node IDs"),
+    ("a", "all matches", "show answers for every matched artifact, not just the closest one"),
+    ("t", "as of a date", "replay the graph at a past date — did this decision exist then?"),
+    ("s", "switch mode", "flip between 'why did this happen?' and 'what does this affect?'"),
 ]
+
 
 
 DECISIONS_SQL = """
@@ -297,8 +316,11 @@ def _pick_decision() -> str | None:
         title = (r["title"] or "")[:44]
         print(f"  {bold(f'{i:>2}')}  {dim(when)}  {ref:<7} {painted}{pad}  {title}")
     print()
-
+    print(dim("  explicit       the decision is stated directly (e.g. named in a release note)"))
+    print(dim("  reconstructed  rebuilt from signals: a closing issue, merged PR, and a review"))
+    print()
     choice = _ask("pick a number (or Enter to go back)")
+
     if not choice:
         return None
     try:

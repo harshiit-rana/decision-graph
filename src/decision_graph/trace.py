@@ -30,9 +30,19 @@ TIER_MEANING = {
     "inferred": "the system's own guess; no explicit path existed, so this is not a record",
 }
 
+# A one-word rank printed next to the tier name so a reader does not have to work out which
+# tier is better. Corroborated is printed as "strongest" rather than "better than explicit"
+# because the absolute claim is more useful than a relative one when only one tier appears.
+TIER_STRENGTH = {
+    "explicit": "strong",
+    "corroborated": "strongest",
+    "inferred": "weak — treat as a lead, not a record",
+}
+
 # Kept from the original renderer. Colour is not available when output is piped -- which is
 # every CI log and every `dg query > file` -- so the tier must survive in ASCII too.
 TIER_MARK = {"explicit": "==", "corroborated": "++", "inferred": "~~"}
+
 
 
 def ref(node_type: str | None, external_id: str | None) -> str:
@@ -154,3 +164,27 @@ def decision_statuses(conn, node_ids: list[int]) -> dict[int, str]:
         (sorted(set(node_ids)),),
     ).fetchall()
     return {r["node_id"]: r["status"] for r in rows}
+
+
+def artifact_bodies(conn, node_ids: list[int]) -> dict[int, str]:
+    """Map node ids to their stored text body or commit message.
+
+    This provides the actual problem statement or motivation written by the human author
+    in the issue, pull request, or commit, enabling deep context instead of just titles.
+    """
+    if not node_ids:
+        return {}
+    sql = """
+    SELECT n.id,
+           COALESCE(i.body, pr.body, c.message) AS body
+    FROM node n
+    LEFT JOIN issue i ON i.node_id = n.id
+    LEFT JOIN pull_request pr ON pr.node_id = n.id
+    LEFT JOIN commit c ON c.node_id = n.id
+    WHERE n.id = ANY(%s)
+      AND COALESCE(i.body, pr.body, c.message) IS NOT NULL
+      AND trim(COALESCE(i.body, pr.body, c.message)) != ''
+    """
+    rows = conn.execute(sql, (sorted(set(node_ids)),)).fetchall()
+    return {r["id"]: r["body"] for r in rows}
+
