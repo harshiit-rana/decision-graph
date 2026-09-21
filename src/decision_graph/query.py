@@ -45,6 +45,7 @@ def render_answer(
     statuses: dict[int, str] | None = None,
     links: dict[str, str] | None = None,
     bodies: dict[int, str] | None = None,
+    reviewers: dict[int, list[str]] | None = None,
     as_of=None,
     closure=None,
     verbose: bool = False,
@@ -52,13 +53,15 @@ def render_answer(
 ) -> None:
     render.render(
         answer, annotations=annotations, statuses=statuses, links=links,
-        bodies=bodies, as_of=as_of, closure=closure, verbose=verbose, out=out,
+        bodies=bodies, reviewers=reviewers, as_of=as_of, closure=closure,
+        verbose=verbose, out=out,
     )
 
 
 def _decision_facts(
     conn, answer: Answer
-) -> tuple[dict[int, str], dict[int, str], dict[str, str], dict[int, str]]:
+) -> tuple[dict[int, str], dict[int, str], dict[str, str], dict[int, str],
+           dict[int, list[str]]]:
     """What the graph credits each Decision in this answer to, plus artifact bodies (issues #19, #69).
 
     A Why-walk stops at the Decision and never traverses `implemented_by`, so without this
@@ -77,12 +80,13 @@ def _decision_facts(
         if path.ref(nid).node_type == "decision"
     ]
     if not ids:
-        return {}, {}, {}, bodies
+        return {}, {}, {}, bodies, {}
     return (
         trace.decision_annotations(conn, ids),
         trace.decision_statuses(conn, ids),
         trace.decision_links(conn, ids),
         bodies,
+        trace.decision_reviewers(conn, ids),
     )
 
 
@@ -229,14 +233,15 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
 
-        annotations, statuses, links, bodies = _decision_facts(conn, answer)
+        annotations, statuses, links, bodies, reviewers = _decision_facts(conn, answer)
         # Only on a refusal, and only for the node the walk started from. A closure
         # explains why *this* artifact produced nothing; it says nothing about the graph,
         # so it has no business appearing beside an answer that was found.
         closure = None if answer.found else trace.closure_fact(conn, c.node_id)
         render_answer(
             answer, annotations=annotations, statuses=statuses, links=links,
-            bodies=bodies, as_of=as_of, closure=closure, verbose=args.verbose,
+            bodies=bodies, reviewers=reviewers, as_of=as_of, closure=closure,
+            verbose=args.verbose,
         )
 
 

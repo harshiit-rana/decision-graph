@@ -61,7 +61,8 @@ def bucket(top=("davidism", 10), total=15, authors=6, bots=()):
     }
 
 
-def data(decisions=None, edges=None, clusters=238, decisions_count=15, concentration=None):
+def data(decisions=None, edges=None, clusters=238, decisions_count=15, concentration=None,
+         reviewers=None):
     d = decisions if decisions is not None else [decision()]
     return {
         "decisions": d,
@@ -79,6 +80,7 @@ def data(decisions=None, edges=None, clusters=238, decisions_count=15, concentra
             "decisions": bucket(),
             "merged_prs": bucket(top=("davidism", 16), total=29, authors=13),
         },
+        "reviewers": reviewers if reviewers is not None else {},
         "generated_at": datetime(2026, 9, 5, 15, 14, tzinfo=timezone.utc),
     }
 
@@ -187,7 +189,7 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(
             set(out),
             {"decisions", "evidence", "coverage", "tiers", "annotations", "concentration",
-             "generated_at"},
+             "reviewers", "generated_at"},
         )
         self.assertIn("clusters", out["coverage"])
 
@@ -208,6 +210,31 @@ def flat(html: str) -> str:
     layout, not meaning -- and it fails the moment the paragraph is rewrapped.
     """
     return " ".join(html.split())
+
+
+class ReviewerTest(unittest.TestCase):
+    """Who scrutinised a Decision (issue #110).
+
+    The evidence table structurally cannot show this: a `reviewed` edge runs person -> pull
+    request and never touches the Decision `EVIDENCE_SQL` selects by. So the author appeared
+    twice and the reviewers not at all, for evidence the rubric already counts -- `reviewed`
+    is one of the four §5.4 corroboration categories.
+    """
+
+    def test_reviewers_are_named_on_the_card(self) -> None:
+        html = report.render_html(data(reviewers={1: ["lkk7", "Samielakkad"]}), "x")
+        self.assertIn("reviewed by lkk7, Samielakkad", flat(html))
+
+    def test_a_decision_with_no_reviewers_says_nothing(self) -> None:
+        # flask merges largely without review -- 14 `reviewed` edges across 226 pull
+        # requests -- so most cards have none, and an empty "reviewed by" would read as a
+        # finding rather than an absence.
+        self.assertNotIn("reviewed by", flat(report.render_html(data(), "x")))
+
+    def test_a_reviewer_login_is_escaped(self) -> None:
+        html = report.render_html(data(reviewers={1: ["<script>alert(1)</script>"]}), "x")
+        self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertIn("&lt;script&gt;", html)
 
 
 class ConcentrationTest(unittest.TestCase):

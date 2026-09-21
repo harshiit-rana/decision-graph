@@ -19,7 +19,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from decision_graph import evaluation, reasoning
+from decision_graph import evaluation, reasoning, trace
 
 DSN = os.environ.get("DATABASE_URL")
 
@@ -238,6 +238,102 @@ class DecisionAnnotationsTest(unittest.TestCase):
 
     def test_empty_input_does_not_query(self) -> None:
         self.assertEqual(evaluation.decision_annotations(self.conn, []), {})
+
+
+@unittest.skipUnless(DSN, "DATABASE_URL not set")
+class DecisionReviewersTest(unittest.TestCase):
+    """Who scrutinised the work a Decision is credited to (issue #110).
+
+    Invisible before this, structurally rather than by oversight: a `reviewed` edge runs
+    person -> pull request, so it touches neither the Decision that `dg report`'s evidence
+    table selects by nor any edge in WHY_EDGES. The author of a change was shown twice and
+    the people who reviewed it not at all -- for evidence the rubric already counts, since
+    `reviewed` is one of the four §5.4 corroboration categories.
+
+    Each test rolls back.
+    """
+
+    def setUp(self) -> None:
+        from decision_graph import db
+
+        self.conn = db.connect(DSN)
+        self.conn.execute("SET CONSTRAINTS ALL DEFERRED")
+        self._seq = 0
+
+    def tearDown(self) -> None:
+        self.conn.rollback()
+        self.conn.close()
+
+    def node(self, node_type: str, title: str = "") -> int:
+        self._seq += 1
+        return self.conn.execute(
+            "INSERT INTO node (node_type, external_id, title) VALUES (%s, %s, %s) RETURNING id",
+            (node_type, f"rv-{id(self)}-{self._seq}", title),
+        ).fetchone()["id"]
+
+    def edge(self, src: int, dst: int, edge_type: str, *, when=None) -> None:
+        self.conn.execute(
+            "INSERT INTO edge (src_node_id, dst_node_id, edge_type, tag, evidence_tier, "
+            "extractor, observed_at) VALUES (%s, %s, %s, 'explicit', 'explicit', "
+            "'test_fixture', %s)",
+            (src, dst, edge_type, when),
+        )
+
+    def decision_with_reviews(self, reviewers: list[str], *, times=None) -> int:
+        decision = self.node("decision", "fixture decision")
+        pr = self.node("pull_request", "fixture pr")
+        self.edge(decision, pr, "implemented_by")
+        for i, login in enumerate(reviewers):
+            person = self.node("person", login)
+            when = times[i] if times else None
+            self.edge(person, pr, "reviewed", when=when)
+        return decision
+
+    def test_reviewers_of_the_credited_work_are_found(self) -> None:
+        decision = self.decision_with_reviews(["lkk7", "Samielakkad"])
+        found = trace.decision_reviewers(self.conn, [decision])
+        self.assertEqual(sorted(found[decision]), ["Samielakkad", "lkk7"])
+
+    def test_a_decision_with_no_reviews_is_absent_not_empty(self) -> None:
+        # Absent rather than an empty list, so the renderer's `if names:` is the only place
+        # that decides whether to print anything.
+        decision = self.decision_with_reviews([])
+        self.assertNotIn(decision, trace.decision_reviewers(self.conn, [decision]))
+
+    def test_one_reviewer_across_two_implementers_is_named_once(self) -> None:
+        # `edge_current_uidx` already forbids two identical reviewed edges, so the case the
+        # Python deduplication actually guards is this one: a Decision credited to more
+        # than one pull request, reviewed by the same person on both. #19's annotation
+        # lookup deliberately takes every current implementer rather than the first, so
+        # this shape is reachable.
+        decision = self.node("decision", "fixture")
+        person = self.node("person", "davidism")
+        for _ in range(2):
+            pr = self.node("pull_request", "fixture pr")
+            self.edge(decision, pr, "implemented_by")
+            self.edge(person, pr, "reviewed")
+        self.assertEqual(trace.decision_reviewers(self.conn, [decision])[decision], ["davidism"])
+
+    def test_earliest_review_comes_first(self) -> None:
+        # Order is the order they reviewed, which is information. Alphabetical would not be.
+        decision = self.decision_with_reviews(
+            ["second", "first"],
+            times=[datetime(2026, 5, 1, tzinfo=timezone.utc),
+                   datetime(2026, 1, 1, tzinfo=timezone.utc)],
+        )
+        self.assertEqual(trace.decision_reviewers(self.conn, [decision])[decision],
+                         ["first", "second"])
+
+    def test_a_review_of_unrelated_work_is_not_borrowed(self) -> None:
+        # The join must run through this Decision's own implemented_by edge.
+        mine = self.decision_with_reviews([])
+        other = self.decision_with_reviews(["someone-else"])
+        found = trace.decision_reviewers(self.conn, [mine, other])
+        self.assertNotIn(mine, found)
+        self.assertIn(other, found)
+
+    def test_empty_input_asks_the_database_nothing(self) -> None:
+        self.assertEqual(trace.decision_reviewers(self.conn, []), {})
 
 
 if __name__ == "__main__":

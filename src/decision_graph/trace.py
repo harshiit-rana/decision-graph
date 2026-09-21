@@ -284,6 +284,61 @@ def _last_word(conn, node_id: int) -> Standing | None:
     )
 
 
+def decision_reviewers(conn, node_ids: list[int]) -> dict[int, list[str]]:
+    """Who reviewed the work each Decision is credited to.
+
+    Invisible in both surfaces until now, and for a structural reason rather than an
+    oversight: a `reviewed` edge runs person -> pull request, so it never touches the
+    Decision node that `dg report`'s evidence table selects by, and `reviewed` is not in
+    WHY_EDGES, so a Why-walk never crosses one either. The person who wrote a change was
+    shown twice and the people who scrutinised it not at all.
+
+    That is worth fixing out of proportion to its size because `reviewed` is one of the four
+    corroboration categories §5.4 counts -- evidence the rubric already weighs and the
+    reader could not see. On this corpus it reaches 3 of 15 Decisions and 5 reviewers, which
+    is a fact about flask rather than about the query: 14 `reviewed` edges across 226 pull
+    requests, already a documented limitation. A repo with mandatory review populates it
+    heavily.
+
+    Names only, in the order they reviewed. No ranking and no score: authorship and review
+    volume are not expertise, and #91's concentration caveat refuses that inference for the
+    same reason this does.
+    """
+    if not node_ids:
+        return {}
+
+    rows = conn.execute(
+        """
+        SELECT impl.src_node_id      AS decision_node_id,
+               reviewer.title        AS login,
+               min(e.observed_at)    AS first_reviewed
+          FROM edge impl
+          JOIN edge e        ON e.dst_node_id = impl.dst_node_id
+                            AND e.edge_type = 'reviewed'
+                            AND e.valid_to IS NULL
+          JOIN node reviewer ON reviewer.id = e.src_node_id
+                            AND reviewer.node_type = 'person'
+         WHERE impl.src_node_id = ANY(%s)
+           AND impl.edge_type = 'implemented_by'
+           AND impl.valid_to IS NULL
+           AND reviewer.title IS NOT NULL
+         GROUP BY 1, 2
+         ORDER BY 1, 3 NULLS LAST, 2
+        """,
+        (sorted(set(node_ids)),),
+    ).fetchall()
+
+    found: dict[int, list[str]] = {}
+    for row in rows:
+        names = found.setdefault(row["decision_node_id"], [])
+        # A reviewer who reviewed twice is one reviewer. Deduplicated here rather than in
+        # SQL so the ordering above -- earliest review first -- decides which occurrence
+        # survives.
+        if row["login"] not in names:
+            names.append(row["login"])
+    return found
+
+
 def decision_statuses(conn, node_ids: list[int]) -> dict[int, str]:
     """Map Decision node ids to `explicit` or `reconstructed`.
 
