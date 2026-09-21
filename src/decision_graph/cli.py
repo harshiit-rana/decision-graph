@@ -527,6 +527,23 @@ def _verdict(states: list[str]) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _confirmed_current(checked, watermark) -> bool | None:
+    """Was this cursor polled after its own newest artifact?
+
+    None when the question cannot be answered: either timestamp missing, or the two not
+    comparable. Both columns are `timestamptz` so psycopg returns them aware and a mix
+    should not arise -- but `dg status` is the command you run when something is already
+    wrong, and a TypeError here would replace the diagnosis with a traceback (the shape of
+    issue #82). None is the conservative answer: it warns rather than claiming current.
+    """
+    if checked is None or watermark is None:
+        return None
+    try:
+        return checked > watermark
+    except TypeError:
+        return None
+
+
 def _cursor_lines(cursors: list) -> list[str]:
     """Render the ingestion_cursor rows. Split out from cmd_status so the two things
     that were wrong here can be tested without a database (issue #47).
@@ -536,6 +553,15 @@ def _cursor_lines(cursors: list) -> list[str]:
     screen says which row is which. The repo header is omitted for a single repository:
     the Repositories section above has already named it, and repeating it there would be
     noise for the common case.
+
+    The footer was the same failure one line further down (issue #92). It read "a watermark
+    short of today means there is more to fetch", which is a cause the row cannot support: a
+    watermark is the newest artifact *seen*, and it sits short of today whenever the
+    repository has simply been quiet. flask published no release between February and
+    September, so `releases up to 2026-02-19` was complete, and the line sent readers to
+    re-run a full ingest to fetch nothing. `updated_at` is what separates the two -- it is
+    written on every poll, not only when the watermark advances, so a cursor checked after
+    its own watermark is one GitHub was asked about and had nothing newer for.
 
     `phase` is printed for commits alone. It is owned by COMMITTED_DESC, the only strategy
     that pages backwards and therefore the only one with a transition to make. It used to
@@ -551,6 +577,7 @@ def _cursor_lines(cursors: list) -> list[str]:
     multi = len({c["repo"] for c in cursors}) > 1
     shown_repo = None
     phased = False
+    unconfirmed = False
     for c in cursors:
         if multi and c["repo"] != shown_repo:
             lines.append(f"  {bold(c['repo'])}")
@@ -565,10 +592,33 @@ def _cursor_lines(cursors: list) -> list[str]:
             phase, phased = c["phase"], True
         else:
             phase = ""
-        lines.append(f"{indent}{c['resource']:<10} {phase:<9} up to {wm}")
+        checked = c.get("updated_at")
+        # A cursor polled after its own newest artifact was confirmed current at that
+        # moment. One polled before it -- never advanced, or not reached because the run
+        # stopped at the rate-limit floor -- has not been, and must not claim it was.
+        confirmed = _confirmed_current(checked, c["steady_watermark"])
+        if confirmed:
+            note = f"  checked {checked:%Y-%m-%d}"
+        elif checked is None:
+            note = "  never checked"
+            unconfirmed = True
+        elif confirmed is None:
+            note = f"  checked {checked:%Y-%m-%d}, not confirmed current"
+            unconfirmed = True
+        else:
+            note = f"  checked {checked:%Y-%m-%d}, before this watermark"
+            unconfirmed = True
+        lines.append(f"{indent}{c['resource']:<10} {phase:<9} up to {wm}{dim(note)}")
 
-    lines.append(dim("\n  A watermark short of today means there is more to fetch — re-run"))
-    lines.append(dim("  `dg ingest` to continue from exactly there."))
+    # Deliberately avoids repeating the phrase "up to": the resource rows are formatted
+    # with it, and the test that counts those rows matches on it.
+    lines.append(dim("\n  A watermark is the newest artifact seen; `checked` is when GitHub"))
+    lines.append(dim("  last confirmed there was nothing newer. A gap between them is the"))
+    lines.append(dim("  repository being quiet, not work left to fetch. Re-run `dg ingest`"))
+    lines.append(dim("  to advance it."))
+    if unconfirmed:
+        lines.append(dim("  A resource whose `checked` is not past its watermark was not"))
+        lines.append(dim("  confirmed current — that one may genuinely have more to fetch."))
     if multi:
         lines.append(dim("  `dg ingest` reads TARGET_REPO, so it advances that repository only."))
     if phased:
@@ -649,7 +699,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     cursors = conn.execute(
         """
-        SELECT r.external_id AS repo, c.resource, c.phase, c.steady_watermark
+        SELECT r.external_id AS repo, c.resource, c.phase, c.steady_watermark,
+               c.updated_at
         FROM ingestion_cursor c
         JOIN node r ON r.id = c.repo_node_id
         ORDER BY r.external_id, c.resource
