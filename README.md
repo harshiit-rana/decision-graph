@@ -261,7 +261,7 @@ fetch — that signal sat unnoticed through an entire evaluation cycle once, whi
 `dg status` now prints it.
 
 **Few or no Decisions is a real answer, not a failure.** The rubric needs a motivating
-issue *and* merged work in the same thread. On flask, 238 thread clusters yield 15
+issue *and* merged work in the same thread. On flask, 239 thread clusters yield 15
 Decisions. A repo that does not reference issues from pull requests will yield fewer.
 
 ### When something breaks
@@ -492,7 +492,7 @@ thread:
 
 ```
 wrote /work/decision-graph-report.html
-  15 decisions from 238 clusters
+  15 decisions from 239 clusters
 ```
 
 The page is one self-contained file. It fetches exactly one script — the mermaid UMD build,
@@ -503,10 +503,10 @@ file you open from disk, and Chrome refuses a module import from a remote origin
 produces.
 
 It states its own coverage at the top, because a page listing 15 Decisions and saying nothing
-about the 223 clusters that produced none is a coverage claim made by omission:
+about the 224 clusters that produced none is a coverage claim made by omission:
 
 > **This is not the repository's history.** It is what the §5.1 rubric could evidence: a
-> motivating issue and merged work in one conversation. 223 clusters produced no decision,
+> motivating issue and merged work in one conversation. 224 clusters produced no decision,
 > most because no issue is referenced from the work at all, and a refusal to assert is the
 > intended outcome there rather than a gap.
 
@@ -605,15 +605,25 @@ Accepted deliberately rather than fixed by switching repos:
   evaluation set cannot include ownership queries against flask.**
 - **`has_wiki: false`.** The `wiki_page` extractor no-ops. On this repo `motivated_by`
   therefore resolves only to issues and PR bodies, never wiki pages.
-- **The `corroborated` tier is sparse: 8 of 238 threads.**
-  flask merges largely without formal GitHub reviews — 14 `reviewed` edges across 224
+- **The `corroborated` tier is sparse: 8 of 239 threads.**
+  flask merges largely without formal GitHub reviews — 14 `reviewed` edges across 226
   PRs, and only 8 threads carry any review at all; 3 threads appear in release notes.
   The rubric was chosen on independence grounds and not tuned to raise this number, so
   §9 should report the tier as under-exercised on this repo rather than as a rubric
   weakness. A repo with mandatory review would populate it heavily.
 - **Explicit-status Decisions are limited to what release notes itemise** (3 of 15).
-  flask's changelog lives in `CHANGES.rst`, a repo file, and file-content ingestion is
-  not built.
+  flask's changelog lives in `CHANGES.rst`, a repo file, and file-content ingestion is not
+  built — but building it would not move this number today, which is worth stating so
+  nobody writes the parser to find out. `CHANGES.rst` carries 276 structured `:pr:` and
+  `:issue:` refs across 63 version sections. Eleven resolve inside the 12-month window, and
+  ten of those sit in a Decision thread; the question is which version cites them. Three are
+  cited by 3.1.2 and are **already `explicit`**, caught by the release-body path. The other
+  seven are cited by **3.2.0, which is "Unreleased"** — and §5.1 treats a release note as a
+  formal artifact precisely because it records that something shipped, so upgrading on it
+  would assert a decision reached users when it has not. The blocker is not the missing
+  parser; it is that this repository has not cut a release since that work landed. (The graph
+  is not merely behind: flask's newest release on the API is 3.1.3, which is exactly the
+  releases watermark.)
 - Cross-references to artifacts **outside** the 12-month window are skipped rather than
   fetched — fetching them would make the window unbounded by the back door. They are
   counted in the run summary under `*_target_not_ingested` rather than hidden.
@@ -650,7 +660,7 @@ for the figure with its disclosures.** Read them before quoting the number. 8 of
 correct outcomes are the system returning nothing, so a degenerate engine that always
 returned nothing would score 8/18 on this set; the query set was curated by the person who
 built the system; and the graph holds zero inferred edges, so nothing here measures
-inference. 15 Decisions out of 238 threads — coverage, not precision, is the binding limit,
+inference. 15 Decisions out of 239 threads — coverage, not precision, is the binding limit,
 and this measures precision only. That ratio has now been taken three times against three
 different corpora (#46, #48, #67), and the numerator has not moved once: the window grew by
 45%, then by another 7 clusters, and produced no new Decision either time. The fourteenth and
