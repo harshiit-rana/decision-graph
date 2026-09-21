@@ -45,12 +45,13 @@ def render_answer(
     links: dict[str, str] | None = None,
     bodies: dict[int, str] | None = None,
     as_of=None,
+    closure=None,
     verbose: bool = False,
     out=None,
 ) -> None:
     render.render(
         answer, annotations=annotations, statuses=statuses, links=links,
-        bodies=bodies, as_of=as_of, verbose=verbose, out=out,
+        bodies=bodies, as_of=as_of, closure=closure, verbose=verbose, out=out,
     )
 
 
@@ -215,9 +216,13 @@ def main(argv: list[str] | None = None) -> int:
 
 
         annotations, statuses, links, bodies = _decision_facts(conn, answer)
+        # Only on a refusal, and only for the node the walk started from. A closure
+        # explains why *this* artifact produced nothing; it says nothing about the graph,
+        # so it has no business appearing beside an answer that was found.
+        closure = None if answer.found else trace.closure_fact(conn, c.node_id)
         render_answer(
             answer, annotations=annotations, statuses=statuses, links=links,
-            bodies=bodies, as_of=as_of, verbose=args.verbose,
+            bodies=bodies, as_of=as_of, closure=closure, verbose=args.verbose,
         )
 
 

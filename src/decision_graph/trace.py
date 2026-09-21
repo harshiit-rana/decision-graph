@@ -14,6 +14,8 @@ the graph does not hold and a reader could not check.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 # Node types whose external_id is a number a human uses. A commit's is a 40-character sha,
@@ -148,6 +150,78 @@ def decision_links(conn, node_ids: list[int]) -> dict[str, str]:
         if row["implementer_ref"] and row["implementer_url"]:
             links[ref(row["implementer_type"], row["implementer_ref"])] = row["implementer_url"]
     return links
+
+
+@dataclass(frozen=True)
+class Closure:
+    """How an artifact ended, in the cases where the ending is itself the answer.
+
+    `kind` is the graph's own word for it, not an interpretation: `not_planned` and
+    `duplicate` are GitHub's `state_reason` values, and `unmerged` means `merged_at IS
+    NULL` on a closed pull request. None of the three says *why* -- that distinction is
+    the whole point, and `render` is careful to keep it.
+    """
+
+    ref: str
+    kind: str
+    closed_at: datetime | None
+
+
+# The endings that explain a refusal rather than merely accompanying one. An issue closed
+# `completed` is absent here on purpose: it refuses for an ordinary reason (the thread
+# carried no rubric-qualifying evidence), and naming its closure would dress up a plain
+# miss as an explanation.
+_EXPLAINS_A_REFUSAL = {"not_planned", "duplicate", "unmerged"}
+
+
+def closure_fact(conn, node_id: int) -> Closure | None:
+    """How this artifact closed, when that is itself why a Why-walk found nothing.
+
+    §5.1 asserts a Decision only where work landed, so an issue closed `not_planned` and a
+    pull request closed without merging both produce no Decision *by design*. The graph
+    records both facts and the extractor is deliberate about them -- `state_reason`
+    "separates an issue that was resolved from one the maintainers declined", `merged_at`
+    "is what distinguishes work that landed from work that was refused".
+
+    The refusal never read either, and so told 237 of the 263 artifacts that refuse that
+    "a change made without an issue leaves nothing to reconstruct a decision from" -- which
+    is false for every one of them (issue #86). Returns None when the graph records no
+    ending that would explain the silence, which is when the existing sentence is right.
+    """
+    row = conn.execute(
+        """
+        SELECT n.node_type,
+               n.external_id,
+               i.state_reason::text AS state_reason,
+               i.closed_at          AS issue_closed_at,
+               p.closed_at          AS pr_closed_at,
+               p.merged_at          AS merged_at,
+               p.state              AS pr_state
+          FROM node n
+          LEFT JOIN issue i         ON i.node_id = n.id
+          LEFT JOIN pull_request p  ON p.node_id = n.id
+         WHERE n.id = %s
+        """,
+        (node_id,),
+    ).fetchone()
+    if row is None:
+        return None
+
+    if row["node_type"] == "issue":
+        kind, closed_at = row["state_reason"], row["issue_closed_at"]
+    elif row["node_type"] == "pull_request":
+        # Only a *closed* pull request is an ending. An open one has not been refused;
+        # it has not been decided at all, and saying otherwise would be the same
+        # over-claim in the other direction.
+        if row["pr_state"] != "closed" or row["merged_at"] is not None:
+            return None
+        kind, closed_at = "unmerged", row["pr_closed_at"]
+    else:
+        return None
+
+    if kind not in _EXPLAINS_A_REFUSAL:
+        return None
+    return Closure(ref=ref(row["node_type"], row["external_id"]), kind=kind, closed_at=closed_at)
 
 
 def decision_statuses(conn, node_ids: list[int]) -> dict[int, str]:

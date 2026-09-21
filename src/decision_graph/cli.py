@@ -903,6 +903,9 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     # connection, and the whole point of them is that a Why-walk stops at the Decision and
     # never reaches the pull request that did the work (#19).
     annotations, statuses, links, bodies = query._decision_facts(conn, answer)
+    # The same lookup `dg query` does, for the same reason and before the same close: one
+    # renderer means nothing if the two callers feed it different facts.
+    closure = None if answer.found else trace.closure_fact(conn, c.node_id)
     conn.close()
 
     # The evidence, in the same form `dg query` prints it -- one renderer, so the prose and
@@ -910,7 +913,8 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     # rather than left to a default, which would bind at import and ignore any later
     # redirection, including the one the test for this uses.
     query.render_answer(
-        answer, annotations=annotations, statuses=statuses, links=links, bodies=bodies, out=sys.stdout
+        answer, annotations=annotations, statuses=statuses, links=links, bodies=bodies,
+        closure=closure, out=sys.stdout,
     )
 
     try:
