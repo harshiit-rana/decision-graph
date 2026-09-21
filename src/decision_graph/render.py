@@ -354,6 +354,37 @@ def _urls(answer: Answer) -> list[tuple[str, str]]:
     return list(seen.items())
 
 
+def _render_last_word(said, p) -> None:
+    """Show what was said, and refuse to call it the reason (issue #108).
+
+    Printing a comment next to a closure invites the reader to treat it as the rationale,
+    and for many of these it is not: of the first four issues ingested, "ok, my bad" is the
+    reporter withdrawing and "Duplicate of ..." is triage. The graph holds no edge asserting
+    that any comment caused any closure, so the disclaimer is not politeness -- it is the
+    only thing separating this from an assertion the system cannot evidence.
+
+    Quoted rather than summarised, for the reason `trace` gives for everything it renders:
+    say what the graph holds, in the reader's vocabulary, and nothing else. A summary would
+    be the system's words about someone else's sentence.
+    """
+    import textwrap
+
+    when = f", {said.at:%Y-%m-%d}" if said.at else ""
+    p()
+    p(f"    The last word on it, from a {said.association}{when}:")
+    p()
+    # Collapsed to one paragraph: a comment carries its own line breaks, code blocks and
+    # quoting, and reproducing those here competes with the layout around it.
+    flat = " ".join(said.body.split())
+    for line in textwrap.wrap(flat, width=68, max_lines=4, placeholder=" ..."):
+        p(f"      {line}")
+    p()
+    p("    That is what was said, not why it closed -- the graph records no link between")
+    p("    the two, and someone with standing writing it is not the same as the project")
+    p("    deciding. Closed without landing covers rejection, supersession and abandonment")
+    p("    alike.")
+
+
 def _render_closure(closure, mode, p) -> None:
     """Say how the artifact ended, and stop short of saying why.
 
@@ -383,11 +414,18 @@ def _render_closure(closure, mode, p) -> None:
         p("    Nothing downstream references it, which is the ordinary consequence of work")
         p("    that did not land rather than an unknown.")
 
-    if closure.kind != "duplicate":
+    if closure.kind == "duplicate":
+        return
+
+    said = getattr(closure, "last_word", None)
+    if said is None:
         p()
         p("    What the graph records is that it closed, not why. The closing discussion is")
         p("    not ingested, so this is not evidence the idea was rejected -- closed without")
         p("    landing covers rejection, supersession and abandonment alike.")
+        return
+
+    _render_last_word(said, p)
 
 
 def _render_refusal(answer: Answer, p, as_of=None, closure=None) -> None:

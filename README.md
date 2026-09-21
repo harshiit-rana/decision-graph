@@ -177,9 +177,15 @@ A refusal has to be *true*, which for most artifacts means naming how they ended
     work landed, so work that did not land produces no node. The silence is the
     rubric holding, not a gap in the graph.
 
-    What the graph records is that it closed, not why. The closing discussion is
-    not ingested, so this is not evidence the idea was rejected - closed without
-    landing covers rejection, supersession and abandonment alike.
+    The last word on it, from a MEMBER, 2026-08-28:
+
+      If you throw away the error saying you did something wrong, then yes
+      you might end up with incorrect setup.
+
+    That is what was said, not why it closed - the graph records no link between
+    the two, and someone with standing writing it is not the same as the project
+    deciding. Closed without landing covers rejection, supersession and abandonment
+    alike.
 
     engine: no path found, explicit or inferred
     the inferred fallback was tried and also found nothing
