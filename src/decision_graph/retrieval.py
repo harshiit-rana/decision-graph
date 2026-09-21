@@ -102,6 +102,13 @@ def find_candidates(
     mostly squash-merge subjects like `Docs typo/markup fixes (#5829)`, and those must keep
     matching on their own text rather than on the pull request they mention.
 
+    A node can match several tiers at once -- a title equal to the query scores 1.0 on
+    `exact` and, because `similarity` of identical strings is also 1.0, on `fuzzy` too. The
+    `tier` column breaks that tie so the label names the strongest tier the node matched
+    rather than whichever row the planner happened to keep (issue #98). It is the LAST
+    ordering key, after `score`, so ranking between different nodes is untouched: only the
+    word a reader is shown changes.
+
     `repo_node_id`, when given, restricts matches to that repository (issue #28) --
     without it, a query against a database holding more than one repo can return
     candidates from any of them, indistinguishably.
@@ -126,30 +133,30 @@ def find_candidates(
 
     sql = f"""
         WITH matches AS (
-            SELECT id, node_type, external_id, title, 'exact' AS match, 1.0 AS score
+            SELECT id, node_type, external_id, title, 'exact' AS match, 1.0 AS score, 1 AS tier
             FROM node
             WHERE lower(title) = lower(%(q)s) {type_filter} {repo_filter}
 
             UNION ALL
-            SELECT id, node_type, external_id, title, 'identifier', 0.95
+            SELECT id, node_type, external_id, title, 'identifier', 0.95, 2
             FROM node
             WHERE external_id = ANY(%(identifiers)s) {type_filter} {repo_filter}
 
             UNION ALL
-            SELECT id, node_type, external_id, title, 'prefix', 0.75
+            SELECT id, node_type, external_id, title, 'prefix', 0.75, 3
             FROM node
             WHERE title ILIKE %(prefix)s {type_filter} {repo_filter}
 
             UNION ALL
             SELECT id, node_type, external_id, title, 'fuzzy',
-                   similarity(title, %(q)s)
+                   similarity(title, %(q)s), 4
             FROM node
             WHERE title IS NOT NULL
               AND similarity(title, %(q)s) >= %(floor)s {type_filter} {repo_filter}
         )
         SELECT DISTINCT ON (id) id, node_type, external_id, title, match, score
         FROM matches
-        ORDER BY id, score DESC
+        ORDER BY id, score DESC, tier
     """
 
     rows = conn.execute(sql, params).fetchall()
