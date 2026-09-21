@@ -139,5 +139,78 @@ class FindCandidatesTest(unittest.TestCase):
         self.assertEqual(found[0].node_id, titled)
 
 
+@unittest.skipUnless(DSN, "DATABASE_URL not set")
+class TierLabelTest(unittest.TestCase):
+    """The label must name the strongest tier a node matched (issue #98).
+
+    `query.py` treats it as load-bearing -- "a fuzzy match on a paraphrase is a different
+    claim from a title hit" -- and it was arbitrary whenever a node matched two tiers at the
+    same score. A title equal to the query scores 1.0 on `exact`, and `similarity()` of
+    identical strings is also 1.0, so `ORDER BY id, score DESC` kept whichever row it
+    happened to. Across the 220 titles in this graph it kept `fuzzy` for 77 candidates, 34
+    of them the top result: the tool reported a guess where it had an exact hit.
+    """
+
+    def setUp(self) -> None:
+        from decision_graph import db
+
+        self.conn = db.connect(DSN)
+        self.conn.execute("SET CONSTRAINTS ALL DEFERRED")
+
+    def tearDown(self) -> None:
+        self.conn.rollback()
+        self.conn.close()
+
+    def node(self, node_type: str, external_id: str, title: str) -> int:
+        return self.conn.execute(
+            "INSERT INTO node (node_type, external_id, title) VALUES (%s, %s, %s) RETURNING id",
+            (node_type, external_id, title),
+        ).fetchone()["id"]
+
+    def test_a_verbatim_title_is_called_exact_not_fuzzy(self) -> None:
+        title = "fixture the scheduler retries with a widening backoff"
+        wanted = self.node("issue", "990101", title)
+
+        found = retrieval.find_candidates(self.conn, title, limit=5)
+
+        self.assertEqual(found[0].node_id, wanted)
+        self.assertEqual(found[0].match, "exact", "an exact hit was reported as a guess")
+
+    def test_a_genuine_paraphrase_is_still_called_fuzzy(self) -> None:
+        # The label only moves where the node really did match a stronger tier. A near-miss
+        # must keep saying so, or the distinction stops carrying information in the other
+        # direction.
+        self.node("issue", "990102", "fixture the scheduler retries with a widening backoff")
+
+        found = retrieval.find_candidates(
+            self.conn, "fixture the scheduler retries with widening backoffs", limit=5
+        )
+
+        self.assertTrue(found)
+        self.assertEqual(found[0].match, "fuzzy")
+
+    def test_the_tie_break_does_not_reorder_candidates(self) -> None:
+        # `tier` is the last ordering key, after `score`, so it settles which label survives
+        # for one node and never which node comes first.
+        exact = self.node("issue", "990103", "fixture widening backoff")
+        near = self.node("issue", "990104", "fixture widening backoffs")
+
+        found = retrieval.find_candidates(self.conn, "fixture widening backoff", limit=5)
+        ids = [c.node_id for c in found]
+
+        self.assertEqual(ids[0], exact)
+        self.assertIn(near, ids)
+        self.assertLess(ids.index(exact), ids.index(near))
+
+    def test_an_identifier_hit_outranks_a_fuzzy_one_and_says_which(self) -> None:
+        wanted = self.node("issue", "990105", "fixture unrelated wording entirely")
+        self.node("pull_request", "990106", "fixture issue mentioned in a title")
+
+        found = retrieval.find_candidates(self.conn, "issue #990105", limit=5)
+
+        self.assertEqual(found[0].node_id, wanted)
+        self.assertEqual(found[0].match, "identifier")
+
+
 if __name__ == "__main__":
     unittest.main()
