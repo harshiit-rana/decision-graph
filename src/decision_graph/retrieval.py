@@ -63,6 +63,37 @@ def identifiers_in(query: str) -> list[str]:
     return found
 
 
+# An abbreviated commit sha. Seven is not arbitrary: it is git's default abbreviation and
+# exactly what `trace.ref` prints, so this floor covers every commit the tool displays.
+#
+# The floor is also the safety. Every decimal string is valid hex, so a shorter one would
+# read `6143` as a candidate sha prefix and offer whatever commit happens to start with
+# those digits beside the issue the reader asked for. Issue numbers do not reach seven
+# digits on this corpus, and the exact-identifier tier outranks this one regardless.
+# Optionally introduced by the word, because `trace.ref` prints `commit eca5fd1` and that
+# whole string is what a reader copies. Accepting only the bare sha fixed the identifier
+# without fixing the rendering it came from -- the same half-fix `identifiers_in` exists to
+# avoid for `issue #6143`.
+_ABBREVIATED_SHA = re.compile(r"^(?:commit\s+)?([0-9a-f]{7,40})$", re.IGNORECASE)
+
+
+def sha_prefix_of(query: str) -> str | None:
+    """The query as a commit-sha prefix, or None when it cannot be one.
+
+    `trace.ref` renders every commit as `commit eca5fd1` because a 40-character sha "is an
+    identifier but not a readable one". Neither that nor the bare `eca5fd1` resolved
+    anywhere: the identifier tier compares `external_id` for equality and the prefix tier
+    matches titles, so the one form the tool prints could not be typed back in (#102).
+    """
+    found = _ABBREVIATED_SHA.match(query.strip())
+    if not found:
+        return None
+    # Lowercased because shas are stored canonically lowercase and LIKE is case-sensitive.
+    # `git show ECA5FD1` resolves, so typing it here must not fail -- and it would have
+    # failed as "Nothing in the graph matches", which is the false-statement family again.
+    return found.group(1).lower()
+
+
 @dataclass(frozen=True)
 class Candidate:
     node_id: int
@@ -96,7 +127,10 @@ def find_candidates(
     always outranks a fuzzy one regardless of trigram score. `#1234` and a bare number
     resolve as identifiers, which is how an impact query normally arrives, and so does a
     number named inside a phrase -- `issue #1234`, `PR 1234` -- which is how the tool's own
-    output and `dg ask` both write one (issue #96).
+    output and `dg ask` both write one (issue #96). An abbreviated commit sha resolves the
+    way git resolves one, against `external_id`, because `commit eca5fd1` is the only form
+    of a commit the tool ever shows (issue #102); an ambiguous prefix returns every commit
+    it matches rather than choosing, which is also what git does.
 
     Exact title stays above the identifier tier on purpose: 35 titles here carry a `#N`,
     mostly squash-merge subjects like `Docs typo/markup fixes (#5829)`, and those must keep
@@ -124,6 +158,9 @@ def find_candidates(
     params = {
         "q": cleaned,
         "identifiers": identifiers,
+        # Built here rather than in SQL so the pattern needs no `%` escaping inside an
+        # f-string that psycopg is also reading `%(name)s` placeholders out of.
+        "sha_like": (lambda pre: f"{pre}%" if pre else None)(sha_prefix_of(cleaned)),
         "prefix": f"{cleaned}%",
         "floor": FUZZY_FLOOR,
         "limit": limit,
@@ -143,13 +180,20 @@ def find_candidates(
             WHERE external_id = ANY(%(identifiers)s) {type_filter} {repo_filter}
 
             UNION ALL
-            SELECT id, node_type, external_id, title, 'prefix', 0.75, 3
+            SELECT id, node_type, external_id, title, 'sha', 0.93, 3
+            FROM node
+            WHERE %(sha_like)s::text IS NOT NULL
+              AND node_type = 'commit'
+              AND external_id LIKE %(sha_like)s::text {type_filter} {repo_filter}
+
+            UNION ALL
+            SELECT id, node_type, external_id, title, 'prefix', 0.75, 4
             FROM node
             WHERE title ILIKE %(prefix)s {type_filter} {repo_filter}
 
             UNION ALL
             SELECT id, node_type, external_id, title, 'fuzzy',
-                   similarity(title, %(q)s), 4
+                   similarity(title, %(q)s), 5
             FROM node
             WHERE title IS NOT NULL
               AND similarity(title, %(q)s) >= %(floor)s {type_filter} {repo_filter}
