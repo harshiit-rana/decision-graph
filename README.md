@@ -531,7 +531,8 @@ that file is the record of an evaluation run and stays one — and they agree wi
 
 ## Asking in English (`dg ask`)
 
-`dg query` takes a title, a `#number`, or a sha. `dg ask` takes a sentence, uses a model to
+`dg query` takes a title, a `#number`, or a sha — abbreviated or full, since `commit eca5fd1`
+is the only form of a commit the tool prints. `dg ask` takes a sentence, uses a model to
 turn it into one of those plus a mode, runs the *same* engines, and writes the result up in
 prose:
 

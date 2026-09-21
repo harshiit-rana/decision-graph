@@ -212,5 +212,110 @@ class TierLabelTest(unittest.TestCase):
         self.assertEqual(found[0].match, "identifier")
 
 
+class ShaPrefixOfTest(unittest.TestCase):
+    """What may be read as a commit sha (issue #102). Pure, so no database."""
+
+    def test_the_form_the_tool_prints(self) -> None:
+        # `trace.ref` abbreviates every commit to seven characters, so this is the exact
+        # string a reader copies out of a trace, a diagram or a report row.
+        self.assertEqual(retrieval.sha_prefix_of("eca5fd1"), "eca5fd1")
+
+    def test_a_full_sha(self) -> None:
+        full = "eca5fd1dfdc614c2df876cc32018a7d71f84ea82"
+        self.assertEqual(retrieval.sha_prefix_of(full), full)
+
+    def test_case_is_normalised_because_git_accepts_either(self) -> None:
+        # `git show ECA5FD1` resolves. Storing shas lowercase and matching with LIKE would
+        # have made this "Nothing in the graph matches", which is a false statement about
+        # the repository rather than an unrecognised input.
+        self.assertEqual(retrieval.sha_prefix_of("ECA5FD1"), "eca5fd1")
+        self.assertEqual(retrieval.sha_prefix_of("Eca5Fd1"), "eca5fd1")
+
+    # -- the guard -----------------------------------------------------------
+
+    def test_an_issue_number_is_not_a_sha_prefix(self) -> None:
+        # Every decimal string is valid hex. Without the seven-character floor, `6143`
+        # would offer whatever commit starts with those digits beside the issue asked for.
+        for number in ("6143", "5898", "614300", "1"):
+            with self.subTest(number=number):
+                self.assertIsNone(retrieval.sha_prefix_of(number))
+
+    def test_too_short_is_not_a_sha_prefix(self) -> None:
+        self.assertIsNone(retrieval.sha_prefix_of("eca5fd"))
+
+    def test_non_hex_is_not_a_sha_prefix(self) -> None:
+        for query in ("eca5fd1z", "redirect", "issue #6143", "eca5fd1 "  "extra"):
+            with self.subTest(query=query):
+                self.assertIsNone(retrieval.sha_prefix_of(query))
+
+    def test_longer_than_a_sha_is_not_one(self) -> None:
+        self.assertIsNone(retrieval.sha_prefix_of("a" * 41))
+
+
+@unittest.skipUnless(DSN, "DATABASE_URL not set")
+class ShaLookupTest(unittest.TestCase):
+    """Against the real schema; fixtures roll back."""
+
+    def setUp(self) -> None:
+        from decision_graph import db
+
+        self.conn = db.connect(DSN)
+        self.conn.execute("SET CONSTRAINTS ALL DEFERRED")
+
+    def tearDown(self) -> None:
+        self.conn.rollback()
+        self.conn.close()
+
+    def commit(self, sha: str, title: str) -> int:
+        return self.conn.execute(
+            "INSERT INTO node (node_type, external_id, title) VALUES ('commit', %s, %s) "
+            "RETURNING id",
+            (sha, title),
+        ).fetchone()["id"]
+
+    def test_the_abbreviation_resolves_to_the_commit(self) -> None:
+        full = "beef1230000000000000000000000000000000aa"
+        wanted = self.commit(full, "fixture a commit with a known sha")
+
+        found = retrieval.find_candidates(self.conn, full[:7], limit=5)
+
+        self.assertTrue(found, "the only form the tool prints resolved to nothing")
+        self.assertEqual(found[0].node_id, wanted)
+        self.assertEqual(found[0].match, "sha")
+
+    def test_the_full_sha_is_still_an_identifier_match(self) -> None:
+        # Exact identifier scores above the prefix tier, so the stronger label survives.
+        full = "beef1240000000000000000000000000000000aa"
+        wanted = self.commit(full, "fixture another commit")
+
+        found = retrieval.find_candidates(self.conn, full, limit=5)
+
+        self.assertEqual(found[0].node_id, wanted)
+        self.assertEqual(found[0].match, "identifier")
+
+    def test_an_ambiguous_prefix_offers_every_match(self) -> None:
+        # What git does. `dg query` already prints "N other candidates matched this query",
+        # so choosing one here would hide the ambiguity rather than resolve it.
+        a = self.commit("beef1250000000000000000000000000000000aa", "fixture first")
+        b = self.commit("beef1250000000000000000000000000000000bb", "fixture second")
+
+        ids = [c.node_id for c in retrieval.find_candidates(self.conn, "beef125", limit=10)]
+
+        self.assertIn(a, ids)
+        self.assertIn(b, ids)
+
+    def test_a_number_does_not_reach_the_sha_tier(self) -> None:
+        self.commit("6143000000000000000000000000000000000000", "fixture numeric-looking sha")
+        wanted = self.conn.execute(
+            "INSERT INTO node (node_type, external_id, title) "
+            "VALUES ('issue', '614399', 'fixture the issue actually asked for') RETURNING id"
+        ).fetchone()["id"]
+
+        found = retrieval.find_candidates(self.conn, "614399", limit=5)
+
+        self.assertEqual(found[0].node_id, wanted)
+        self.assertEqual(found[0].match, "identifier")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -32,6 +32,7 @@ TIER_MARK = trace.TIER_MARK
 _MATCH_MEANING = {
     "exact": "exact title match",
     "identifier": "matched by identifier",
+    "sha": "matched an abbreviated commit sha",
     "prefix": "title starts with your query",
     "fuzzy": "closest text match",
 }
