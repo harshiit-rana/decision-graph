@@ -14,6 +14,7 @@ change that touches every caller.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 
 import psycopg
@@ -26,6 +27,40 @@ DEFAULT_LIMIT = 10
 # the query at all; an empty candidate set is a better answer than a wrong start node,
 # for the same reason §5.1 prefers no inferred edge to a weak one.
 FUZZY_FLOOR = 0.25
+
+
+# An artifact reference that arrived inside a sentence. Two forms, both explicit:
+# a `#` immediately before digits, or one of the artifact words followed by a number.
+#
+# Bare digits are deliberately absent. "change default redirect code to 303" is a real
+# title in this graph, and treating its 303 as an identifier would answer a title search
+# with whatever artifact happens to be numbered 303 -- trading this bug for its mirror
+# image. A number only counts as a reference when the query says it is one.
+_REFERENCE = re.compile(
+    r"#(\d+)|\b(?:issue|issues|pr|prs|pull\s+request|pull)\s*#?(\d+)\b",
+    re.IGNORECASE,
+)
+
+
+def identifiers_in(query: str) -> list[str]:
+    """Every explicitly-marked artifact number in a query, in order, deduplicated.
+
+    The whole query is included when it is itself an identifier, which is the case that
+    already worked: `#6143` and `6143`. What did not work was any phrasing around it, and
+    the tool's own output is such a phrasing -- `trace.ref` renders `issue #6143`, so
+    pasting a reference out of one command into another returned a different artifact
+    (issue #96). `dg ask` hit it hardest: a model asked for a search term writes
+    "issue 6143", not "#6143".
+    """
+    found: list[str] = []
+    whole = query.strip().lstrip("#")
+    if whole.isdigit():
+        found.append(whole)
+    for hashed, worded in _REFERENCE.findall(query):
+        number = hashed or worded
+        if number not in found:
+            found.append(number)
+    return found
 
 
 @dataclass(frozen=True)
@@ -59,7 +94,13 @@ def find_candidates(
 
     Tiers are tried in order and the results concatenated, so an exact title match
     always outranks a fuzzy one regardless of trigram score. `#1234` and a bare number
-    resolve as identifiers, which is how an impact query normally arrives.
+    resolve as identifiers, which is how an impact query normally arrives, and so does a
+    number named inside a phrase -- `issue #1234`, `PR 1234` -- which is how the tool's own
+    output and `dg ask` both write one (issue #96).
+
+    Exact title stays above the identifier tier on purpose: 35 titles here carry a `#N`,
+    mostly squash-merge subjects like `Docs typo/markup fixes (#5829)`, and those must keep
+    matching on their own text rather than on the pull request they mention.
 
     `repo_node_id`, when given, restricts matches to that repository (issue #28) --
     without it, a query against a database holding more than one repo can return
@@ -69,12 +110,13 @@ def find_candidates(
     if not cleaned:
         return []
 
-    identifier = cleaned.lstrip("#")
+    # A query is allowed to name an artifact the way the tool itself prints one.
+    identifiers = identifiers_in(cleaned) or [cleaned.lstrip("#")]
     type_filter = "AND node_type = ANY(%(types)s)" if node_types else ""
     repo_filter = "AND repo_node_id = %(repo)s" if repo_node_id is not None else ""
     params = {
         "q": cleaned,
-        "identifier": identifier,
+        "identifiers": identifiers,
         "prefix": f"{cleaned}%",
         "floor": FUZZY_FLOOR,
         "limit": limit,
@@ -91,7 +133,7 @@ def find_candidates(
             UNION ALL
             SELECT id, node_type, external_id, title, 'identifier', 0.95
             FROM node
-            WHERE external_id = %(identifier)s {type_filter} {repo_filter}
+            WHERE external_id = ANY(%(identifiers)s) {type_filter} {repo_filter}
 
             UNION ALL
             SELECT id, node_type, external_id, title, 'prefix', 0.75
