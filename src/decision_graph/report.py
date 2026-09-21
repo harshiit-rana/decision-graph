@@ -171,7 +171,7 @@ def _esc(text) -> str:
 
 
 def collect(conn, repo_node_id: int) -> dict:
-    """Everything the page shows, read in six queries.
+    """Everything the page shows, read in seven queries.
 
     Returned as plain data rather than rendered directly so the tests can assert what the
     page will contain without parsing HTML, and so a future JSON export is the same read.
@@ -191,6 +191,10 @@ def collect(conn, repo_node_id: int) -> dict:
 
     annotations = trace.decision_annotations(conn, ids)
     return {
+        # Who scrutinised the work, which the evidence table below structurally cannot
+        # show: a `reviewed` edge runs person -> pull request and never touches the
+        # Decision that EVIDENCE_SQL selects by (issue #110).
+        "reviewers": trace.decision_reviewers(conn, ids),
         "decisions": decisions,
         "evidence": evidence,
         "coverage": coverage,
@@ -327,6 +331,7 @@ def render_html(data: dict, repo: str) -> str:
         tiers = {e["evidence_tier"] for e in edges}
         badge = "corroborated" if "corroborated" in tiers else "explicit"
         note = data["annotations"].get(d["node_id"], "no current implementer")
+        seen_by = data.get("reviewers", {}).get(d["node_id"], [])
         source = ""
         if d["source_ref"]:
             name = trace.ref(d["source_type"], d["source_ref"])
@@ -346,7 +351,8 @@ def render_html(data: dict, repo: str) -> str:
   </header>
   <p class="meta">{note and _esc(note)}
      {' · decided ' + d['decided_at'].strftime('%Y-%m-%d') if d.get('decided_at') else ''}
-     {' · from ' + source if source else ''}</p>
+     {' · from ' + source if source else ''}
+     {' · reviewed by ' + _esc(', '.join(seen_by)) if seen_by else ''}</p>
   <p class="key">cluster <code>{_esc(d['thread_key'])}</code>
      <span class="warn">names the cluster, not necessarily the work that landed</span></p>
   <table>

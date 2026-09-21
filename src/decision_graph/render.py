@@ -230,6 +230,7 @@ def render(
     statuses: dict[int, str] | None = None,
     links: dict[str, str] | None = None,
     bodies: dict[int, str] | None = None,
+    reviewers: dict[int, list[str]] | None = None,
     as_of=None,
     closure=None,
     verbose: bool = False,
@@ -240,6 +241,7 @@ def render(
     statuses = statuses or {}
     links = links or {}
     bodies = bodies or {}
+    reviewers = reviewers or {}
     p = lambda s="": print(s, file=out)  # noqa: E731
 
     if not answer.found:
@@ -298,7 +300,7 @@ def render(
     p(dim("    a corroborated answer has at least 3 independent kinds all pointing the same way."))
 
     for i, path in enumerate(sorted(answer.paths, key=lambda x: (x.depth, x.target_id)), 1):
-        _render_path(path, i, annotations, statuses, verbose, p)
+        _render_path(path, i, annotations, statuses, verbose, p, reviewers)
 
     urls = _urls(answer)
     # Artifacts the answer NAMES but no path passes through -- chiefly the credited
@@ -313,14 +315,14 @@ def render(
         p()
 
 
-def _render_path(path, index, annotations, statuses, verbose, p) -> None:
+def _render_path(path, index, annotations, statuses, verbose, p, reviewers=None) -> None:
     mark = "" if _COLOR else trace.TIER_MARK.get(path.tier, "??") + " "
     p(f"  [{index}] {mark}{_tier_colour(path.tier, path.tier)}  {plural(path.depth, 'hop')}")
     p(f"      {label(path, path.node_ids[0], verbose=verbose)}")
     # Including the start node. A query that matched a Decision directly begins there, and
     # skipping it meant the one node whose label is deliberately uninformative -- see
     # `trace.ref` -- was also the one node with nothing to explain it.
-    _annotate(path.node_ids[0], annotations, statuses, p)
+    _annotate(path.node_ids[0], annotations, statuses, p, reviewers)
 
     for step, node_id in zip(path.steps, path.node_ids[1:]):
         forward = step.to_node_id == node_id
@@ -328,14 +330,30 @@ def _render_path(path, index, annotations, statuses, verbose, p) -> None:
         p(f"       └─ {phrase(step.edge_type, forward)}  "
           f"{_tier_colour(step.evidence_tier, '[' + step.evidence_tier + ']')}{detail}")
         p(f"      {label(path, node_id, verbose=verbose)}")
-        _annotate(node_id, annotations, statuses, p)
+        _annotate(node_id, annotations, statuses, p, reviewers)
     p()
 
 
-def _annotate(node_id: int, annotations: dict, statuses: dict, p) -> None:
+def _annotate(node_id: int, annotations: dict, statuses: dict, p,
+              reviewers: dict | None = None) -> None:
+    """What the graph credits this node with, under its label.
+
+    Reviewers are named here rather than beside the implementer because they answer a
+    different question. The annotation says what did the work; this says who scrutinised it
+    -- and until #110 nobody did, because a `reviewed` edge runs person -> pull request and
+    so touches neither the Decision the evidence table selects by nor any edge a Why-walk
+    crosses. The author was shown twice and the reviewers not at all.
+    """
     detail = ", ".join(x for x in (statuses.get(node_id), annotations.get(node_id)) if x)
     if detail:
         p(dim(f"          {detail}"))
+
+    names = (reviewers or {}).get(node_id)
+    if names:
+        # Named, in the order they reviewed, and nothing more. Not ranked and not counted:
+        # review volume is not expertise, which is the inference #91's concentration caveat
+        # refuses for the same reason.
+        p(dim(f"          reviewed by {', '.join(names)}"))
 
 
 def _urls(answer: Answer) -> list[tuple[str, str]]:
