@@ -154,6 +154,19 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    # The same defect one argument over, missed when --depth was guarded (issue #99). A
+    # zero-candidate retrieval cannot match anything, so `find_candidates` correctly
+    # returned nothing and the miss below reported it as "Nothing in the graph matches
+    # '#5895'" -- about an artifact the graph holds, with advice to go check `dg status`,
+    # which shows it present and sends the reader after a problem that does not exist.
+    if args.limit < 1:
+        print(
+            f"error: --limit {args.limit} asks for no candidates, so nothing can match. "
+            "Use 1 or more.",
+            file=sys.stderr,
+        )
+        return 2
+
     conn = db.connect(dsn)
 
     repo_node_id = None

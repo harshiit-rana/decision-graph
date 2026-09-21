@@ -81,6 +81,26 @@ class QueryArgumentTest(unittest.TestCase):
         code, _text = run_query(["#5898", "--depth", "-1"])
         self.assertEqual(code, 2)
 
+    def test_limit_zero_is_refused_rather_than_answered_with_nothing(self) -> None:
+        # The same defect as --depth 0, one argument over, and missed when that was
+        # guarded. A zero-candidate retrieval cannot match anything, so the miss was
+        # rendered as "Nothing in the graph matches '#5898'" -- about an artifact the graph
+        # holds, with advice to check `dg status`, which shows it present.
+        code, text = run_query(["#5898", "--limit", "0"])
+        self.assertEqual(code, 2)
+        self.assertIn("no candidates", text)
+        self.assertNotIn(
+            "Nothing in the graph matches", text,
+            "a caller's own argument was reported as a fact about the repository",
+        )
+
+    def test_a_negative_limit_is_refused(self) -> None:
+        code, _text = run_query(["#5898", "--limit", "-1"])
+        self.assertEqual(code, 2)
+
+    def test_limit_one_still_works(self) -> None:
+        self.assertAccepted(["#5898", "--limit", "1"])
+
     def test_depth_one_still_works(self) -> None:
         self.assertAccepted(["#5898", "--depth", "1"])
 
