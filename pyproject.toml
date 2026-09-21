@@ -22,6 +22,7 @@ nlp = ["openai>=1.0"]
 dg = "decision_graph.cli:main"
 dg-ingest = "decision_graph.run:main"
 dg-query = "decision_graph.query:main"
+dg-webhook = "decision_graph.webhook:main"
 
 [build-system]
 requires = ["setuptools>=68"]

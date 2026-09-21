@@ -535,6 +535,32 @@ Its numbers come from the graph at the moment you run it, not from `eval/results
 that file is the record of an evaluation run and stays one — and they agree with
 `eval/figures.sql`, which is the script that exists so any figure here can be checked.
 
+## Reacting instead of polling (`dg-webhook`)
+
+`dg ingest` polls: it walks cursors forward and asks GitHub what changed. `dg-webhook` reacts,
+running the **same** extractors on a delivery — nothing here is a second ingestion path.
+
+```bash
+GITHUB_WEBHOOK_SECRET=... DATABASE_URL=... GITHUB_TOKEN=... dg-webhook --port 8000
+```
+
+It **refuses to start without a secret**, because a receiver with verification off is an
+unauthenticated write endpoint into the graph, and the way that happens in practice is an unset
+variable rather than a decision. Signatures are checked with `hmac.compare_digest` against the
+raw body before it is parsed; missing, malformed and wrong all get the same 401, so the reply
+does not tell a forger which attempt was closer.
+
+Handled: `issues`, `pull_request`, `issue_comment`, `release`. Anything else is acknowledged
+with 200 rather than refused — GitHub disables a hook after enough non-2xx replies, so erroring
+on `star` would eventually switch off the deliveries that matter. **`push` is deliberately not
+handled**: its commit objects are a different shape from the commits API, so `extract_commit`
+would write subtly wrong nodes rather than fail.
+
+It advances **no cursor**. A delivery says one thing changed; it cannot say nothing else did,
+and writing a watermark from one would claim a completeness no webhook can offer. `dg ingest`
+remains the thing that guarantees the window. It is also not a production server —
+`http.server` is single-threaded and terminates no TLS.
+
 ## Asking in English (`dg ask`)
 
 `dg query` takes a title, a `#number`, or a sha — abbreviated or full, since `commit eca5fd1`
