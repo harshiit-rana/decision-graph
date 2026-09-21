@@ -591,6 +591,96 @@ def extract_reviews(ctx: Context, pr_number: int, pr_node_id: int) -> None:
             )
 
 
+def extract_comments(ctx: Context, number: int, parent_node_id: int) -> int:
+    """Ingest the comments on an issue or pull request. Returns how many were stored.
+
+    Artifacts and nothing else. No Decision is created, no rubric clause is satisfied, and
+    the edges carry provenance rather than a claim: `created` from the author, and
+    `discussed_in` from the artifact to the comment, which reads "issue #5895 was discussed
+    in ...". `discussed_in` has been in the edge enum since 0001 with no producer.
+
+    The PRD roadmap note is why this stops here. Adding a `rejected` outcome without
+    rejection-rationale extraction "would reintroduce exactly the failure §5.1 exists to
+    prevent", and the sampled closing comments bear that out -- "ok, my bad" is a reporter
+    withdrawing, "Duplicate of ..." is triage. Storing the prose lets a reader judge that;
+    concluding from it is a different feature with a different evidence burden.
+
+    Driven per-artifact by the issues cursor, like `extract_reviews`, so there is no
+    independent cursor to advance and a re-run costs the same calls the issues page did.
+    """
+    stored = 0
+    for page in ctx.client.paginate(
+        f"/repos/{ctx.settings.target_repo}/issues/{number}/comments"
+    ):
+        for payload in page.items:
+            comment_id = payload.get("id")
+            if comment_id is None:
+                # No stable identity means no idempotent upsert, and a comment that
+                # re-inserts on every run is worse than one that is absent.
+                ctx.stats.note_skip("comment_without_id")
+                continue
+
+            created = parse_ts(payload.get("created_at"))
+            node_id = ctx.node(
+                node_type="comment",
+                external_id=str(comment_id),
+                github_node_id=payload.get("node_id"),
+                # The body is the title's job here: a comment has no title of its own, and
+                # `trace.ref` would otherwise render it as a bare id a reader cannot place.
+                title=_comment_title(payload.get("body")),
+                url=payload.get("html_url"),
+                source_created_at=created,
+                source_updated_at=parse_ts(payload.get("updated_at")),
+                raw=payload,
+            )
+            db.upsert_detail(
+                ctx.conn,
+                "comment",
+                node_id,
+                parent_node_id=parent_node_id,
+                body=payload.get("body") or "",
+                created_at=created,
+                author_association=payload.get("author_association"),
+            )
+            stored += 1
+
+            author_id = upsert_person(ctx, payload.get("user"))
+            if author_id:
+                ctx.edge(
+                    src=author_id,
+                    dst=node_id,
+                    edge_type="created",
+                    extractor="issue_comment",
+                    source_ref=f"comment:{comment_id}",
+                    observed_at=created,
+                )
+
+            ctx.edge(
+                src=parent_node_id,
+                dst=node_id,
+                edge_type="discussed_in",
+                extractor="issue_comment",
+                source_ref=f"comment:{comment_id}",
+                observed_at=created,
+            )
+    return stored
+
+
+# A comment has no title. One line of its body is what makes it identifiable in a trace,
+# and the whole body is on the node anyway -- this is a label, not a summary.
+_COMMENT_TITLE_CHARS = 72
+
+
+def _comment_title(body: str | None) -> str:
+    first = (body or "").strip().splitlines()
+    if not first:
+        return "(empty comment)"
+    line = first[0].strip()
+    return line[:_COMMENT_TITLE_CHARS] if len(line) <= _COMMENT_TITLE_CHARS else (
+        line[: _COMMENT_TITLE_CHARS - 1] + "\u2026"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Commits
 # ---------------------------------------------------------------------------

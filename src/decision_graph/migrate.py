@@ -71,6 +71,12 @@ SENTINELS: dict[str, str] = {
     "0013": """EXISTS (SELECT 1 FROM information_schema.columns
                 WHERE table_name = 'pending_reference'
                   AND column_name = 'retracted_at')""",
+    # 0014 adds only an enum value, so the value itself is the object to probe. It is
+    # split from 0015 because Postgres refuses to USE a new enum label in the transaction
+    # that added it, and the detail table's CHECK is such a use.
+    "0014": """EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+                WHERE t.typname = 'node_type' AND e.enumlabel = 'comment')""",
+    "0015": "to_regclass('public.comment') IS NOT NULL",
 }
 
 
