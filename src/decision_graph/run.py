@@ -207,6 +207,11 @@ def _process_page(ctx: Context, resource: str, items: list[dict]) -> list[dateti
             node_id = extractors.extract_issue_or_pr(ctx, payload)
             ts = parse_ts(payload.get("updated_at"))
 
+            # Comments hang off issues AND pull requests, and the endpoint is the same
+            # `/issues/{n}/comments` for both -- GitHub models a pull request as an issue
+            # for discussion. Outside the `pull_request` branch below for that reason.
+            extractors.extract_comments(ctx, payload["number"], node_id)
+
             if "pull_request" in payload:
                 number = payload["number"]
                 extractors.extract_reviews(ctx, number, node_id)

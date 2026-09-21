@@ -604,6 +604,13 @@ Accepted deliberately rather than fixed by switching repos:
 - **No CODEOWNERS** at `/CODEOWNERS`, `/.github/CODEOWNERS`, or `/docs/CODEOWNERS`. The
   `owns` extractor is built but no-ops; the graph gets no ownership edges. **The §9
   evaluation set cannot include ownership queries against flask.**
+- **Comments are ingested as artifacts only** (migrations 0014/0015). The closing discussion
+  is in the graph now, so a refusal no longer has to say it is absent — but it creates no
+  Decision and satisfies no rubric clause. Sampled closing comments are the argument for
+  stopping there: `"ok, my bad"` is the reporter withdrawing (`author_association: NONE`),
+  `"Duplicate of ..."` is triage. `db/tests/0015_comment_checks.sql` enforces it, and the
+  refusal counts are unchanged — 263 artifacts refused a Why-walk before comments and 263
+  after.
 - **`has_wiki: false`.** The `wiki_page` extractor no-ops. On this repo `motivated_by`
   therefore resolves only to issues and PR bodies, never wiki pages.
 - **The `corroborated` tier is sparse: 8 of 239 threads.**
