@@ -164,14 +164,22 @@ Three things about that output are deliberate:
   reader used to see was the one inside the `thread_key` — which names the *cluster*, and for
   6 of 15 Decisions names a pull request that was abandoned (#19).
 
-A refusal is treated as a result, because it is one — 8 of the 18 §9 outcomes are refusals:
+A refusal is treated as a result, because it is one — 8 of the 18 §9 outcomes are refusals.
+A refusal has to be *true*, which for most artifacts means naming how they ended:
 
 ```
   No answer - and that is a result, not a failure
 
-    Nothing in the ingested window records why this happened. The rubric needs
-    a motivating issue and merged work in the same conversation; a change made
-    without an issue leaves nothing to reconstruct a decision from.
+    issue #6143 was closed as "not planned" on 2026-08-28, with nothing merged
+    for it.
+
+    That is why there is no Decision to walk back to: §5.1 asserts one only where
+    work landed, so work that did not land produces no node. The silence is the
+    rubric holding, not a gap in the graph.
+
+    What the graph records is that it closed, not why. The closing discussion is
+    not ingested, so this is not evidence the idea was rejected - closed without
+    landing covers rejection, supersession and abandonment alike.
 
     engine: no path found, explicit or inferred
     the inferred fallback was tried and also found nothing
@@ -179,6 +187,22 @@ A refusal is treated as a result, because it is one — 8 of the 18 §9 outcomes
   What to try
     - widen the walk:      --depth 3
     ...
+```
+
+The last paragraph is the point. *How* it ended is in the graph and checkable; *why* it ended
+is in closing discussion that is not ingested, and guessing would be the failure §5.1 exists
+to prevent — sampled closing comments include a reporter withdrawing (`"ok, my bad"`), a
+duplicate, and an already-fixed bug, none of which are decisions.
+
+Of the 263 artifacts a Why-walk refuses, **236 end in a way the graph records** — 185 pull
+requests closed unmerged, 50 issues closed `not_planned`, one duplicate. The wording below is
+what the other 27 get, and is correct only for them: work that landed with nothing recording
+why (issue #86).
+
+```
+    Nothing in the ingested window records why this happened. The rubric needs
+    a motivating issue and merged work in the same conversation; a change made
+    without an issue leaves nothing to reconstruct a decision from.
 ```
 
 ### Answers as diagrams

@@ -231,6 +231,7 @@ def render(
     links: dict[str, str] | None = None,
     bodies: dict[int, str] | None = None,
     as_of=None,
+    closure=None,
     verbose: bool = False,
     out=None,
 ) -> None:
@@ -242,7 +243,7 @@ def render(
     p = lambda s="": print(s, file=out)  # noqa: E731
 
     if not answer.found:
-        _render_refusal(answer, p, as_of)
+        _render_refusal(answer, p, as_of, closure)
         return
 
     if answer.used_inferred_fallback:
@@ -353,7 +354,43 @@ def _urls(answer: Answer) -> list[tuple[str, str]]:
     return list(seen.items())
 
 
-def _render_refusal(answer: Answer, p, as_of=None) -> None:
+def _render_closure(closure, mode, p) -> None:
+    """Say how the artifact ended, and stop short of saying why.
+
+    The line between those two is the whole reason this is safe to print. That it closed
+    unmerged, or as `not_planned`, is recorded in the graph and checkable. *Why* it closed
+    lives in the closing discussion, which is not ingested -- and the sampled comments are
+    a fair warning against guessing: "ok, my bad" is a reporter withdrawing, "Duplicate of
+    ..." is triage, "it's fixed in main" is already-done. Most of these are not decisions
+    at all, so the paragraph names the ending and explicitly declines the inference.
+    """
+    when = f"{closure.closed_at:%Y-%m-%d}" if closure.closed_at else "an unrecorded date"
+
+    if closure.kind == "not_planned":
+        p(f'    {closure.ref} was closed as "not planned" on {when}, with nothing merged')
+        p("    for it.")
+    elif closure.kind == "duplicate":
+        p(f"    {closure.ref} was closed as a duplicate on {when}.")
+    else:
+        p(f"    {closure.ref} was closed on {when} without being merged.")
+    p()
+
+    if mode is Mode.WHY:
+        p("    That is why there is no Decision to walk back to: \u00a75.1 asserts one only where")
+        p("    work landed, so work that did not land produces no node. The silence is the")
+        p("    rubric holding, not a gap in the graph.")
+    else:
+        p("    Nothing downstream references it, which is the ordinary consequence of work")
+        p("    that did not land rather than an unknown.")
+
+    if closure.kind != "duplicate":
+        p()
+        p("    What the graph records is that it closed, not why. The closing discussion is")
+        p("    not ingested, so this is not evidence the idea was rejected -- closed without")
+        p("    landing covers rejection, supersession and abandonment alike.")
+
+
+def _render_refusal(answer: Answer, p, as_of=None, closure=None) -> None:
     """Say what was looked for and what that means -- refusals are a primary output.
 
     The distinction that matters is between "you asked the wrong question" and "the graph
@@ -364,6 +401,12 @@ def _render_refusal(answer: Answer, p, as_of=None) -> None:
     evidence exists but did not exist YET. Saying "nothing records why this happened" to
     someone who asked as of last June states something false about the graph, so the
     timestamp is named before anything else.
+
+    A recorded ending is the fourth case and the widest: an issue closed `not_planned` or a
+    pull request closed unmerged produces no Decision *by design*, and saying "a change made
+    without an issue leaves nothing to reconstruct a decision from" to one of those states
+    something the graph itself contradicts. It was doing so for 237 of the 263 artifacts
+    that refuse (issue #86).
     """
     p(bold("  No answer — and that is a result, not a failure"))
     p()
@@ -375,7 +418,9 @@ def _render_refusal(answer: Answer, p, as_of=None) -> None:
         p(dim(f"    engine: {answer.explanation}"))
         p()
         return
-    if answer.mode is Mode.WHY:
+    if closure is not None:
+        _render_closure(closure, answer.mode, p)
+    elif answer.mode is Mode.WHY:
         p("    Nothing in the ingested window records why this happened. The rubric needs")
         p("    a motivating issue and merged work in the same conversation; a change made")
         p("    without an issue leaves nothing to reconstruct a decision from.")
