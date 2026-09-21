@@ -8,7 +8,7 @@ something it shouldn't, an error translator that stops translating.
 from __future__ import annotations
 
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -144,8 +144,24 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(extra, ["--bogus"])
 
 
-def _row(repo, resource, phase="backfill", watermark=None):
-    return {"repo": repo, "resource": resource, "phase": phase, "steady_watermark": watermark}
+DEFAULT_WATERMARK = datetime(2026, 2, 19, tzinfo=timezone.utc)
+DEFAULT_CHECKED = datetime(2026, 9, 5, tzinfo=timezone.utc)
+
+
+def _row(repo, resource, phase="backfill", watermark=DEFAULT_WATERMARK,
+         updated_at=DEFAULT_CHECKED):
+    """A healthy cursor by default: polled after its own newest artifact.
+
+    That is the ordinary case -- GitHub was asked and had nothing newer -- and it is the
+    one the old footer described as "there is more to fetch".
+    """
+    return {
+        "repo": repo,
+        "resource": resource,
+        "phase": phase,
+        "steady_watermark": watermark,
+        "updated_at": updated_at,
+    }
 
 
 class CursorLinesTest(unittest.TestCase):
@@ -258,6 +274,77 @@ class ChooseReportRepoTest(unittest.TestCase):
         outcome, repo = cli.choose_report_repo("", ["a/one", "b/two"])
         self.assertEqual(outcome, "ambiguous")
         self.assertIsNone(repo)
+
+
+class QuietIsNotIncompleteTest(unittest.TestCase):
+    """A watermark short of today is usually the repository being quiet (issue #92).
+
+    The old footer said, unconditionally, that it meant there was more to fetch. For
+    `releases up to 2026-02-19` that was false -- flask's newest release *is* 3.1.3, so
+    ingestion was complete and the line sent readers to re-run a full ingest for nothing.
+    """
+
+    def test_the_old_claim_is_gone(self) -> None:
+        text = "\n".join(cli._cursor_lines([_row("a/one", "releases")]))
+        self.assertNotIn("more to fetch", text.replace("not work left to fetch", ""))
+
+    def test_a_cursor_polled_after_its_watermark_is_shown_as_checked(self) -> None:
+        lines = cli._cursor_lines([_row("a/one", "releases")])
+        self.assertIn("checked 2026-09-05", lines[0])
+
+    def test_and_carries_no_warning(self) -> None:
+        text = "\n".join(cli._cursor_lines([_row("a/one", "releases")]))
+        self.assertNotIn("may genuinely have more", text)
+
+    def test_the_gap_is_explained_as_quiet(self) -> None:
+        text = " ".join(" ".join(cli._cursor_lines([_row("a/one", "releases")])).split())
+        self.assertIn("repository being quiet, not work left to fetch", text)
+
+    def test_a_cursor_never_polled_says_so(self) -> None:
+        lines = cli._cursor_lines([_row("a/one", "releases", updated_at=None)])
+        self.assertIn("never checked", lines[0])
+
+    def test_a_cursor_not_reached_by_the_last_run_is_warned_about(self) -> None:
+        # Stopping at the rate-limit floor leaves a cursor whose `checked` never passed its
+        # own watermark. That one genuinely may have more, and saying "quiet" there would be
+        # the same over-claim pointed the other way.
+        stale = _row("a/one", "releases",
+                     watermark=datetime(2026, 9, 5, tzinfo=timezone.utc),
+                     updated_at=datetime(2026, 2, 19, tzinfo=timezone.utc))
+        text = " ".join(" ".join(cli._cursor_lines([stale])).split())
+        self.assertIn("before this watermark", text)
+        self.assertIn("may genuinely have more", text)
+
+    def test_a_naive_and_aware_mix_does_not_become_a_traceback(self) -> None:
+        # Both columns are timestamptz, so this should not arise -- but `dg status` is what
+        # you run when something is already wrong, and comparing the two raised TypeError
+        # before `_confirmed_current` caught it. A status command that crashes instead of
+        # reporting is the shape of #82.
+        mixed = _row("a/one", "releases",
+                     watermark=datetime(2026, 2, 19),                       # naive
+                     updated_at=datetime(2026, 9, 5, tzinfo=timezone.utc))  # aware
+        lines = cli._cursor_lines([mixed])
+        self.assertIn("not confirmed current", lines[0])
+        self.assertIn("may genuinely have more", " ".join(" ".join(lines).split()))
+
+    def test_confirmed_current_answers_none_rather_than_raising(self) -> None:
+        naive = datetime(2026, 2, 19)
+        aware = datetime(2026, 9, 5, tzinfo=timezone.utc)
+        self.assertIsNone(cli._confirmed_current(aware, naive))
+        self.assertIsNone(cli._confirmed_current(None, aware))
+        self.assertIsNone(cli._confirmed_current(aware, None))
+        self.assertTrue(cli._confirmed_current(aware, datetime(2026, 2, 19, tzinfo=timezone.utc)))
+        self.assertFalse(cli._confirmed_current(datetime(2026, 1, 1, tzinfo=timezone.utc), aware))
+
+    def test_one_unconfirmed_resource_warns_without_condemning_the_rest(self) -> None:
+        rows = [
+            _row("a/one", "commits"),
+            _row("a/one", "releases", updated_at=None),
+        ]
+        lines = cli._cursor_lines(rows)
+        self.assertIn("checked 2026-09-05", lines[0])
+        self.assertIn("never checked", lines[1])
+        self.assertIn("may genuinely have more", " ".join(" ".join(lines).split()))
 
 
 if __name__ == "__main__":
