@@ -37,7 +37,7 @@ FUZZY_FLOOR = 0.25
 # with whatever artifact happens to be numbered 303 -- trading this bug for its mirror
 # image. A number only counts as a reference when the query says it is one.
 _REFERENCE = re.compile(
-    r"#(\d+)|\b(?:issue|issues|pr|prs|pull\s+request|pull)\s*#?(\d+)\b",
+    r"#(\d+)|\b(?:issue|issues|pr|prs|pull\s+request|pull|comment|comments)\s*#?(\d+)\b",
     re.IGNORECASE,
 )
 
@@ -51,6 +51,11 @@ def identifiers_in(query: str) -> list[str]:
     pasting a reference out of one command into another returned a different artifact
     (issue #96). `dg ask` hit it hardest: a model asked for a search term writes
     "issue 6143", not "#6143".
+
+    The word list has to grow with `trace.ref`. `comment` was added to the graph in #106
+    and rendered as `comment 5151339312`, which resolved to nothing until #114 -- the same
+    defect this function exists to prevent, in the node type added after it. The round-trip
+    test over every node type is what catches the next one.
     """
     found: list[str] = []
     whole = query.strip().lstrip("#")
@@ -75,6 +80,43 @@ def identifiers_in(query: str) -> list[str]:
 # without fixing the rendering it came from -- the same half-fix `identifiers_in` exists to
 # avoid for `issue #6143`.
 _ABBREVIATED_SHA = re.compile(r"^(?:commit\s+)?([0-9a-f]{7,40})$", re.IGNORECASE)
+
+
+# Every node_type as `trace.ref` writes it -- underscores become spaces there, so both
+# spellings are accepted. Longest first, so "pull request" is stripped before "pull".
+_TYPE_WORDS = tuple(sorted(
+    (
+        "repository", "commit", "pull request", "pull_request", "issue", "release",
+        "person", "team", "workflow", "wiki page", "wiki_page", "comment", "branch",
+        "codeowners scope", "codeowners_scope", "decision",
+    ),
+    key=len,
+    reverse=True,
+))
+
+
+def typed_identifier_of(query: str) -> str | None:
+    """`workflow ci.yml` -> `ci.yml`. The identifier behind the word `trace.ref` prints.
+
+    Added because fixing this one node type at a time was not working. #96 handled issues
+    and pull requests, #102 handled commits, and #106 then introduced `comment` with the
+    same defect -- three rounds of the same bug because each fix knew about the types that
+    existed when it was written.
+
+    `trace.ref` renders every node as `<type> <external_id>`, so stripping the type word is
+    the general form of all three. It also turns three lucky fuzzy matches into exact ones:
+    `repository pallets/flask` and `workflow <path>` were resolving by trigram similarity or
+    not at all, and a workflow path was matching a *person*.
+    """
+    cleaned = query.strip()
+    lowered = cleaned.lower()
+    for word in _TYPE_WORDS:
+        if lowered.startswith(word + " "):
+            rest = cleaned[len(word):].strip()
+            # `#6143` is already found by `identifiers_in`; returning the bare number here
+            # too is harmless, and returning it with the `#` would match nothing.
+            return rest.lstrip("#") or None
+    return None
 
 
 def sha_prefix_of(query: str) -> str | None:
@@ -153,6 +195,9 @@ def find_candidates(
 
     # A query is allowed to name an artifact the way the tool itself prints one.
     identifiers = identifiers_in(cleaned) or [cleaned.lstrip("#")]
+    typed = typed_identifier_of(cleaned)
+    if typed and typed not in identifiers:
+        identifiers.append(typed)
     type_filter = "AND node_type = ANY(%(types)s)" if node_types else ""
     repo_filter = "AND repo_node_id = %(repo)s" if repo_node_id is not None else ""
     params = {

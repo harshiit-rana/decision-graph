@@ -212,6 +212,38 @@ class TierLabelTest(unittest.TestCase):
         self.assertEqual(found[0].match, "identifier")
 
 
+class TypedIdentifierOfTest(unittest.TestCase):
+    """`<node type> <external id>` -- the general form of #96, #102 and #114."""
+
+    def test_the_word_trace_ref_prints_is_stripped(self) -> None:
+        self.assertEqual(retrieval.typed_identifier_of("workflow ci.yml"), "ci.yml")
+        self.assertEqual(retrieval.typed_identifier_of("repository pallets/flask"),
+                         "pallets/flask")
+        self.assertEqual(retrieval.typed_identifier_of("comment 5151339312"), "5151339312")
+
+    def test_the_longest_word_wins(self) -> None:
+        # "pull request #5229" must not be stripped as "pull" leaving "request #5229".
+        self.assertEqual(retrieval.typed_identifier_of("pull request #5229"), "5229")
+
+    def test_both_spellings_of_a_two_word_type(self) -> None:
+        # `trace.ref` turns underscores into spaces; the stored node_type has them.
+        self.assertEqual(retrieval.typed_identifier_of("pull_request 5229"), "5229")
+
+    def test_case_does_not_matter(self) -> None:
+        self.assertEqual(retrieval.typed_identifier_of("Workflow ci.yml"), "ci.yml")
+
+    def test_a_query_that_is_not_a_typed_reference(self) -> None:
+        for query in ("change default redirect code to 303", "issue", "workflow", ""):
+            with self.subTest(query=query):
+                self.assertIsNone(retrieval.typed_identifier_of(query))
+
+    def test_a_title_beginning_with_a_type_word_is_still_searchable(self) -> None:
+        # The typed identifier is ADDED to the identifier list, never replacing the exact
+        # title tier -- which scores 1.0 and still wins.
+        self.assertEqual(retrieval.typed_identifier_of("release notes need a rewrite"),
+                         "notes need a rewrite")
+
+
 class ShaPrefixOfTest(unittest.TestCase):
     """What may be read as a commit sha (issue #102). Pure, so no database."""
 
@@ -340,6 +372,108 @@ class ShaLookupTest(unittest.TestCase):
 
         self.assertEqual(found[0].node_id, wanted)
         self.assertEqual(found[0].match, "identifier")
+
+
+@unittest.skipUnless(DSN, "DATABASE_URL not set")
+class EveryRenderedRefResolvesTest(unittest.TestCase):
+    """Whatever `trace.ref` prints must be typeable back in (issues #96, #102, #114).
+
+    Three separate bugs came from this one check, and the third arrived *after* the first
+    two were fixed: #106 added the `comment` node type, `trace.ref` rendered it as
+    `comment 5151339312`, and that resolved to nothing. Each earlier fix knew only about the
+    types that existed when it was written.
+
+    Seeds one node per type rather than reading the live graph, so it runs against CI's
+    migrated-but-empty database as well. That matters: reading the graph would make this
+    skip exactly where the last one slipped through.
+    """
+
+    # external_id has to look like the real thing, because how it is rendered depends on
+    # it -- a commit is abbreviated to seven characters, a numbered type gets a `#`.
+    SHAPES = {
+        "commit": "beefcafe" + "0" * 32,
+        "issue": "990201",
+        "pull_request": "990202",
+        "comment": "9902030000",
+        "release": "9.9.9-fixture",
+        "person": "fixture-person",
+        "repository": "fixture/repo",
+        "workflow": "fixture/workflow.yml",
+        "team": "fixture-org/fixture-team",
+        "branch": "fixture-branch",
+        "wiki_page": "Fixture-Page",
+        "codeowners_scope": "CODEOWNERS:1",
+    }
+
+    # No external_id, so `trace.ref` renders the bare word. A label, not a reference, and
+    # not addressable by design.
+    NOT_ADDRESSABLE = {"decision"}
+
+    def setUp(self) -> None:
+        from decision_graph import db
+
+        self.conn = db.connect(DSN)
+        self.conn.execute("SET CONSTRAINTS ALL DEFERRED")
+
+    def tearDown(self) -> None:
+        self.conn.rollback()
+        self.conn.close()
+
+    def all_node_types(self) -> list[str]:
+        return [
+            r["label"]
+            for r in self.conn.execute(
+                "SELECT unnest(enum_range(NULL::node_type))::text AS label"
+            ).fetchall()
+        ]
+
+    def test_every_node_type_round_trips(self) -> None:
+        from decision_graph import trace
+
+        types = [t for t in self.all_node_types() if t not in self.NOT_ADDRESSABLE]
+        self.assertGreaterEqual(len(types), 8, "enum looks wrong")
+
+        checked = 0
+        for node_type in types:
+            shape = self.SHAPES.get(node_type)
+            # A type with no shape here is a type someone added without teaching this test
+            # about it, which is the omission the whole class exists to catch.
+            self.assertIsNotNone(
+                shape, f"node_type {node_type!r} has no fixture: add one and check it resolves"
+            )
+
+            external_id = f"{shape}-{id(self)}" if not shape[0].isdigit() else shape
+            node_id = self.conn.execute(
+                "INSERT INTO node (node_type, external_id, title) VALUES (%s, %s, %s) "
+                "RETURNING id",
+                # A title sharing no word with the query, so the fuzzy tier cannot rescue a
+                # broken identifier path and let this pass for the wrong reason. With
+                # "fixture workflow" as the title, removing `workflow` from _TYPE_WORDS
+                # still passed -- trigram similarity found the node by its title instead.
+                (node_type, external_id, "zzqq placeholder row"),
+            ).fetchone()["id"]
+
+            rendered = trace.ref(node_type, external_id)
+            with self.subTest(node_type=node_type, rendered=rendered):
+                found = retrieval.find_candidates(self.conn, rendered, limit=3)
+                self.assertTrue(found, f"{rendered!r} resolved to nothing")
+                self.assertIn(
+                    node_id,
+                    [c.node_id for c in found],
+                    f"{rendered!r} did not find the node it names",
+                )
+            checked += 1
+
+        self.assertGreaterEqual(checked, 8)
+
+    def test_the_fixture_ids_are_the_shape_trace_ref_expects(self) -> None:
+        # If a commit fixture were short, `trace.ref` would not abbreviate and the sha tier
+        # would never be exercised -- the check would pass for the wrong reason.
+        from decision_graph import trace
+
+        self.assertEqual(len(self.SHAPES["commit"]), 40)
+        self.assertTrue(trace.ref("commit", self.SHAPES["commit"]).endswith("beefcaf"))
+        self.assertIn("#990201", trace.ref("issue", self.SHAPES["issue"]))
 
 
 if __name__ == "__main__":
