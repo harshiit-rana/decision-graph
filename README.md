@@ -510,6 +510,21 @@ about the 223 clusters that produced none is a coverage claim made by omission:
 > most because no issue is referenced from the work at all, and a refusal to assert is the
 > intended outcome there rather than a gap.
 
+It also states its **concentration**, which is the PRD's Phase 5 Bus Factor and needs no new
+ingestion — only a query over authorship the graph already holds:
+
+> **10 of 15** decisions by davidism · **6** authors across all decisions
+> **16 of 29** merged pull requests by davidism · **13** authors of merged pull requests
+
+Two thirds of everything the rubric could evidence traces to one person, and a page that
+lists what was decided while staying silent on how few people decided it is leaving out the
+more consequential half. What it counts is authorship of the pull request each Decision is
+credited to — not who understands the code, which the graph does not hold, and not a risk
+score, since it knows nothing about who is still available. It is not weighted by review
+either, and says so: this repository records review on a small fraction of its pull requests,
+so review would rank almost everyone equally at zero. Bot accounts are named separately
+rather than folded into the human counts.
+
 Its numbers come from the graph at the moment you run it, not from `eval/results.json` —
 that file is the record of an evaluation run and stays one — and they agree with
 `eval/figures.sql`, which is the script that exists so any figure here can be checked.
