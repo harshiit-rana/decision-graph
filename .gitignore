@@ -9,3 +9,20 @@ __pycache__/
 # directory (the only path that exists on both sides of the container bind mount), so it
 # lands where a stray `git add .` would pick it up.
 decision-graph-report.html
+
+# The demo videos are rendered output: ~200MB of it, from the scripts alongside this file.
+# Same reason as the line above -- they land in the project directory, which is where a stray
+# `git add .` looks -- but with a consequence that entry does not have. A 66MB capture that
+# lands once stays in every future clone, because git does not forget a blob it has seen.
+#
+# The generators are committed; what they produce is not. Re-render with `generate_video.py`,
+# `record_terminal_video.py`, or `record_dg_menu_video.py`.
+*.mp4
+*.aac
+*.srt
+demo_video_assets/
+menu_recording_assets/
+terminal_recording_assets/
+subtitles_audio_assets/
+video_analysis_frames/
+video_fine_frames/

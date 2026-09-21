@@ -18,6 +18,7 @@ that renders it correctly, which is all of them.
 
 from __future__ import annotations
 
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -25,6 +26,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Every file executed by a host shell before the container exists.
 WRAPPERS = ("dg.ps1", "dg.bat", "dg")
+
+
+def host_scripts() -> list[Path]:
+    """The wrappers, plus any other host script the repo has since picked up.
+
+    Found rather than listed. The rule is about how Windows decodes a `.ps1`, not about
+    three particular names, and a remembered tuple only covers the files someone
+    remembered: `demo_walkthrough.ps1` arrived later carrying three cp1252 em-dashes and
+    the check above had nothing to say about it. Tracked files only -- a contributor's
+    local scratch script in the root is not ours to fail over.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "*.ps1", "*.bat"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    names = tracked.stdout.split("\0") if tracked.returncode == 0 else []
+    found = {ROOT / n for n in names if n}
+    found.update(ROOT / name for name in WRAPPERS)
+    return sorted(p for p in found if p.is_file())
 
 # The exact byte sequence that shipped: U+2014 inside a double-quoted PowerShell string.
 EM_DASH_SAMPLE = b'Fail "Update Docker Desktop \xe2\x80\x94 Compose v2 is required."\r\n'
@@ -52,9 +72,12 @@ class WrapperEncodingTest(unittest.TestCase):
             self.assertTrue((ROOT / name).is_file(), f"{name} is missing")
 
     def test_wrappers_are_pure_ascii(self) -> None:
-        for name in WRAPPERS:
+        scripts = host_scripts()
+        self.assertGreaterEqual(len(scripts), len(WRAPPERS), "host scripts went missing")
+        for script in scripts:
+            name = script.name
             with self.subTest(wrapper=name):
-                offenders = non_ascii_positions((ROOT / name).read_bytes())
+                offenders = non_ascii_positions(script.read_bytes())
                 detail = ", ".join(
                     f"line {ln} col {col}: 0x{b:02X}" for ln, col, b in offenders[:5]
                 )
@@ -65,6 +88,25 @@ class WrapperEncodingTest(unittest.TestCase):
                     f"decodes BOM-less scripts as the ANSI codepage, where these become "
                     f"different characters -- an em-dash becomes a closing quote.",
                 )
+
+    def test_discovery_is_not_silently_falling_back(self) -> None:
+        # host_scripts() degrades to WRAPPERS when `git ls-files` fails, and the ASCII
+        # check would then still pass while covering nothing it did not already cover --
+        # the same vacuous shape the byte check below guards against. `dg.ps1` and
+        # `dg.bat` are tracked, so working discovery returns them on its own.
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z", "*.ps1", "*.bat"],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        self.assertEqual(
+            tracked.returncode, 0,
+            "`git ls-files` failed, so host_scripts() is quietly back to three names",
+        )
+        found = {n for n in tracked.stdout.split("\0") if n}
+        self.assertLessEqual(
+            {"dg.ps1", "dg.bat"}, found,
+            f"discovery did not find the tracked wrappers: {sorted(found)}",
+        )
 
     def test_the_check_is_not_vacuous(self) -> None:
         # If this ever passes, the check above has stopped checking.
