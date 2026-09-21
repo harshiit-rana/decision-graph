@@ -44,9 +44,15 @@ def refusal(mode=Mode.WHY) -> Answer:
     )
 
 
-def closure(kind: str, *, when=datetime(2026, 8, 28, tzinfo=timezone.utc)) -> trace.Closure:
+def closure(kind: str, *, when=datetime(2026, 8, 28, tzinfo=timezone.utc),
+            last_word=None) -> trace.Closure:
     ref = "pull request #6015" if kind == "unmerged" else "issue #6143"
-    return trace.Closure(ref=ref, kind=kind, closed_at=when)
+    return trace.Closure(ref=ref, kind=kind, closed_at=when, last_word=last_word)
+
+
+def said(body: str, association: str = "MEMBER",
+         at=datetime(2026, 8, 28, tzinfo=timezone.utc)) -> trace.Standing:
+    return trace.Standing(body=body, association=association, at=at)
 
 
 def rendered(answer: Answer, **kwargs) -> str:
@@ -119,6 +125,147 @@ class OtherRefusalsAreUnchangedTest(unittest.TestCase):
         text = rendered(refusal(mode=Mode.IMPACT), closure=closure("unmerged"))
         self.assertIn("Nothing downstream references it", text)
         self.assertNotIn("Decision to walk back to", text)
+
+
+class TheLastWordTest(unittest.TestCase):
+    """Comments arrived in #106, so the refusal can show one -- and must not explain it."""
+
+    def test_it_quotes_what_was_said(self) -> None:
+        text = rendered(refusal(), closure=closure(
+            "not_planned", last_word=said("If you throw away the error, yes.")))
+        self.assertIn("If you throw away the error, yes.", text)
+
+    def test_it_names_the_association_and_the_date(self) -> None:
+        # Both are how a reader weighs it. "A MEMBER said this in August" is a different
+        # claim from an anonymous sentence sitting under a closure.
+        text = rendered(refusal(), closure=closure("not_planned", last_word=said("no.")))
+        self.assertIn("MEMBER", text)
+        self.assertIn("2026-08-28", text)
+
+    def test_it_refuses_to_call_it_the_reason(self) -> None:
+        # The line this feature must not cross. Adjacency is not causation, and the graph
+        # holds no edge saying any comment closed anything.
+        text = " ".join(rendered(refusal(), closure=closure(
+            "not_planned", last_word=said("no."))).split())
+        self.assertIn("what was said, not why it closed", text)
+        self.assertIn("records no link between the two", text)
+
+    def test_it_says_standing_is_not_the_project_deciding(self) -> None:
+        text = " ".join(rendered(refusal(), closure=closure(
+            "not_planned", last_word=said("no."))).split())
+        self.assertIn("not the same as the project deciding", text)
+
+    def test_the_alternatives_survive(self) -> None:
+        # #87 named rejection, supersession and abandonment as the things it cannot tell
+        # apart. Showing a comment must not quietly drop that.
+        text = rendered(refusal(), closure=closure("unmerged", last_word=said("no.")))
+        for word in ("rejection", "supersession", "abandonment"):
+            self.assertIn(word, text)
+
+    def test_a_very_long_comment_is_clipped_rather_than_dumped(self) -> None:
+        text = rendered(refusal(), closure=closure(
+            "not_planned", last_word=said("word " * 400)))
+        self.assertIn("...", text)
+        self.assertLess(len(text.splitlines()), 40, "a comment took over the refusal")
+
+    def test_internal_line_breaks_do_not_fight_the_layout(self) -> None:
+        text = rendered(refusal(), closure=closure(
+            "not_planned", last_word=said("first line\n\n```\ncode\n```\n\nlast line")))
+        self.assertIn("first line", text)
+        self.assertIn("last line", text)
+        # Re-wrapped as one paragraph, so the comment's own fences do not appear as layout.
+        self.assertNotIn("\n```\n", text)
+
+    def test_without_a_comment_the_previous_wording_stands(self) -> None:
+        # And it is true again in that case, which is the only reason it may stay.
+        text = rendered(refusal(), closure=closure("not_planned"))
+        self.assertIn("closing discussion is", text)
+        self.assertIn("not ingested", text)
+
+    def test_a_duplicate_gets_neither(self) -> None:
+        # A duplicate's reason is its duplicate, which the closure line already said.
+        text = rendered(refusal(), closure=closure("duplicate", last_word=said("dupe")))
+        self.assertNotIn("The last word", text)
+        self.assertNotIn("not ingested", text)
+
+
+@unittest.skipUnless(DSN, "DATABASE_URL not set")
+class LastWordLookupTest(unittest.TestCase):
+    """Which comment is chosen, against the real schema. Rolls back."""
+
+    def setUp(self) -> None:
+        from decision_graph import db
+
+        self.conn = db.connect(DSN)
+        self.conn.execute("SET CONSTRAINTS ALL DEFERRED")
+        self.repo = self.conn.execute(
+            "INSERT INTO node (node_type, external_id) VALUES ('repository', %s) RETURNING id",
+            (f"lw-repo-{id(self)}",),
+        ).fetchone()["id"]
+        self.issue = self.conn.execute(
+            "INSERT INTO node (node_type, external_id, repo_node_id) "
+            "VALUES ('issue', %s, %s) RETURNING id",
+            (f"lw-issue-{id(self)}", self.repo),
+        ).fetchone()["id"]
+        self.conn.execute(
+            "INSERT INTO issue (node_id, node_type, number, state, state_reason, closed_at) "
+            "VALUES (%s, 'issue', 9911, 'closed', 'not_planned', now())",
+            (self.issue,),
+        )
+        self._seq = 0
+
+    def tearDown(self) -> None:
+        self.conn.rollback()
+        self.conn.close()
+
+    def comment(self, body: str, association: str, minutes: int) -> None:
+        self._seq += 1
+        node = self.conn.execute(
+            "INSERT INTO node (node_type, external_id, repo_node_id) "
+            "VALUES ('comment', %s, %s) RETURNING id",
+            (f"lw-c-{id(self)}-{self._seq}", self.repo),
+        ).fetchone()["id"]
+        self.conn.execute(
+            "INSERT INTO comment (node_id, parent_node_id, body, author_association, created_at) "
+            "VALUES (%s, %s, %s, %s, now() + make_interval(mins => %s))",
+            (node, self.issue, body, association, minutes),
+        )
+
+    def test_the_reporter_withdrawing_is_not_the_last_word(self) -> None:
+        # The real shape of flask#6120: a MEMBER says why, then the reporter says "ok, my
+        # bad" and that is chronologically last. Showing it would present a withdrawal as
+        # the project's position.
+        self.comment("Do not submit a fix. Wait for the next release.", "MEMBER", 1)
+        self.comment("ok, my bad", "NONE", 2)
+
+        found = trace.closure_fact(self.conn, self.issue)
+
+        self.assertIsNotNone(found.last_word)
+        self.assertEqual(found.last_word.association, "MEMBER")
+        self.assertIn("Do not submit a fix", found.last_word.body)
+
+    def test_the_most_recent_standing_comment_wins(self) -> None:
+        self.comment("first", "MEMBER", 1)
+        self.comment("second", "OWNER", 2)
+        self.assertEqual(trace.closure_fact(self.conn, self.issue).last_word.body, "second")
+
+    def test_a_contributor_does_not_have_standing(self) -> None:
+        # CONTRIBUTOR means "has had a pull request merged here", which is not standing to
+        # close someone else's request.
+        self.comment("I think this is wrong", "CONTRIBUTOR", 1)
+        self.assertIsNone(trace.closure_fact(self.conn, self.issue).last_word)
+
+    def test_an_empty_comment_is_not_the_last_word(self) -> None:
+        self.comment("real reason here", "MEMBER", 1)
+        self.comment("   ", "MEMBER", 2)
+        self.assertEqual(
+            trace.closure_fact(self.conn, self.issue).last_word.body, "real reason here"
+        )
+
+    def test_no_comments_leaves_it_absent(self) -> None:
+        found = trace.closure_fact(self.conn, self.issue)
+        self.assertIsNotNone(found)
+        self.assertIsNone(found.last_word)
 
 
 @unittest.skipUnless(DSN, "DATABASE_URL not set")

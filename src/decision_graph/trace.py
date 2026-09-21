@@ -152,6 +152,28 @@ def decision_links(conn, node_ids: list[int]) -> dict[str, str]:
     return links
 
 
+# GitHub's associations that mean the writer speaks for the project rather than to it.
+# CONTRIBUTOR is deliberately absent: it means "has had a pull request merged here", which
+# is not standing to close someone else's request -- and NONE is how "ok, my bad" was
+# written, by the reporter withdrawing their own issue.
+_STANDING = ("OWNER", "MEMBER", "COLLABORATOR")
+
+
+@dataclass(frozen=True)
+class Standing:
+    """The last thing someone with standing said on an artifact.
+
+    Not "the reason it closed". The graph holds no edge asserting that any comment caused
+    any closure and this does not invent one -- it is the most recent comment from someone
+    who speaks for the project, offered with its association and date so a reader can weigh
+    it themselves.
+    """
+
+    body: str
+    association: str
+    at: datetime | None
+
+
 @dataclass(frozen=True)
 class Closure:
     """How an artifact ended, in the cases where the ending is itself the answer.
@@ -165,6 +187,7 @@ class Closure:
     ref: str
     kind: str
     closed_at: datetime | None
+    last_word: Standing | None = None
 
 
 # The endings that explain a refusal rather than merely accompanying one. An issue closed
@@ -221,7 +244,44 @@ def closure_fact(conn, node_id: int) -> Closure | None:
 
     if kind not in _EXPLAINS_A_REFUSAL:
         return None
-    return Closure(ref=ref(row["node_type"], row["external_id"]), kind=kind, closed_at=closed_at)
+    return Closure(
+        ref=ref(row["node_type"], row["external_id"]),
+        kind=kind,
+        closed_at=closed_at,
+        last_word=_last_word(conn, node_id),
+    )
+
+
+def _last_word(conn, node_id: int) -> Standing | None:
+    """The most recent comment on this artifact from someone with standing.
+
+    Comments arrived as artifacts in #106 and are ingested for whatever the issues cursor
+    surfaced, so this is often None -- which is not an error, and the caller falls back to
+    saying the discussion is not ingested, which is then true.
+
+    Ordered by `created_at DESC` and taking one. The last word is the one a reader wants
+    next to a closure; showing several would read as a transcript and invite the inference
+    that the whole exchange is the rationale.
+    """
+    row = conn.execute(
+        """
+        SELECT c.body, c.author_association, c.created_at
+          FROM comment c
+         WHERE c.parent_node_id = %s
+           AND c.author_association = ANY(%s)
+           AND coalesce(btrim(c.body), '') <> ''
+         ORDER BY c.created_at DESC NULLS LAST
+         LIMIT 1
+        """,
+        (node_id, list(_STANDING)),
+    ).fetchone()
+    if row is None:
+        return None
+    return Standing(
+        body=row["body"],
+        association=row["author_association"],
+        at=row["created_at"],
+    )
 
 
 def decision_statuses(conn, node_ids: list[int]) -> dict[int, str]:
