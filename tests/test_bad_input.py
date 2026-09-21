@@ -15,10 +15,12 @@ database are skipped without one.
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import os
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
 
 from decision_graph import evaluation, query
 
@@ -149,6 +151,72 @@ class EvaluationArgumentTest(unittest.TestCase):
             code = evaluation.main(["--query-set", "no/such/file.json"])
         self.assertEqual(code, 2)
         self.assertIn("no query set", err.getvalue())
+
+
+def _load_b2_check():
+    """eval/ is a script directory, not a package, so load it by path."""
+    path = Path(__file__).resolve().parents[1] / "eval" / "b2_landing_check.py"
+    spec = importlib.util.spec_from_file_location("b2_landing_check", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class B2LandingCheckArgumentTest(unittest.TestCase):
+    """It accepts no arguments, which is exactly why it has to parse them (issue #104).
+
+    `python -m decision_graph.evaluation --help` once took an argv it never read and ran the
+    entire §9 evaluation, overwriting the committed record (#82). This script spends a GitHub
+    API call per commit, so running on a typo costs budget and time.
+    """
+
+    def setUp(self) -> None:
+        self.module = _load_b2_check()
+
+    def test_help_exits_without_running_anything(self) -> None:
+        with self.assertRaises(SystemExit) as caught:
+            with redirect_stdout(io.StringIO()):
+                self.module.main(["--help"])
+        self.assertEqual(caught.exception.code, 0)
+
+    def test_an_unknown_flag_is_an_error_not_a_full_run(self) -> None:
+        with self.assertRaises(SystemExit) as caught:
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.module.main(["--not-a-flag"])
+        self.assertEqual(caught.exception.code, 2)
+
+    def test_arguments_are_checked_before_the_environment(self) -> None:
+        # A mistyped flag must report the typo even with nothing configured, rather than a
+        # missing DATABASE_URL -- which sends you to look at something that was never wrong.
+        saved = {k: os.environ.pop(k, None) for k in ("DATABASE_URL", "GITHUB_TOKEN")}
+        try:
+            with self.assertRaises(SystemExit) as caught:
+                with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()) as err:
+                    self.module.main(["--not-a-flag"])
+            self.assertEqual(caught.exception.code, 2)
+            self.assertIn("unrecognized arguments", err.getvalue())
+        finally:
+            for key, value in saved.items():
+                if value is not None:
+                    os.environ[key] = value
+
+    def test_a_missing_database_url_is_reported_rather_than_traced(self) -> None:
+        saved = os.environ.pop("DATABASE_URL", None)
+        try:
+            err = io.StringIO()
+            with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                code = self.module.main([])
+            self.assertEqual(code, 2)
+            self.assertIn("DATABASE_URL", err.getvalue())
+        finally:
+            if saved is not None:
+                os.environ["DATABASE_URL"] = saved
+
+    def test_landed_statuses_are_the_two_that_mean_ancestor_of_main(self) -> None:
+        # `behind` and `identical` mean the sha IS on main. `ahead` and `diverged` do not,
+        # and an unreachable sha is not evidence either way -- treating any of those as
+        # landed would report a recall gap that is not there.
+        self.assertEqual(self.module.ON_MAIN, {"behind", "identical"})
 
 
 if __name__ == "__main__":
