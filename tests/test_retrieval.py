@@ -220,6 +220,19 @@ class ShaPrefixOfTest(unittest.TestCase):
         # string a reader copies out of a trace, a diagram or a report row.
         self.assertEqual(retrieval.sha_prefix_of("eca5fd1"), "eca5fd1")
 
+    def test_the_word_the_tool_prints_in_front_of_it(self) -> None:
+        # `trace.ref` renders "commit eca5fd1", and that whole string is what gets copied.
+        # Accepting only the bare sha fixed the identifier without fixing the rendering it
+        # came from -- and "commit 028160e" fuzzy-matched a *workflow*.
+        self.assertEqual(retrieval.sha_prefix_of("commit eca5fd1"), "eca5fd1")
+        self.assertEqual(retrieval.sha_prefix_of("COMMIT ECA5FD1"), "eca5fd1")
+        self.assertEqual(retrieval.sha_prefix_of("commit  eca5fd1"), "eca5fd1")
+
+    def test_only_that_exact_word(self) -> None:
+        self.assertIsNone(retrieval.sha_prefix_of("commits eca5fd1"))
+        self.assertIsNone(retrieval.sha_prefix_of("commit 6143"))
+        self.assertIsNone(retrieval.sha_prefix_of("commit"))
+
     def test_a_full_sha(self) -> None:
         full = "eca5fd1dfdc614c2df876cc32018a7d71f84ea82"
         self.assertEqual(retrieval.sha_prefix_of(full), full)
@@ -292,6 +305,18 @@ class ShaLookupTest(unittest.TestCase):
 
         self.assertEqual(found[0].node_id, wanted)
         self.assertEqual(found[0].match, "identifier")
+
+    def test_the_rendered_form_round_trips(self) -> None:
+        # The whole point: what `dg query` prints as the start node must be typeable back in.
+        full = "beef1260000000000000000000000000000000aa"
+        wanted = self.commit(full, "fixture round trip")
+
+        from decision_graph import trace
+
+        found = retrieval.find_candidates(self.conn, trace.ref("commit", full), limit=5)
+
+        self.assertTrue(found, "the tool's own rendering of a commit resolved to nothing")
+        self.assertEqual(found[0].node_id, wanted)
 
     def test_an_ambiguous_prefix_offers_every_match(self) -> None:
         # What git does. `dg query` already prints "N other candidates matched this query",

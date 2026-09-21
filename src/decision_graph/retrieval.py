@@ -70,24 +70,28 @@ def identifiers_in(query: str) -> list[str]:
 # read `6143` as a candidate sha prefix and offer whatever commit happens to start with
 # those digits beside the issue the reader asked for. Issue numbers do not reach seven
 # digits on this corpus, and the exact-identifier tier outranks this one regardless.
-_ABBREVIATED_SHA = re.compile(r"^[0-9a-f]{7,40}$", re.IGNORECASE)
+# Optionally introduced by the word, because `trace.ref` prints `commit eca5fd1` and that
+# whole string is what a reader copies. Accepting only the bare sha fixed the identifier
+# without fixing the rendering it came from -- the same half-fix `identifiers_in` exists to
+# avoid for `issue #6143`.
+_ABBREVIATED_SHA = re.compile(r"^(?:commit\s+)?([0-9a-f]{7,40})$", re.IGNORECASE)
 
 
 def sha_prefix_of(query: str) -> str | None:
     """The query as a commit-sha prefix, or None when it cannot be one.
 
     `trace.ref` renders every commit as `commit eca5fd1` because a 40-character sha "is an
-    identifier but not a readable one". That abbreviation resolved nowhere: the identifier
-    tier compares `external_id` for equality and the prefix tier matches titles, so the one
-    form the tool prints could not be typed back in (issue #102).
+    identifier but not a readable one". Neither that nor the bare `eca5fd1` resolved
+    anywhere: the identifier tier compares `external_id` for equality and the prefix tier
+    matches titles, so the one form the tool prints could not be typed back in (#102).
     """
-    cleaned = query.strip()
-    if not _ABBREVIATED_SHA.match(cleaned):
+    found = _ABBREVIATED_SHA.match(query.strip())
+    if not found:
         return None
     # Lowercased because shas are stored canonically lowercase and LIKE is case-sensitive.
     # `git show ECA5FD1` resolves, so typing it here must not fail -- and it would have
     # failed as "Nothing in the graph matches", which is the false-statement family again.
-    return cleaned.lower()
+    return found.group(1).lower()
 
 
 @dataclass(frozen=True)
