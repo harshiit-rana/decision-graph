@@ -261,7 +261,7 @@ fetch — that signal sat unnoticed through an entire evaluation cycle once, whi
 `dg status` now prints it.
 
 **Few or no Decisions is a real answer, not a failure.** The rubric needs a motivating
-issue *and* merged work in the same thread. On flask, 238 thread clusters yield 15
+issue *and* merged work in the same thread. On flask, 239 thread clusters yield 15
 Decisions. A repo that does not reference issues from pull requests will yield fewer.
 
 ### When something breaks
