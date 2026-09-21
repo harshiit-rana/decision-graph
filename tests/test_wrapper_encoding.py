@@ -89,6 +89,25 @@ class WrapperEncodingTest(unittest.TestCase):
                     f"different characters -- an em-dash becomes a closing quote.",
                 )
 
+    def test_discovery_is_not_silently_falling_back(self) -> None:
+        # host_scripts() degrades to WRAPPERS when `git ls-files` fails, and the ASCII
+        # check would then still pass while covering nothing it did not already cover --
+        # the same vacuous shape the byte check below guards against. `dg.ps1` and
+        # `dg.bat` are tracked, so working discovery returns them on its own.
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z", "*.ps1", "*.bat"],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        self.assertEqual(
+            tracked.returncode, 0,
+            "`git ls-files` failed, so host_scripts() is quietly back to three names",
+        )
+        found = {n for n in tracked.stdout.split("\0") if n}
+        self.assertLessEqual(
+            {"dg.ps1", "dg.bat"}, found,
+            f"discovery did not find the tracked wrappers: {sorted(found)}",
+        )
+
     def test_the_check_is_not_vacuous(self) -> None:
         # If this ever passes, the check above has stopped checking.
         self.assertNotEqual(
