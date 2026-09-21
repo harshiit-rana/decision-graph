@@ -637,6 +637,7 @@ DATABASE_URL=... python -m decision_graph.evaluation   # runs eval/query_set.jso
 python eval/render_report.py                            # -> eval/report.html
 psql "$DATABASE_URL" -f eval/figures.sql                # every figure quoted below
 psql "$DATABASE_URL" -f eval/recall_audit.sql           # the coverage buckets
+python eval/b2_landing_check.py                         # did any refused thread land anyway?
 ```
 
 **Every repository figure in this README was measured on 2026-09-05 and is reproducible by
