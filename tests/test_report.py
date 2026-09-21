@@ -50,7 +50,18 @@ def edge(edge_type="motivated_by", tier="explicit", outward=True, ref="5895"):
     }
 
 
-def data(decisions=None, edges=None, clusters=238, decisions_count=15):
+def bucket(top=("davidism", 10), total=15, authors=6, bots=()):
+    people = [{"login": top[0], "n": top[1]}] if top else []
+    return {
+        "total": total,
+        "authors": authors,
+        "people": people,
+        "bots": [{"login": b, "n": 1} for b in bots],
+        "top": people[0] if people else None,
+    }
+
+
+def data(decisions=None, edges=None, clusters=238, decisions_count=15, concentration=None):
     d = decisions if decisions is not None else [decision()]
     return {
         "decisions": d,
@@ -64,6 +75,10 @@ def data(decisions=None, edges=None, clusters=238, decisions_count=15):
         },
         "tiers": [{"tier": "explicit", "edges": 1248}, {"tier": "corroborated", "edges": 76}],
         "annotations": {x["node_id"]: "implemented by PR #5898, merged 2026-01-25" for x in d},
+        "concentration": concentration if concentration is not None else {
+            "decisions": bucket(),
+            "merged_prs": bucket(top=("davidism", 16), total=29, authors=13),
+        },
         "generated_at": datetime(2026, 9, 5, 15, 14, tzinfo=timezone.utc),
     }
 
@@ -171,7 +186,8 @@ class CollectTest(unittest.TestCase):
         out = report.collect(self.conn, repo)
         self.assertEqual(
             set(out),
-            {"decisions", "evidence", "coverage", "tiers", "annotations", "generated_at"},
+            {"decisions", "evidence", "coverage", "tiers", "annotations", "concentration",
+             "generated_at"},
         )
         self.assertIn("clusters", out["coverage"])
 
@@ -182,6 +198,84 @@ class CollectTest(unittest.TestCase):
         html = report.render_html(report.collect(self.conn, repo), "test/repo")
         self.assertTrue(html.startswith("<!doctype html>"))
         self.assertIn("</html>", html)
+
+
+def flat(html: str) -> str:
+    """Collapse whitespace before asserting on prose.
+
+    The page is written with hard line breaks, so a sentence the reader sees as one phrase
+    is several in the source. Asserting on the raw text pins where the wrap falls, which is
+    layout, not meaning -- and it fails the moment the paragraph is rewrapped.
+    """
+    return " ".join(html.split())
+
+
+class ConcentrationTest(unittest.TestCase):
+    """Bus Factor (issue #90). The risk here is over-claiming, not omission."""
+
+    def test_the_share_is_shown_for_both_denominators(self) -> None:
+        html = report.render_html(data(), "pallets/flask")
+        self.assertIn("10 of 15", html)
+        self.assertIn("16 of 29", html)
+
+    def test_each_share_names_what_it_counts(self) -> None:
+        # Both rows read "by davidism" without the noun, which puts two different
+        # fractions on the page under identical labels.
+        html = report.render_html(data(), "pallets/flask")
+        self.assertIn("decisions by davidism", flat(html))
+        self.assertIn("merged pull requests by davidism", flat(html))
+
+    def test_it_refuses_the_inferences_a_reader_would_otherwise_draw(self) -> None:
+        # Authorship volume is not expertise, and the graph holds nothing about who is
+        # still around. Saying so is what makes printing the number defensible.
+        html = report.render_html(data(), "pallets/flask")
+        self.assertIn("counts authorship", flat(html))
+        self.assertIn("not a claim about who understands the code", flat(html))
+        self.assertIn("not a risk score", flat(html))
+
+    def test_it_discloses_that_review_is_not_counted(self) -> None:
+        # 14 `reviewed` edges across 226 pull requests: review cannot weight this, and a
+        # reader who assumes it was would read the number as stronger than it is.
+        self.assertIn("not weighted by review", flat(report.render_html(data(), "x")))
+
+    def test_bots_are_named_rather_than_silently_dropped(self) -> None:
+        conc = {
+            "decisions": bucket(),
+            "merged_prs": bucket(top=("davidism", 16), total=29, authors=13,
+                                 bots=("pre-commit-ci-lite[bot]",)),
+        }
+        html = report.render_html(data(concentration=conc), "x")
+        self.assertIn("pre-commit-ci-lite[bot]", html)
+        self.assertIn("Counted apart from people", flat(html))
+
+    def test_an_empty_graph_renders_no_section_at_all(self) -> None:
+        # Rather than "0 of 0 by nobody", which reads as a finding about the repository.
+        conc = {
+            "decisions": bucket(top=None, total=0, authors=0),
+            "merged_prs": bucket(top=None, total=0, authors=0),
+        }
+        html = report.render_html(data(decisions=[], clusters=0, decisions_count=0,
+                                       concentration=conc), "x")
+        self.assertNotIn("Concentration", html)
+
+    def test_a_bot_only_corpus_says_no_human_rather_than_crashing(self) -> None:
+        conc = {
+            "decisions": bucket(top=None, total=2, authors=1, bots=("some[bot]",)),
+            "merged_prs": bucket(top=None, total=2, authors=1, bots=("some[bot]",)),
+        }
+        html = report.render_html(data(concentration=conc), "x")
+        self.assertIn("no human author", flat(html))
+
+
+class IsBotTest(unittest.TestCase):
+    def test_the_github_bot_suffix_is_what_marks_one(self) -> None:
+        self.assertTrue(report.is_bot("pre-commit-ci-lite[bot]"))
+        self.assertTrue(report.is_bot("dependabot[bot]"))
+
+    def test_a_person_whose_name_merely_contains_bot_is_not_one(self) -> None:
+        for login in ("robot", "bottomley", "abbot", "bot"):
+            with self.subTest(login=login):
+                self.assertFalse(report.is_bot(login))
 
 
 if __name__ == "__main__":

@@ -95,12 +95,83 @@ GROUP BY 1 ORDER BY 2 DESC
 """
 
 
+# Who authored the pull request each Decision is credited to, and who authored the merged
+# pull requests generally. Two queries rather than one because they have different
+# denominators -- 15 Decisions and 29 merged pull requests -- and folding them into a single
+# row per author would invite dividing one by the other.
+#
+# `created` runs person -> artifact, so the person is the source. A person belongs to no
+# repository (they appear across many), which is why the repo filter is applied to the
+# artifact end here, exactly as TIERS_SQL had to.
+DECISION_AUTHORS_SQL = """
+SELECT author.title AS login, count(DISTINCT d.node_id) AS n
+FROM decision d
+JOIN node dn   ON dn.id = d.node_id
+JOIN edge impl ON impl.src_node_id = d.node_id
+              AND impl.edge_type = 'implemented_by'
+              AND impl.valid_to IS NULL
+JOIN edge made ON made.dst_node_id = impl.dst_node_id
+              AND made.edge_type = 'created'
+              AND made.valid_to IS NULL
+JOIN node author ON author.id = made.src_node_id AND author.node_type = 'person'
+WHERE dn.repo_node_id = %(repo)s
+GROUP BY 1 ORDER BY 2 DESC, 1
+"""
+
+MERGED_AUTHORS_SQL = """
+SELECT author.title AS login, count(DISTINCT pr.id) AS n
+FROM node pr
+JOIN pull_request p ON p.node_id = pr.id AND p.merged_at IS NOT NULL
+JOIN edge made ON made.dst_node_id = pr.id
+              AND made.edge_type = 'created'
+              AND made.valid_to IS NULL
+JOIN node author ON author.id = made.src_node_id AND author.node_type = 'person'
+WHERE pr.repo_node_id = %(repo)s
+GROUP BY 1 ORDER BY 2 DESC, 1
+"""
+
+
+def is_bot(login: str) -> bool:
+    """GitHub marks App accounts with a `[bot]` suffix on the login.
+
+    Counted apart from people rather than dropped: `pre-commit-ci-lite[bot]` is the second
+    most frequent author in this corpus, and a concentration figure that silently included
+    it would overstate how many humans are involved, while one that silently removed it
+    would not add up against the totals printed beside it.
+    """
+    return login.endswith("[bot]")
+
+
+def concentration(conn, repo_node_id: int) -> dict:
+    """How few authors the evidenced work traces to.
+
+    A count of authorship and nothing more. It is not a claim about who understands the
+    code -- `trace` has the rule this follows: say what the graph holds, in the reader's
+    vocabulary, and nothing else. Nor is it weighted by review, because on this corpus it
+    cannot be: 14 `reviewed` edges across 226 pull requests, a documented limitation.
+    """
+    out = {}
+    for key, sql in (("decisions", DECISION_AUTHORS_SQL), ("merged_prs", MERGED_AUTHORS_SQL)):
+        rows = [dict(r) for r in conn.execute(sql, {"repo": repo_node_id}).fetchall()]
+        people = [r for r in rows if not is_bot(r["login"])]
+        bots = [r for r in rows if is_bot(r["login"])]
+        total = sum(r["n"] for r in rows)
+        out[key] = {
+            "total": total,
+            "authors": len(rows),
+            "people": people,
+            "bots": bots,
+            "top": people[0] if people else None,
+        }
+    return out
+
+
 def _esc(text) -> str:
     return html.escape(str(text if text is not None else ""), quote=True)
 
 
 def collect(conn, repo_node_id: int) -> dict:
-    """Everything the page shows, read in four queries.
+    """Everything the page shows, read in six queries.
 
     Returned as plain data rather than rendered directly so the tests can assert what the
     page will contain without parsing HTML, and so a future JSON export is the same read.
@@ -125,6 +196,7 @@ def collect(conn, repo_node_id: int) -> dict:
         "coverage": coverage,
         "tiers": tiers,
         "annotations": annotations,
+        "concentration": concentration(conn, repo_node_id),
         "generated_at": datetime.now(timezone.utc),
     }
 
@@ -187,6 +259,62 @@ def _evidence_row(e: dict) -> str:
     )
 
 
+def _concentration_html(conc: dict) -> str:
+    """The concentration figures, or nothing at all when there is nothing to say.
+
+    An empty graph renders no section rather than a row of zeroes claiming that nobody
+    authored anything -- the same reason `diagram.emit` returns nothing for a refusal
+    instead of an empty `graph LR`, which reads as a drawing failure rather than as an
+    absence.
+    """
+    dec, prs = conc["decisions"], conc["merged_prs"]
+    if not dec["total"] and not prs["total"]:
+        return ""
+
+    def share(bucket, noun: str) -> str:
+        """The top author's share, named so the two rows cannot be confused for each other.
+
+        Both read "by davidism" without the noun, and the page then shows two different
+        fractions with identical labels.
+        """
+        top = bucket["top"]
+        if not top:
+            return (
+                f'<div class="stat"><b>&mdash;</b>'
+                f'<span>no human author on any {noun}</span></div>'
+            )
+        return (
+            f'<div class="stat"><b>{top["n"]} of {bucket["total"]}</b>'
+            f'<span>{noun}s by {_esc(top["login"])}</span></div>'
+        )
+
+    bot_note = ""
+    bots = {b["login"] for b in dec["bots"]} | {b["login"] for b in prs["bots"]}
+    if bots:
+        bot_note = (
+            " Counted apart from people, and excluded from the share above: "
+            + ", ".join(f"<code>{_esc(b)}</code>" for b in sorted(bots))
+            + "."
+        )
+
+    return f"""
+<h2>Concentration</h2>
+<div class="stats">
+  {share(dec, 'decision')}
+  <div class="stat"><b>{dec["authors"]}</b><span>authors across all decisions</span></div>
+  {share(prs, 'merged pull request')}
+  <div class="stat"><b>{prs["authors"]}</b><span>authors of merged pull requests</span></div>
+</div>
+
+<p class="caveat"><strong>This counts authorship, and only authorship.</strong> A decision is
+attributed to whoever opened the pull request it is credited to. That is not a claim about who
+understands the code, and it is not a risk score &mdash; the graph has no notion of who is
+still available. It is also not weighted by review, because on this corpus it cannot be: the
+repository records review on a small fraction of its pull requests, so review would rank
+almost everyone equally at zero.{bot_note}</p>
+"""
+
+
 def render_html(data: dict, repo: str) -> str:
     cov = data["coverage"]
     clusters = cov["clusters"] or 0
@@ -244,6 +372,7 @@ def render_html(data: dict, repo: str) -> str:
   body {{ background:var(--bg); color:var(--fg); margin:0 auto; max-width:60rem; padding:2rem 1rem;
          font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }}
   h1 {{ font-size:1.5rem; margin:0 0 .2rem; }}
+  h2 {{ font-size:1.1rem; margin:2rem 0 .6rem; font-weight:600; }}
   .sub {{ color:var(--dim); margin:0 0 1.5rem; }}
   .stats {{ display:flex; flex-wrap:wrap; gap:1.5rem; padding:1rem; background:var(--card);
             border:1px solid var(--line); border-radius:8px; margin-bottom:1rem; }}
@@ -300,7 +429,7 @@ rubric could evidence: a motivating issue and merged work in one conversation.
 {clusters - cov['decisions']} clusters produced no decision, most because no issue is
 referenced from the work at all, and a refusal to assert is the intended outcome there
 rather than a gap. Coverage, not precision, is this system's binding limit.</p>
-
+{_concentration_html(data['concentration'])}
 {''.join(cards)}
 
 <footer>Generated by <code>dg report</code> from the graph, not from an evaluation record.
