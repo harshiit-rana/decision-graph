@@ -32,8 +32,14 @@ for what each column does and does not measure.
 | encode/django-rest-framework | no | 172 | 33 | 8 | 99 | 95% | 13% | 22% |
 | pypa/packaging | no | 368 | 67 | 7 | 100 | 93% | 13% | 8% |
 
-Sixteen further repositories were measured and are omitted here as clearly weaker on the
-same properties; re-run the script to reproduce any of them.
+Seventeen further repositories were measured and are omitted here, each weaker than urllib3
+on at least one deciding property (no CODEOWNERS, low review rate, or several times the size):
+encode/httpx, pydantic/pydantic, psf/black, python-attrs/attrs, fastapi/typer,
+marshmallow-code/marshmallow, BurntSushi/ripgrep, sharkdp/bat, go-chi/chi, Kludex/starlette,
+aio-libs/aiohttp, pypa/twine, pre-commit/pre-commit, Textualize/rich, sqlalchemy/alembic,
+pydantic/pydantic-core, python-jsonschema/jsonschema. Two names returned errors
+(`encode/starlette`, which has moved to `Kludex/starlette`, and `jazzband/pip-tools`).
+Re-run the script to reproduce any of them.
 
 ## Checked by hand for urllib3
 
