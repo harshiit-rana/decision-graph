@@ -33,7 +33,7 @@ Engineering knowledge is fragmented across tools and decays over time:
 
 - General-purpose document search (not competing with Glean/Guru on retrieval breadth).
 - Multi-source ingestion — Slack, Jira, Notion, Confluence are out of scope for v1.
-- Webhook-driven real-time ingestion — v1 uses scheduled polling.
+- ~~Webhook-driven real-time ingestion~~ — built after v1 (#113); scheduled polling remains the path that guarantees completeness (§8).
 - Permission modeling / ACL simulation.
 - Formal precision/recall evaluation at scale — v1 evaluation is a small hand-verified query set.
 - A dedicated graph database, event bus, or microservice architecture — deliberately out of scope; see Design Decisions.
@@ -165,7 +165,7 @@ Every Why Engine or Impact Analysis answer includes an expandable trace of the t
 
 **v1:** scheduled polling of the GitHub API (repositories, issues, PRs, commits, reviews, releases, CODEOWNERS), processed synchronously into the graph via the Extraction stage on each run.
 
-**Explicitly deferred:** webhook-driven event queue with a relationship extractor for near-real-time updates. Documented as the intended long-term ingestion path, not built in v1.
+**Added after v1:** a webhook receiver (`dg-webhook`, #113) that runs the same extractors on a delivery. It advances no cursor, so polling still guarantees the window. It is not an event queue and is not a production server. Its known gaps are listed in the roadmap (#162, #164, #191).
 
 ## 9. Evaluation
 
@@ -176,11 +176,11 @@ Formal precision/recall evaluation at scale is out of scope for v1 given the eff
 - Each answer manually checked against the repo's actual history for correctness.
 - Reported as a simple accuracy figure, with failure cases documented rather than hidden.
 
-**Actual v1 result and what it does and doesn't support.** The Phase 4 run against flask scored 18/18 (10 answered and independently verified against real GitHub history — 2 of those, a paraphrase-retrieval and a temporal control, are consistency checks rather than independent evidence — plus 8 correct refusals/contracts). That figure is reported plainly, alongside the following, so it isn't read as more than it is:
+**Actual v1 result and what it does and doesn't support.** The Phase 4 run against flask scored 18/18 (10 answered and independently verified against real GitHub history — 2 of those, a bare-identifier retrieval (H5, `#5898`; not a paraphrase, see eval/RESULTS.md) and a temporal control, are consistency checks rather than independent evidence — plus 8 correct refusals/contracts). That figure is reported plainly, alongside the following, so it isn't read as more than it is:
 
 - **The set is curated by the system's builder**, not sampled or adversarially constructed. A 100% result on 18 hand-picked queries is not evidence of accuracy at scale.
 - **8 of the 18 correct outcomes are "returned nothing."** A degenerate engine that always answers nothing would score 8/18 by this measure alone. The discriminating subset is the 10 answered queries, of which 8 are independently checked.
-- **The run observed zero real inferred edges** (the fallback path was entered 6 times, and returned nothing every time on this repository). Inferred-edge behavior is validated only by the seeded fixture from Phase 2 (5.3) — this evaluation cycle says nothing about inference quality on real data.
+- **The run observed zero real inferred edges** because the proposer is a stub (`inference.propose()` always returns nothing), not because the repository has none. The fallback path was entered 6 times and returned nothing every time, which is what an empty inferred set produces. Inferred-edge behavior is validated only by the seeded fixture from Phase 2 (5.3) — this evaluation cycle says nothing about inference quality on real data.
 - **13 Decisions were synthesized from 161 threads.** The evaluation measures precision on that set (are the 13 correct) — it does not measure recall (are any of the 148 non-Decision threads a Decision the rubric should have caught but didn't). Coverage at scale remains the binding open question and is explicitly out of scope for v1, per the Non-Goals in Section 4.
 - **Neither defect found during Phase 1-4 implementation (merge-state gaps #16/#17, the mislabeled-implementer trace #19) was caught by the evaluation set's automated portion.** Both were found by a human opening a trace and comparing it to GitHub directly. At the point where 12 of 20 Decisions rested on unmerged PRs, the same evaluation harness reported "12 answered, 4 refusals, contracts held" — a clean-looking result. This is §9's design working as intended, not a gap in it: the automated runner checks mechanical contracts (a query must/must not return an answer) and records what the engines returned: it has no power over whether an answer is *true*. Every correctness claim in this record came from a human reading GitHub, and the accuracy figure has no meaning independent of that manual review.
 
@@ -195,7 +195,7 @@ Five properties of the target repository and its bounded window were carried int
 | System asserts a decision existed without evidence | Decision nodes require explicit or reconstructed status backed by explicit signals, per the mechanical rubric in 5.1 (Motivation mandatory + one of Implementation/Validation); never created from inference alone |
 | Evidence tiers read as arbitrary | Tier assignment is rule-based on signal type, not model-judged; rules documented alongside output |
 | Scope creep across feature list | Features are enforced as thin views; no feature may introduce engine-level logic |
-| Ingestion complexity stalls delivery | v1 uses polling; webhook architecture documented, not built |
+| Ingestion complexity stalls delivery | v1 used polling; a webhook receiver was added later (#113) without a second extraction path |
 | Graph traversal outgrows Postgres | Documented migration trigger to a dedicated graph database, not a default assumption |
 | Time-versioning retrofitted late | Time fields are part of the initial schema, not added post hoc |
 | Inferred edges treated as fact | Inferred edges tagged at creation, gated by relevance threshold and per-node cap (5.1), and used only as a traversal fallback when no explicit/corroborated path exists (5.3) |
@@ -207,7 +207,7 @@ Five properties of the target repository and its bounded window were carried int
 - **Phase 2:** Candidate Retrieval (simple lookup); Graph Reasoning engine — backward (Why Engine) and forward (Impact Analysis) traversal, including the explicit-first / inferred-fallback traversal order.
 - **Phase 3:** Evidence Ranking engine with Explicit / Corroborated / Inferred tiering.
 - **Phase 4:** Explainability Mode; evaluation set and accuracy reporting.
-- **Phase 5 (future, out of scope here):** Webhook-driven ingestion, additional sources (Slack, Jira), permission modeling, Bus Factor / Architecture View / Expert Finder, ranked/embedding-based retrieval.
+- **Phase 5 (partly shipped):** Webhook ingestion (#113), Bus Factor (#91) and Expert Finder (#111) are built. Not built: additional sources (Slack, Jira), permission modeling, Bus Factor / Architecture View / Expert Finder, ranked/embedding-based retrieval.
 
 > **Roadmap note — rejected decisions as a first-class outcome (Phase 5+).**
 > Implementation surfaced a category the current model cannot express. A cluster where

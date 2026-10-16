@@ -37,8 +37,8 @@ achievement as a correct answer, and collapsing both into one ratio hides that.
 | correct by construction | 7 | retrieval consistency, the known #14 gap, mechanical contracts |
 
 Of the 10 *answered* queries, 8 were checked directly. The remaining two are controls
-rather than independent evidence: H5 reaches the same Decision as F1 through a paraphrase,
-and T2 re-runs F2 through the time filter. They confirm consistency, not correctness.
+rather than independent evidence: H5 reaches the same Decision as F1 by a bare identifier
+(`#5898`, not a paraphrase), and T2 re-runs F2 through the time filter. They confirm consistency, not correctness.
 
 ## Per-query outcome
 
@@ -120,10 +120,16 @@ evaluation measures precision only.
   and found no rubric bug: every rejection traces to absent evidence. What remains
   unmeasured is whether `thread_key` splits decisions across clusters — that is not
   mechanically detectable and is tracked as issue #26.
-- **Inference quality.** The graph holds zero inferred edges. §5.3's fallback was entered
-  6 times and returned nothing every time, so its *entry condition* is exercised by flask
-  while its answer-producing behaviour is verified only by the seeded fixture in
-  `tests/test_traversal_fallback.py`. The LLM path remains stubbed and gated.
+- **Inference quality.** The graph holds zero inferred edges, **because the proposer is a
+  stub**: `inference.propose()` always returns no proposals. That is a property of our
+  code, not a finding about flask. §5.3's fallback was entered 6 times and returned nothing
+  every time, which is what an empty inferred set produces, so its *entry condition* is
+  exercised by flask while its answer-producing behaviour is verified only by the seeded
+  fixture in `tests/test_traversal_fallback.py`.
+- **Paraphrase retrieval.** No answered query tests it. H5 is a bare identifier lookup and
+  the only reworded query, H7, correctly returns nothing (its Decision was retracted by the
+  landing gate). The 18/18 verdicts are unchanged; only the description of what they cover
+  is corrected (#117). Measuring paraphrase retrieval is #144.
 - **Corroborated-tier calibration.** 61 edges across 7 of 235 threads, and only 4 queries
   returned a corroborated path. flask merges largely without formal GitHub review — 14
   `reviewed` edges across 219 PRs. Completing the window nearly doubled the corroborated

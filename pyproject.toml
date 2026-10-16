@@ -1,7 +1,7 @@
 [project]
 name = "decision-graph"
 version = "0.1.0"
-description = "Organizational Intelligence Engine — Phase 1 (knowledge graph + GitHub ingestion)"
+description = "TraceMind: an evidence-tiered decision graph over a GitHub repository, with why/impact queries that refuse when the record is silent"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]

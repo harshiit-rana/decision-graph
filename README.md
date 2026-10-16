@@ -1,11 +1,24 @@
 # TraceMind
 
-Organizational Intelligence Engine — implementation of `PRD_v3.1_Organizational_Intelligence_Engine.md`.
+Organizational Intelligence Engine — implementation of `PRD_v3.2_Organizational_Intelligence_Engine.md`.
 
-**Phases 1–4 complete.** Time-versioned graph schema, extraction-first GitHub ingestion,
-Decision synthesis, candidate retrieval, the Why/Impact traversal engine, evidence
-tiering, and the §9 evaluation set — adjudicated 18 of 18 against flask's real history,
-with the disclosures that number needs recorded in [`eval/RESULTS.md`](eval/RESULTS.md).
+*Naming: **TraceMind** is the product. The repository, the Python package and the command
+are `decision-graph` and `dg`.*
+
+**What is built (Phases 1–4, plus the Phase 5 items marked).** Time-versioned graph schema,
+extraction-first GitHub ingestion, Decision synthesis, candidate retrieval, the Why/Impact
+traversal engine, evidence tiering, and the §9 evaluation set — adjudicated 18 of 18
+against flask's real history, with the disclosures that number needs recorded in
+[`eval/RESULTS.md`](eval/RESULTS.md). Phase 5 items shipped so far: Bus Factor (#91),
+Expert Finder (#111), comment ingestion (#107), webhook ingestion (#113), `--format json`
+(#135), prior attempts (#137), `dg context` (#138), and snapshot tooling (#122).
+
+**What is *not* built.** The inferred-link proposer is a **stub**:
+`inference.propose()` always returns no proposals (`src/decision_graph/inference.py`). Nothing
+in this repository has ever produced an inferred edge from real data. The gate that would
+admit one is tested, and so is the traversal fallback, but only on a seeded fixture. There
+is no file-level history, no MCP server yet, and only one repository has been evaluated.
+The roadmap is [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 - **Code repo:** this repository.
 - **Ingestion target:** `pallets/flask`.
@@ -882,7 +895,10 @@ nobody wrote down can only be re-derived, never checked — the argument `eval/r
 already makes for the audit (#46), one level out.
 
 18 queries — 2 flagship plus 16 harder cases spanning causal reconstruction, impact,
-retrieval by identifier and paraphrase, point-in-time, and four **correct-refusal** cases.
+retrieval by identifier and by fuzzy title, point-in-time, and four **correct-refusal**
+cases. **None of the answered queries tests paraphrase retrieval:** the one query that looks
+like it (H5) is a bare `#5898` identifier lookup, and the one reworded query (H7) correctly
+returns nothing. Paraphrase retrieval is unmeasured (#144).
 
 **The runner grades nothing.** §9 requires answers checked against the repository's real
 history; a system scoring its own output against its own graph measures self-consistency,
@@ -895,8 +911,9 @@ code rather than about flask.
 for the figure with its disclosures.** Read them before quoting the number. 8 of the 18
 correct outcomes are the system returning nothing, so a degenerate engine that always
 returned nothing would score 8/18 on this set; the query set was curated by the person who
-built the system; and the graph holds zero inferred edges, so nothing here measures
-inference. 15 Decisions out of 239 threads — coverage, not precision, is the binding limit,
+built the system; and the graph holds zero inferred edges **because the proposer is a stub**
+(`inference.propose()` returns nothing), not because flask has none, so nothing here
+measures inference. 15 Decisions out of 239 threads — coverage, not precision, is the binding limit,
 and this measures precision only. That ratio has now been taken three times against three
 different corpora (#46, #48, #67), and the numerator has not moved once: the window grew by
 45%, then by another 7 clusters, and produced no new Decision either time. The fourteenth and
@@ -935,14 +952,12 @@ vulnerability. Every statement in it names the code it describes.
 ## Tests
 
 ```bash
-psql "$DATABASE_URL" -f db/tests/0002_rubric_checks.sql             # 13 checks
-psql "$DATABASE_URL" -f db/tests/0005_pending_reference_checks.sql  #  4 checks
-psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
-psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
-psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
-psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests -t .          # 394 tests
+for f in db/tests/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
+DATABASE_URL=... python -m unittest discover -s tests -t .
 ```
+
+Each command prints its own totals. This section states none, because a hand-typed count
+drifted from 209 to 394 before anyone noticed (#117). CI runs both on every push.
 
 `-t .` matters. It makes `tests/` a package, whose `__init__.py` puts `src/` on the path,
 so the suite runs in a plain checkout without `pip install -e .` (#123). Without it,
@@ -955,21 +970,21 @@ and all five of its checks were silently dead until something finally ran them (
 
 **A failing check now fails the run.** CI passes `ON_ERROR_STOP=1`, which turns a SQL
 *error* into a red build; a check that merely recorded `passed = false` was not an error,
-so four of the five suites printed `FAIL` inside a collapsed group and exited 0 — 30 of the
-39 checks could not turn the build red (#62). Each suite now prints its results table and
+so four of the five suites then existing printed `FAIL` inside a collapsed group and
+exited 0 — most of their checks could not turn the build red (#62). Each suite now prints its results table and
 then raises if anything failed, and `tests/test_sql_suites.py` asserts that every file in
 `db/tests/` does, so a suite added later cannot quietly arrive without it.
 
-All SQL suites run in a transaction and roll back. The Python suite runs 180 tests
-standalone. Setting `DATABASE_URL` adds 21 integration tests — 7 for the traversal
-fallback, which seed their own fixture because the real graph holds no inferred edges,
-5 for the trace annotation, 7 for reference retraction, and 2 that run every `dg report`
-query against the real schema, which is the half a fixture cannot check. Docker adds 3 more that compile the whole package on the
-oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much newer
-one and otherwise nothing ever exercises the declared floor.
+All SQL suites run in a transaction and roll back. The Python suite runs standalone.
+Setting `DATABASE_URL` adds integration tests that seed their own fixtures (the real graph
+holds no inferred edges) and tests that run every `dg report` query against the real schema,
+which is the half a fixture cannot check. Docker adds tests that compile the whole package
+on the oldest Python `pyproject.toml` claims to support, because the Dockerfile pins a much
+newer one and otherwise nothing ever exercises the declared floor.
 
-A run without those is still reported as `OK`, with 29 of the 209 quietly skipped — so a
-local pass and a complete pass look alike. CI sets both, and nothing is skipped there.
+A run without those is still reported as `OK`, with the database-gated tests listed as
+*skipped* in the summary line, so a local pass and a complete pass look alike. Read that
+number. CI sets both, and skips almost nothing there.
 
 Three of the standalone tests assert the shell wrappers are pure ASCII. Windows PowerShell
 5.1 decodes a BOM-less script using the system ANSI codepage, where an em-dash's last byte
