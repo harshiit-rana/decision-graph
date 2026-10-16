@@ -640,6 +640,18 @@ and writing a watermark from one would claim a completeness no webhook can offer
 remains the thing that guarantees the window. It is also not a production server —
 `http.server` is single-threaded and terminates no TLS.
 
+**Order of arrival doesn't matter for issues and pull requests (#120).** GitHub doesn't
+order deliveries. It retries failed ones, and a maintainer can redeliver any past one. A
+payload whose `updated_at` is older than what the graph already holds is skipped
+entirely: node content, the detail row (`merged_at`, `state`, `state_reason`), and the
+references in its body. So an "opened" delivery replayed after "merged" can't un-merge a
+pull request, and a closing keyword since edited out can't come back. Equal timestamps
+apply, so re-polling unchanged state is a no-op. A payload with no `updated_at` counts as
+oldest. Only GitHub's own timestamps are compared, never this machine's clock. Every
+other node type has the same rule on its node row. Comments, reviews and PR commits are
+always re-read from the REST API rather than taken from the delivery, so they are current
+by construction.
+
 ## Asking in English (`dg ask`)
 
 `dg query` takes a title, a `#number`, or a sha — abbreviated or full, since `commit eca5fd1`

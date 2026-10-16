@@ -31,6 +31,41 @@ def connect(dsn: str) -> psycopg.Connection:
 # Nodes
 # ---------------------------------------------------------------------------
 
+# Whether an incoming payload may replace stored content: the stored row has no timestamp,
+# or the payload's is at least as new. Ties apply, so re-polling unchanged state stays a
+# no-op that still succeeds. This compares GitHub's clock with GitHub's clock only, never
+# with ours, so clock skew on this machine can't reject a genuinely newer payload.
+_FRESH = (
+    "(node.source_updated_at IS NULL OR (EXCLUDED.source_updated_at IS NOT NULL "
+    "AND EXCLUDED.source_updated_at >= node.source_updated_at))"
+)
+
+
+def is_stale(incoming: datetime | None, stored: datetime | None) -> bool:
+    """The same rule as `_FRESH`, inverted, for callers deciding whether to extract."""
+    if stored is None:
+        return False
+    return incoming is None or incoming < stored
+
+
+def stored_node(
+    conn: psycopg.Connection, *, node_type: str, repo_node_id: int | None, external_id: str
+) -> dict | None:
+    """The stored id and source_updated_at for a node, row-locked for this transaction.
+
+    The lock is what makes check-then-write safe. Two deliveries for the same artifact,
+    handled at once, serialise here instead of interleaving their detail writes.
+    """
+    return conn.execute(
+        """
+        SELECT id, source_updated_at FROM node
+         WHERE node_type = %s::node_type AND COALESCE(repo_node_id, 0) = COALESCE(%s, 0)
+           AND external_id = %s
+           FOR UPDATE
+        """,
+        (node_type, repo_node_id, external_id),
+    ).fetchone()
+
 
 def upsert_node(
     conn: psycopg.Connection,
@@ -65,17 +100,26 @@ def upsert_node(
                 %(source_created_at)s, %(source_updated_at)s, %(raw)s)
         ON CONFLICT (node_type, COALESCE(repo_node_id, 0), external_id)
         DO UPDATE SET
-            github_node_id    = COALESCE(EXCLUDED.github_node_id, node.github_node_id),
-            title             = COALESCE(EXCLUDED.title, node.title),
-            url               = COALESCE(EXCLUDED.url, node.url),
+            -- Newest wins (#120). Content is replaced only by a payload at least as new
+            -- as the one stored, by GitHub's own updated_at. A payload with none counts
+            -- as oldest. Before this, a retried or redelivered webhook could regress a
+            -- row while GREATEST below still claimed the newest timestamp.
+            github_node_id    = CASE WHEN {fresh}
+                THEN COALESCE(EXCLUDED.github_node_id, node.github_node_id)
+                ELSE node.github_node_id END,
+            title             = CASE WHEN {fresh}
+                THEN COALESCE(EXCLUDED.title, node.title) ELSE node.title END,
+            url               = CASE WHEN {fresh}
+                THEN COALESCE(EXCLUDED.url, node.url) ELSE node.url END,
             thread_key        = COALESCE(node.thread_key, EXCLUDED.thread_key),
             source_updated_at = GREATEST(
                 COALESCE(EXCLUDED.source_updated_at, node.source_updated_at),
                 COALESCE(node.source_updated_at, EXCLUDED.source_updated_at)),
-            raw               = COALESCE(EXCLUDED.raw, node.raw),
+            raw               = CASE WHEN {fresh}
+                THEN COALESCE(EXCLUDED.raw, node.raw) ELSE node.raw END,
             last_polled_at    = now()
         RETURNING id
-        """,
+        """.format(fresh=_FRESH),
         {
             "node_type": node_type,
             "repo_node_id": repo_node_id,

@@ -139,6 +139,24 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
         else threads.issue_key(ctx.repo_node_id, number)
     )
 
+    # Newest wins (#120). GitHub doesn't order webhook deliveries, retries failed ones,
+    # and lets a maintainer redeliver any past one. A payload older than what is stored is
+    # skipped entirely: not its node content, not its detail row (where merged_at lives,
+    # and the rubric depends on it), and not the references in its body, which could
+    # re-add a closing keyword since edited out. The poller can't repair a regression,
+    # because its UPDATED_ASC cursor never revisits an artifact whose updated_at hasn't
+    # moved. So the guard has to be here.
+    stored = db.stored_node(
+        ctx.conn, node_type=node_type, repo_node_id=ctx.repo_node_id, external_id=str(number)
+    )
+    if stored is not None and db.is_stale(updated, stored["source_updated_at"]):
+        ctx.stats.note_skip("stale_payload")
+        log.info(
+            "skipped a stale payload for %s #%s: updated_at %s is older than stored %s",
+            node_type, number, updated, stored["source_updated_at"],
+        )
+        return stored["id"]
+
     node_id = ctx.node(
         node_type=node_type,
         external_id=str(number),
