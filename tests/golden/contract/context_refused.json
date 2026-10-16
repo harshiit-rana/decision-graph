@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "kind": "context",
+  "query": "#5900",
+  "repository_text_fields": [
+    "title",
+    "excerpt",
+    "body"
+  ],
+  "start": {
+    "node_id": 620,
+    "type": "issue",
+    "external_id": "5895",
+    "ref": "issue #5895",
+    "url": null,
+    "title": "change default redirect code to 303",
+    "match": "identifier"
+  },
+  "why": {
+    "start": {
+      "node_id": 620,
+      "type": "issue",
+      "external_id": "5895",
+      "ref": "issue #5895",
+      "url": null,
+      "title": "change default redirect code to 303",
+      "match": "identifier"
+    },
+    "found": false,
+    "used_inferred_fallback": false,
+    "tiers": {},
+    "paths": [],
+    "decisions": [],
+    "context": null,
+    "refusal": {
+      "kind": "closed_not_planned",
+      "engine_explanation": "no path within 3 hops",
+      "inferred_fallback_tried": false,
+      "closure": {
+        "ref": "issue #5900",
+        "kind": "not_planned",
+        "closed_at": "2026-01-25T03:53:00+00:00",
+        "last_word": {
+          "body": "Closing, this is not something we will add.",
+          "author_association": "MEMBER",
+          "at": "2026-01-25T03:53:00+00:00",
+          "caveat": "This is what was said, not why it closed. The graph records no link between the comment and the closure."
+        }
+      }
+    }
+  },
+  "impact": {
+    "start": {
+      "node_id": 620,
+      "type": "issue",
+      "external_id": "5895",
+      "ref": "issue #5895",
+      "url": null,
+      "title": "change default redirect code to 303",
+      "match": "identifier"
+    },
+    "found": false,
+    "used_inferred_fallback": false,
+    "tiers": {},
+    "paths": [],
+    "decisions": [],
+    "context": null,
+    "refusal": {
+      "kind": "nothing_downstream",
+      "engine_explanation": "no path within 3 hops",
+      "inferred_fallback_tried": false,
+      "closure": null
+    }
+  },
+  "attempts": [],
+  "gaps": [
+    {
+      "code": "why_refused",
+      "detail": "No Why answer: the graph holds no path from this artifact to a recorded reason. `refusal_kind` says which case this is.",
+      "refusal_kind": "closed_not_planned"
+    },
+    {
+      "code": "impact_refused",
+      "detail": "No impact answer: no recorded link leads downstream from this artifact. `refusal_kind` says which case this is.",
+      "refusal_kind": "nothing_downstream"
+    },
+    {
+      "code": "no_prior_attempt_found",
+      "detail": "No ended attempt in the ingested window matches this artifact's title. Matching is lexical, so that is not evidence nobody tried."
+    }
+  ],
+  "budget": {
+    "max_paths": null,
+    "max_quote_chars": null
+  },
+  "truncated": null
+}

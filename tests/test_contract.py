@@ -188,6 +188,9 @@ V1_FIELDS = frozenset({
     "body", "author_association", "at", "caveat", "meaning", "strength",
     # Added within v1 by #137 (kind "attempts"). Additions are compatible.
     "attempts", "ending", "landed_in", "caveats",
+    # Added within v1 by #138 (kind "context").
+    "why", "impact", "gaps", "detail", "refusal_kind", "budget", "max_paths", "max_quote_chars",
+    "truncated", "paths_omitted", "quote_chars_cut",
 })
 
 

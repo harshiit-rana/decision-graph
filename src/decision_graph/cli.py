@@ -851,6 +851,12 @@ def cmd_ingest(args: argparse.Namespace, extra: list[str]) -> int:
     return run.main(argv)
 
 
+def cmd_context(args: argparse.Namespace, extra: list[str]) -> int:
+    from . import context
+
+    return context.main([args.text] + list(extra))
+
+
 def cmd_query(args: argparse.Namespace, extra: list[str]) -> int:
     from . import query
 
@@ -1107,6 +1113,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     q.add_argument("text", help="a title, #number, or commit sha")
     q.set_defaults(fn=cmd_query, passthrough=True)
+
+    c = sub.add_parser(
+        "context",
+        help="everything the graph evidences about one artifact, and its gaps, as JSON for agents",
+        epilog="Any other flag (--depth, --max-paths, --max-quote-chars, --repo) is passed through.",
+    )
+    c.add_argument("text", help="a #number, commit sha, or title")
+    c.set_defaults(fn=cmd_context, passthrough=True)
 
     a = sub.add_parser("ask", help="ask a natural language question about the repository")
     a.add_argument("question", help="e.g. 'Why did we change the default redirect code?'")

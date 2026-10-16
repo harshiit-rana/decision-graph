@@ -11,6 +11,9 @@
       "$ref": "#/$defs/attempts_document"
     },
     {
+      "$ref": "#/$defs/context_document"
+    },
+    {
       "$ref": "#/$defs/no_match_document"
     },
     {
@@ -773,6 +776,140 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "detail"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "why_refused",
+            "impact_refused",
+            "inferred_fallback_used",
+            "no_decision_reached",
+            "no_review_recorded",
+            "match_not_exact",
+            "no_prior_attempt_found"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "description": "Fixed system text for the code."
+        },
+        "refusal_kind": {
+          "type": "string",
+          "description": "For why_refused / impact_refused: the refusal's kind, the same vocabulary as the text refusal."
+        }
+      }
+    },
+    "context_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "`dg context` (issue #138): one artifact's why, impact, prior attempts and Decision facts, with what the graph does not record in `gaps`.",
+      "required": [
+        "schema_version",
+        "kind",
+        "query",
+        "repository_text_fields",
+        "start",
+        "why",
+        "impact",
+        "attempts",
+        "gaps",
+        "budget",
+        "truncated"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "context"
+        },
+        "query": {
+          "type": "string"
+        },
+        "repository_text_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "start": {
+          "$ref": "#/$defs/candidate"
+        },
+        "why": {
+          "$ref": "#/$defs/result"
+        },
+        "impact": {
+          "$ref": "#/$defs/result"
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attempt"
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gap"
+          }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_paths",
+            "max_quote_chars"
+          ],
+          "properties": {
+            "max_paths": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "max_quote_chars": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        },
+        "truncated": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "paths_omitted",
+                "quote_chars_cut"
+              ],
+              "properties": {
+                "paths_omitted": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "quote_chars_cut": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          ],
+          "description": "Null when nothing was cut. Otherwise, how much the budget removed."
         }
       }
     }

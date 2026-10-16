@@ -111,6 +111,7 @@ need to type one to use the tool.
 | `dg ask "..."` | the same, asked in plain English — needs an Nvidia NIM key |
 | `dg query ... --format mermaid` | the same answer as a diagram (`dot` also available) |
 | `dg query "..." --mode attempts` | has this been tried before? earlier issues and PRs that ended without landing, how each ended, and where the thread later landed |
+| `dg context "#N"` | one JSON document for a coding agent: why, impact, prior attempts, Decision facts, and what the graph does **not** record (`gaps`) |
 | `dg query ... --format json` | the same answer as data, for programs and coding agents: a versioned contract ([schema](docs/schema/answer.v1.json)) |
 | `dg report` | render every decision and its evidence to a browsable HTML page |
 
@@ -274,6 +275,42 @@ It says how each attempt ended, never why. Matching is lexical, on titles and
 identifiers, so a differently-worded attempt is missed. That's why an empty list says
 "not evidence that nobody tried". `--format json` returns the same list as a
 `kind: "attempts"` document under the [v1 schema](docs/schema/answer.v1.json).
+
+### Everything at once, for an agent (`dg context`)
+
+```
+dg context "#5895" --max-paths 5 --max-quote-chars 400
+```
+
+An agent starting work on an issue would otherwise make several queries and merge them.
+`dg context` returns one document (`kind: "context"`, [v1 schema](docs/schema/answer.v1.json))
+holding:
+- the resolved artifact;
+- its Why answer or refusal, and its impact answer or refusal. These are the same objects
+  `dg query --format json` returns, and a test checks they're identical;
+- prior attempts matching its title (`--mode attempts`);
+- the Decision facts;
+- **`gaps`**: what the graph does not record, from a fixed vocabulary and never written by a
+  model.
+
+The gap codes are `why_refused` and `impact_refused` (each with its `refusal_kind`),
+`inferred_fallback_used`, `no_decision_reached`, `no_review_recorded`, `match_not_exact`
+and `no_prior_attempt_found`. A refused pack, abridged:
+
+```json
+"gaps": [
+  {"code": "why_refused", "refusal_kind": "closed_not_planned", "detail": "No Why answer: ..."},
+  {"code": "impact_refused", "refusal_kind": "nothing_downstream", "detail": "..."},
+  {"code": "no_prior_attempt_found", "detail": "... Matching is lexical, so that is not evidence nobody tried."}
+],
+"truncated": null
+```
+
+`--max-paths` and `--max-quote-chars` keep it within an agent's budget, and cut honestly.
+`truncated` counts every path and character removed, and gaps are computed before
+anything is cut. Full answered and refused examples are the goldens
+`tests/golden/contract/context_*.json`. The answered example is about 4.5 KB. Pack sizes
+on the real flask graph are not yet measured (#173).
 
 ### Answers as data (`--format json`)
 
