@@ -1,6 +1,6 @@
 """Unit tests for the extraction-first parsers.
 
-stdlib unittest, no test dependency: `python -m unittest discover tests`.
+stdlib unittest, no test dependency: `python -m unittest discover -s tests -t .`.
 
 The CODEOWNERS parser matters most here. pallets/flask ships no CODEOWNERS file
 (issue #1), so ingestion can never exercise it against the real target — these tests

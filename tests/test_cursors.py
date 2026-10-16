@@ -1,6 +1,6 @@
 """Cursor phase semantics (issue #47 follow-up, migration 0012).
 
-stdlib unittest, no test dependency: `python -m unittest discover tests`.
+stdlib unittest, no test dependency: `python -m unittest discover -s tests -t .`.
 
 `phase` is owned by one strategy of three. These tests pin both halves of that: that only
 COMMITTED_DESC is born with a phase, and — the part that makes the change safe — that

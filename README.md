@@ -751,8 +751,12 @@ psql "$DATABASE_URL" -f db/tests/0006_corroboration_checks.sql      #  7 checks
 psql "$DATABASE_URL" -f db/tests/0008_landing_checks.sql            #  6 checks
 psql "$DATABASE_URL" -f db/tests/0009_decision_identity_checks.sql  #  9 checks
 psql "$DATABASE_URL" -f db/tests/0013_reference_retraction_checks.sql # 6 checks
-DATABASE_URL=... python -m unittest discover -s tests               # 209 tests
+DATABASE_URL=... python -m unittest discover -s tests -t .          # 394 tests
 ```
+
+`-t .` matters. It makes `tests/` a package, whose `__init__.py` puts `src/` on the path,
+so the suite runs in a plain checkout without `pip install -e .` (#123). Without it,
+discovery reports 17 import errors that look like broken code.
 
 `.github/workflows/ci.yml` runs all of it on every push and pull request, against Postgres
 16 on both ends of the supported Python range. That is recent: the 0009 suite had been

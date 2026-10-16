@@ -106,7 +106,19 @@ jobs:
         # DATABASE_URL is set for the whole job, so the 12 integration tests run rather than
         # skipping. Docker is present on the runner, so the 3 python-floor tests run too:
         # nothing here should be skipped, and a skip is worth noticing in the log.
-        run: python -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Python suite without installing the package
+        # The README's command must work in a plain checkout (#123): with only the runtime
+        # dependencies installed, tests/__init__.py puts src/ on the path. DATABASE_URL is
+        # blanked so the integration tests, already run above, are not run a second time
+        # against the same database.
+        env:
+          DATABASE_URL: ""
+        run: |
+          python -m venv /tmp/bare
+          /tmp/bare/bin/pip install --quiet "psycopg[binary]>=3.1" "httpx>=0.27"
+          /tmp/bare/bin/python -m unittest discover -s tests -t .
 
       - name: SQL suites
         # Each file opens a transaction and rolls back, so order does not matter and the
