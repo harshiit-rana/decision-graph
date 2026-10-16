@@ -1089,6 +1089,14 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     # Model output can echo injected repository text, escape sequences included (#126).
     print(render.safe(explanation))
     print()
+    if answer.found:
+        # A refusal is a fixed sentence from the code, with no model output to check (#125).
+        from . import cite_check
+
+        report = cite_check.check_answer(explanation, answer, annotations=annotations, links=links)
+        for n, line in enumerate(report.lines()):
+            print(yellow(line) if report.findings and n < len(report.lines()) - 1 else dim(line))
+        print()
     print(dim("Written by " + explain.model() + " from the trace above, which is the"))
     print(dim("evidence. Where the two disagree, the trace is what the graph holds."))
     return 0

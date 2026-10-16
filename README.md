@@ -787,7 +787,27 @@ anyone who can post to the repository, so they can contain text aimed at the mod
   as data in tests.
 
 This **reduces** the risk; no prompt format removes it. The defence that doesn't depend on
-the model is the trace printed above the prose. Checking the prose against it is #125.
+the model is the trace printed above the prose.
+
+**The paragraph is checked against the trace, mechanically (#125).** After the prose,
+`dg ask` prints a citation check, from fixed sentences in the code. It uses regular
+expressions and set comparison only: no second model call. It verifies:
+- every issue or pull request number, commit sha (any prefix of 7 or more), release tag and
+  GitHub URL the paragraph names is on the trail above it, or is credited by it;
+- a number the paragraph calls an issue is an issue there, and likewise a pull request;
+- GitHub links point at the trail's own repository, and any other link is one the trail
+  printed (a link the model invented is how an injected instruction would try to send you
+  somewhere);
+- the paragraph doesn't claim a stronger tier than the trail grants ("corroborated" over
+  explicit evidence, "explicit" over an inferred answer), skipping negations such as "not
+  corroborated", and says "inferred" when the answer used the inferred fallback.
+
+It does **not** verify whether the reasoning is right, sentences that name no artifact, or
+people, teams, workflows and files, whose forms collide with ordinary English ("release
+notes", "team members"). A clean result means nothing *recognisable* is unsupported. It is
+not proof the paragraph is faithful. A warning never rewrites or hides the prose; it sits
+beside it. A refusal is a fixed sentence and gets no check. The same result is available as
+`cite_check.Report.to_dict()` for the JSON contract and the MCP server.
 
 **The model does not decide anything.** Which paths exist, what tier each carries, and
 whether there is an answer at all come from the graph. Three rules keep it that way (#65):

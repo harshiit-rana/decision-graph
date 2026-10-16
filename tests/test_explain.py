@@ -306,6 +306,25 @@ class AskPrintsItsEvidenceTest(unittest.TestCase):
             "the warning must reach the reader before the confident paragraph does",
         )
 
+    def test_the_citation_check_runs_on_the_prose_and_warns_about_an_invented_reference(self) -> None:
+        # #125: the paragraph names an artifact that is not on the trail. The warning is a
+        # fixed sentence from the code, printed after the prose, and the prose is untouched.
+        printed = self._run(_answer(found=True), summary="It was done in issue #9999.")
+        self.assertIn("It was done in issue #9999.", printed)
+        self.assertIn("does not support", printed)
+        self.assertIn("#9999", printed)
+        self.assertLess(printed.index("It was done in issue #9999."), printed.index("does not support"))
+
+    def test_a_clean_paragraph_gets_the_clean_line_and_its_limits(self) -> None:
+        printed = self._run(_answer(found=True), summary="Issue #5895 asked for it.")
+        self.assertIn("every artifact, link and tier the paragraph names is on the trail", printed)
+        self.assertIn("not whether the reasoning is right", printed)
+
+    def test_a_refusal_runs_no_citation_check(self) -> None:
+        # The refusal is a fixed sentence, so there is no model output to check.
+        printed = self._run(_answer(found=False), summary=explain.NO_ANSWER)
+        self.assertNotIn("Citation check", printed)
+
     def test_a_refusal_says_what_it_means_and_what_to_try(self) -> None:
         # A refusal is a primary output (8 of the 18 §9 outcomes). "no path found" alone
         # cannot tell a reader whether they asked the wrong question or found a real gap.
