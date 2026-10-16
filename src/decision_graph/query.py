@@ -19,8 +19,11 @@ import os
 import sys
 from datetime import datetime
 
-from . import contract, db, diagram, reasoning, render, retrieval, trace
+from . import attempts, contract, db, diagram, reasoning, render, retrieval, trace
 from .reasoning import Answer, Mode
+
+# Not a reasoning.Mode: it walks no edges. It is a filtered retrieval over closure facts.
+ATTEMPTS = "attempts"
 
 # Kept as a module attribute because it was one, and `from .query import TIER_MARK` is the
 # kind of import that exists in someone's script.
@@ -136,14 +139,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("query", help="entity title, #number, or sha to start from")
     parser.add_argument(
-        "--mode", choices=[m.value for m in Mode], default=Mode.WHY.value
+        "--mode", choices=[*(m.value for m in Mode), ATTEMPTS], default=Mode.WHY.value,
+        help="why: what led to this; impact: what it affects; attempts: earlier issues and "
+        "pull requests on this that ended without landing, and how each ended",
     )
     parser.add_argument("--depth", type=int, default=reasoning.DEFAULT_MAX_DEPTH)
     parser.add_argument(
         "--as-of",
         help="ISO timestamp for a point-in-time query; uses edge valid_from/valid_to",
     )
-    parser.add_argument("--limit", type=int, default=3, help="candidate start nodes to try")
+    parser.add_argument(
+        "--limit", type=int, default=None,
+        help="candidate start nodes to try (default 3), or attempts to list (default 10)",
+    )
     parser.add_argument(
         "--all",
         action="store_true",
@@ -214,11 +222,16 @@ def main(argv: list[str] | None = None) -> int:
     # returned nothing and the miss below reported it as "Nothing in the graph matches
     # '#5895'" -- about an artifact the graph holds, with advice to go check `dg status`,
     # which shows it present and sends the reader after a problem that does not exist.
+    if args.limit is None:
+        args.limit = attempts.DEFAULT_LIMIT if args.mode == ATTEMPTS else 3
     if args.limit < 1:
         return fail(
             f"--limit {args.limit} asks for no candidates, so nothing can match. "
             "Use 1 or more."
         )
+
+    if args.mode == ATTEMPTS and args.format not in ("text", "json"):
+        return fail(f"--mode attempts lists artifacts; it has no {args.format} diagram")
 
     conn = db.connect(dsn)
 
@@ -227,6 +240,18 @@ def main(argv: list[str] | None = None) -> int:
         repo_node_id = retrieval.resolve_repo(conn, args.repo)
         if repo_node_id is None:
             return fail(f"repo {args.repo!r} has not been ingested")
+
+    if args.mode == ATTEMPTS:
+        found = attempts.find_attempts(
+            conn, args.query, repo_node_id=repo_node_id, limit=args.limit
+        )
+        conn.close()
+        # An empty list is a result, like a refusal: exit 0, and say what it does not mean.
+        if as_json:
+            print(contract.dumps(attempts.document(args.query, found)))
+        else:
+            attempts.render(args.query, found, out=sys.stdout)
+        return 0
 
     candidates = retrieval.find_candidates(
         conn, args.query, repo_node_id=repo_node_id, limit=args.limit

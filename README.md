@@ -110,6 +110,7 @@ need to type one to use the tool.
 | `dg query "..." --mode why` | ask why something happened, or what a change affects |
 | `dg ask "..."` | the same, asked in plain English — needs an Nvidia NIM key |
 | `dg query ... --format mermaid` | the same answer as a diagram (`dot` also available) |
+| `dg query "..." --mode attempts` | has this been tried before? earlier issues and PRs that ended without landing, how each ended, and where the thread later landed |
 | `dg query ... --format json` | the same answer as data, for programs and coding agents: a versioned contract ([schema](docs/schema/answer.v1.json)) |
 | `dg report` | render every decision and its evidence to a browsable HTML page |
 
@@ -255,6 +256,24 @@ crosses `motivated_by` backwards still shows the arrow the edge actually has.
 `ingest` and `query` forward any flag they do not recognise to the underlying tools, so
 `--months`, `--resources`, `--max-pages`, `--as-of`, `--limit`, `--all` and `--format` all
 still work.
+
+### Has this been tried before? (`--mode attempts`)
+
+```
+dg query "redirect 303" --mode attempts
+```
+
+This lists earlier issues and pull requests matching the query that ended without
+landing: closed unmerged, closed as not planned, or closed as a duplicate. Each shows when
+it ended, the last word from someone with standing (quoted, never offered as the reason),
+and, when a merged pull request shares its thread, **where it later landed** ("tried in
+#A, landed in #B"). It reads only closure facts the graph already records, and adds no
+assertion (#137, ADR 0003 option A).
+
+It says how each attempt ended, never why. Matching is lexical, on titles and
+identifiers, so a differently-worded attempt is missed. That's why an empty list says
+"not evidence that nobody tried". `--format json` returns the same list as a
+`kind: "attempts"` document under the [v1 schema](docs/schema/answer.v1.json).
 
 ### Answers as data (`--format json`)
 

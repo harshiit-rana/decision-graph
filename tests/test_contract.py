@@ -186,6 +186,8 @@ V1_FIELDS = frozenset({
     "status", "implementers", "reviewers", "merged", "merged_at", "excerpt",
     "engine_explanation", "inferred_fallback_tried", "closure", "closed_at", "last_word",
     "body", "author_association", "at", "caveat", "meaning", "strength",
+    # Added within v1 by #137 (kind "attempts"). Additions are compatible.
+    "attempts", "ending", "landed_in", "caveats",
 })
 
 
