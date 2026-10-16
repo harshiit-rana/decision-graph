@@ -108,6 +108,24 @@ jobs:
         # nothing here should be skipped, and a skip is worth noticing in the log.
         run: python -m unittest discover -s tests -t . -v
 
+      - name: Snapshot round trip through the command (#122)
+        # The command path end to end: export the migrated database, import it into a fresh
+        # one, and require eval/figures.sql to print byte-identical output from both. That is
+        # #122's acceptance test, on CI's empty graph. tests/test_snapshot.py covers seeded
+        # data, including the characters that break a careless COPY format.
+        run: |
+          set -euo pipefail
+          export DG_PROJECT_DIR="$PWD"
+          python -m decision_graph.snapshot export /tmp/ci.dgsnap
+          psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS dg_restore" -c "CREATE DATABASE dg_restore"
+          DATABASE_URL=postgresql://postgres:dg@localhost:5432/dg_restore \
+            python -m decision_graph.snapshot import /tmp/ci.dgsnap
+          for db in dg dg_restore; do
+            psql -h localhost -U postgres -d "$db" -v ON_ERROR_STOP=1 -v repo=1 -f eval/figures.sql > "/tmp/figures-$db.txt"
+          done
+          diff /tmp/figures-dg.txt /tmp/figures-dg_restore.txt
+          echo "figures.sql output is identical after a snapshot round trip"
+
       - name: Python suite without installing the package
         # The README's command must work in a plain checkout (#123): with only the runtime
         # dependencies installed, tests/__init__.py puts src/ on the path. DATABASE_URL is

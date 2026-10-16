@@ -121,6 +121,18 @@ def _ledger(conn: psycopg.Connection) -> dict[str, str]:
     }
 
 
+def ledger(conn: psycopg.Connection) -> dict[str, str]:
+    """filename -> checksum of every applied migration. Empty if there is no ledger yet."""
+    if conn.execute("SELECT to_regclass('public.schema_migration') AS t").fetchone()["t"] is None:
+        return {}
+    return _ledger(conn)
+
+
+def checksums(directory: Path | None = None) -> dict[str, str]:
+    """filename -> checksum for every migration this code ships."""
+    return {p.name: _checksum(p.read_text(encoding="utf-8")) for p in discover(directory)}
+
+
 def pending(conn: psycopg.Connection, directory: Path | None = None) -> list[str]:
     """Migrations not yet recorded as applied. Read-only — used by `dg doctor`."""
     conn.execute(LEDGER_DDL)
@@ -129,9 +141,15 @@ def pending(conn: psycopg.Connection, directory: Path | None = None) -> list[str
     return [p.name for p in discover(directory) if p.name not in done]
 
 
-def apply_all(conn: psycopg.Connection, directory: Path | None = None) -> MigrationResult:
-    """Bring the database up to date. Safe to run repeatedly."""
-    files = discover(directory)
+def apply_all(conn: psycopg.Connection, directory: Path | None = None,
+              only: set[str] | None = None) -> MigrationResult:
+    """Bring the database up to date. Safe to run repeatedly.
+
+    `only` limits the run to those filenames. `snapshot.import_` uses it to rebuild exactly
+    the schema a snapshot was taken at, so its rows load into the columns they came from.
+    The newer migrations then run over real data, through the ordinary `dg init`.
+    """
+    files = [p for p in discover(directory) if only is None or p.name in only]
     result = MigrationResult()
 
     was_autocommit = conn.autocommit

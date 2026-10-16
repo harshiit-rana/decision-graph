@@ -26,3 +26,9 @@ terminal_recording_assets/
 subtitles_audio_assets/
 video_analysis_frames/
 video_fine_frames/
+
+# Graph snapshots (#122). A snapshot is a full copy of the ingested repository content, so
+# it is published deliberately (a release asset), never committed by a stray `git add .`.
+snapshots/
+*.dgsnap
+*.dgsnap.partial

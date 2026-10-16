@@ -114,6 +114,7 @@ need to type one to use the tool.
 | `dg context "#N"` | one JSON document for a coding agent: why, impact, prior attempts, Decision facts, and what the graph does **not** record (`gaps`) |
 | `dg query ... --format json` | the same answer as data, for programs and coding agents: a versioned contract ([schema](docs/schema/answer.v1.json)) |
 | `dg report` | render every decision and its evidence to a browsable HTML page |
+| `dg snapshot export` | save the whole graph to one file; `import` restores it into an empty database |
 
 ```powershell
 .\dg.ps1 ingest --repo pallets/flask
@@ -406,6 +407,40 @@ Database
 - **Rebuilding after a Dockerfile change** — `dg rebuild`.
 - **Starting over** — `docker compose down -v` deletes the database volume and everything
   ingested. `.env` survives.
+
+### Snapshots (`dg snapshot`)
+
+```
+dg snapshot export                 # snapshots/graph-<UTC time>.dgsnap
+dg snapshot inspect FILE           # print its manifest
+dg snapshot import FILE            # into an EMPTY database only
+```
+
+A snapshot is the whole graph in one file. It exists because every published figure was
+measured on one graph that lived only in one Docker volume (#122). It is a zip:
+- a manifest: the code commit, the migration ledger with checksums, repositories, counts
+  by node type, and each table's row count and SHA-256;
+- each table's rows in PostgreSQL's COPY format.
+
+`pg_dump` isn't used, because the image's client is PostgreSQL 15 and the server is 16.
+
+Import refuses:
+- a snapshot taken with migrations this code doesn't have;
+- one whose migration checksums differ;
+- a target database that isn't empty.
+
+It replays exactly the snapshot's migrations and loads the rows with triggers suspended,
+so they're restored as they were, not re-judged. Then it re-hashes every table against
+the manifest. Any mismatch fails the import, and nothing is left half-loaded. Newer
+migrations then run through `dg init` as usual.
+
+**`dg init` snapshots before it migrates a populated database**, into `snapshots/`, and
+doesn't migrate if the snapshot fails (`--skip-snapshot` overrides that, for when you hold
+a backup). `snapshots/` is git-ignored: a snapshot is a full copy of the ingested
+repository's content. Adjudicated snapshots are published deliberately, as GitHub release
+assets, and linked from `eval/RESULTS.md`. Export refuses if the configured `GITHUB_TOKEN`
+appears anywhere in the data. Import uses `session_replication_role`, so it needs the
+superuser that `dg` connects as today (see #172).
 
 ### Running the internals directly
 

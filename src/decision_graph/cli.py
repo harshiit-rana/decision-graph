@@ -373,7 +373,22 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     # --- 4. migrations -----------------------------------------------------
     step(4, total, "Schema")
-    from . import migrate
+    from . import migrate, snapshot
+
+    # A migration over real data is the one step here that changes the graph, so the graph
+    # is saved first (#122). If the snapshot fails, the migration doesn't run.
+    try:
+        outstanding = migrate.pending(conn)
+        if outstanding and snapshot.is_populated(conn) and not args.skip_snapshot:
+            path = snapshot.default_path(PROJECT_DIR, "pre-migrate")
+            print(f"        {len(outstanding)} migration(s) to apply to a populated database;")
+            print(f"        saving a snapshot first: {cyan(str(path))}")
+            snapshot.export(conn, path, project_dir=PROJECT_DIR)
+    except Exception as exc:
+        print(red(f"        could not snapshot the database before migrating: {exc}"))
+        print(f"        {yellow('→')} nothing was migrated. Fix the cause, or re-run with "
+              "--skip-snapshot if you have a backup")
+        return 1
 
     try:
         result = migrate.apply_all(conn)
@@ -851,6 +866,12 @@ def cmd_ingest(args: argparse.Namespace, extra: list[str]) -> int:
     return run.main(argv)
 
 
+def cmd_snapshot(args: argparse.Namespace) -> int:
+    from . import snapshot
+
+    return snapshot.main([args.action] + ([args.file] if args.file else []))
+
+
 def cmd_context(args: argparse.Namespace, extra: list[str]) -> int:
     from . import context
 
@@ -1087,7 +1108,20 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument(
         "--reconfigure", action="store_true", help="re-prompt for token and repo even if set"
     )
+    i.add_argument(
+        "--skip-snapshot", action="store_true",
+        help="migrate a populated database without saving a snapshot first (only with a backup)",
+    )
     i.set_defaults(fn=cmd_init)
+
+    sn = sub.add_parser(
+        "snapshot",
+        help="save the whole graph to one file, or restore one into an empty database",
+        epilog="dg snapshot export [FILE] | import FILE | inspect FILE",
+    )
+    sn.add_argument("action", choices=["export", "import", "inspect"])
+    sn.add_argument("file", nargs="?")
+    sn.set_defaults(fn=cmd_snapshot)
 
     m = sub.add_parser("menu", help="interactive launcher (also shown when you run dg with no command)")
     m.set_defaults(fn=cmd_menu)
