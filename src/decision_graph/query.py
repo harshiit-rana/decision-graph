@@ -19,7 +19,7 @@ import os
 import sys
 from datetime import datetime
 
-from . import db, diagram, reasoning, render, retrieval, trace
+from . import contract, db, diagram, reasoning, render, retrieval, trace
 from .reasoning import Answer, Mode
 
 # Kept as a module attribute because it was one, and `from .query import TIER_MARK` is the
@@ -91,6 +91,45 @@ def _decision_facts(
 
 
 
+def _wants_json(argv: list[str]) -> bool:
+    """Whether the caller asked for JSON, decided before argparse can fail on anything."""
+    for i, arg in enumerate(argv):
+        if arg == "--format=json" or (arg == "--format" and argv[i + 1 : i + 2] == ["json"]):
+            return True
+    return False
+
+
+def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth: int,
+                    answer_all: bool = False) -> dict:
+    """The JSON contract for one query (issue #135). Takes a connection so it can be tested
+    inside a rolled-back fixture transaction, and so the MCP server (#139) can call it."""
+    chosen = candidates if answer_all else candidates[:1]
+    urls = contract.node_urls(conn, (c.node_id for c in candidates))
+    results = []
+    for c in chosen:
+        answer = reasoning.reason(conn, c.node_id, Mode(mode), max_depth=max_depth, as_of=as_of)
+        facts = contract.read_facts(conn, answer)
+        # The same rule as the text path: a closure explains only a refusal, and only
+        # for the node the walk started from.
+        closure = None if answer.found else trace.closure_fact(conn, c.node_id)
+        results.append(contract.result_doc(
+            c, answer, facts, as_of=as_of, closure=closure, url=urls.get(c.node_id)
+        ))
+    return contract.answer_document(
+        query=query, mode=mode, as_of=as_of, max_depth=max_depth, results=results,
+        other_candidates=candidates[len(chosen):], urls=urls,
+    )
+
+
+def _print_json(conn, args, candidates, as_of) -> int:
+    doc = answer_document(
+        conn, query=args.query, mode=args.mode, candidates=candidates, as_of=as_of,
+        max_depth=args.depth, answer_all=args.all,
+    )
+    print(contract.dumps(doc))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="dg-query", description="Why Engine / Impact Analysis over the graph"
@@ -120,11 +159,29 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--format",
-        choices=["text", *sorted(diagram.FORMATS)],
+        choices=["text", "json", *sorted(diagram.FORMATS)],
         default="text",
-        help="text (default), or a diagram of the walk: mermaid, dot",
+        help="text (default); json, the versioned contract for programs and agents "
+        "(docs/schema/answer.v1.json); or a diagram of the walk: mermaid, dot",
     )
+    argv = list(sys.argv[1:] if argv is None else argv)
+    as_json = _wants_json(argv)
+    if as_json:
+        # A program that asked for JSON must get JSON on every exit, including argparse's
+        # own usage errors, which would otherwise print prose and exit 2 (#82's contract).
+        def _json_error(message: str) -> None:
+            print(contract.dumps(contract.error_document(message)))
+            print(f"error: {message}", file=sys.stderr)
+            raise SystemExit(2)
+
+        parser.error = _json_error  # type: ignore[method-assign]
     args = parser.parse_args(argv)
+
+    def fail(message: str, code: int = 2) -> int:
+        if as_json:
+            print(contract.dumps(contract.error_document(message)))
+        print(f"error: {message}", file=sys.stderr)
+        return code
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.WARNING,
@@ -133,31 +190,24 @@ def main(argv: list[str] | None = None) -> int:
 
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
-        print("error: DATABASE_URL is not set", file=sys.stderr)
-        return 2
+        return fail("DATABASE_URL is not set")
 
     try:
         as_of = datetime.fromisoformat(args.as_of) if args.as_of else None
     except ValueError:
         # Every other bad argument here produces a sentence; this one produced a traceback
         # out of the standard library (issue #82).
-        print(
-            f"error: --as-of {args.as_of!r} is not a timestamp. Use YYYY-MM-DD, or a full "
-            "ISO instant like 2026-03-01T00:00:00Z.",
-            file=sys.stderr,
+        return fail(
+            f"--as-of {args.as_of!r} is not a timestamp. Use YYYY-MM-DD, or a full "
+            "ISO instant like 2026-03-01T00:00:00Z."
         )
-        return 2
 
     # A zero-hop walk cannot reach anything, so the engine correctly returns nothing -- and
     # the renderer then says the graph holds no evidence, which is a false statement about
     # the repository caused by the caller's own argument. A refusal that reports your
     # mistake as a fact is worse than an error, because it is believable (issues #77, #82).
     if args.depth < 1:
-        print(
-            f"error: --depth {args.depth} cannot reach anything. Use 1 or more.",
-            file=sys.stderr,
-        )
-        return 2
+        return fail(f"--depth {args.depth} cannot reach anything. Use 1 or more.")
 
     # The same defect one argument over, missed when --depth was guarded (issue #99). A
     # zero-candidate retrieval cannot match anything, so `find_candidates` correctly
@@ -165,12 +215,10 @@ def main(argv: list[str] | None = None) -> int:
     # '#5895'" -- about an artifact the graph holds, with advice to go check `dg status`,
     # which shows it present and sends the reader after a problem that does not exist.
     if args.limit < 1:
-        print(
-            f"error: --limit {args.limit} asks for no candidates, so nothing can match. "
-            "Use 1 or more.",
-            file=sys.stderr,
+        return fail(
+            f"--limit {args.limit} asks for no candidates, so nothing can match. "
+            "Use 1 or more."
         )
-        return 2
 
     conn = db.connect(dsn)
 
@@ -178,12 +226,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.repo:
         repo_node_id = retrieval.resolve_repo(conn, args.repo)
         if repo_node_id is None:
-            print(f"error: repo {args.repo!r} has not been ingested", file=sys.stderr)
-            return 2
+            return fail(f"repo {args.repo!r} has not been ingested")
 
     candidates = retrieval.find_candidates(
         conn, args.query, repo_node_id=repo_node_id, limit=args.limit
     )
+    if not candidates and as_json:
+        print(contract.dumps(contract.no_match_document(args.query)))
+        conn.close()
+        return 1
     if not candidates:
         print(f"Nothing in the graph matches {args.query!r}.", file=sys.stderr)
         print(file=sys.stderr)
@@ -191,6 +242,11 @@ def main(argv: list[str] | None = None) -> int:
         print("  so a miss means no artifact in the ingested window resembles this.", file=sys.stderr)
         print("  Try `#5898` or a commit sha, or check `dg status` for what is ingested.", file=sys.stderr)
         return 1
+
+    if as_json:
+        code = _print_json(conn, args, candidates, as_of)
+        conn.close()
+        return code
 
     graphical = args.format != "text"
     question = "Why did this happen?" if args.mode == Mode.WHY.value else "What does this affect?"

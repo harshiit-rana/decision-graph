@@ -223,6 +223,48 @@ def summarize(answer: Answer, annotations: dict[int, str], statuses: dict[int, s
 
 
 
+def context_node_id(answer: Answer, bodies: dict[int, str]) -> int | None:
+    """Which artifact's body the answer quotes as "Motivation & Context".
+
+    The start node if it has a body, otherwise the first issue or pull request along a path
+    that has one. It's a function so `--format json` quotes the same artifact the text does.
+    """
+    if bodies.get(answer.start_node_id):
+        return answer.start_node_id
+    for path in answer.paths:
+        for nid in path.node_ids:
+            if bodies.get(nid) and path.ref(nid).node_type in ("issue", "pull_request"):
+                return nid
+    return None
+
+
+def context_excerpt(body: str) -> str:
+    """The cleaned opening of a body as one paragraph, as the text renderer shows it."""
+    return " ".join(_clean_body_excerpt(body))
+
+
+# Why an answer is a refusal, as one code. The text renderer and the JSON contract both
+# branch on this, so they can't classify the same refusal differently.
+REFUSAL_KINDS = (
+    "not_yet_recorded",       # --as-of: the evidence did not exist yet at that moment
+    "closed_not_planned",     # the artifact was closed as not planned, nothing merged
+    "closed_duplicate",       # closed as a duplicate
+    "closed_unmerged",        # a pull request closed without merging
+    "no_rationale_recorded",  # why: no motivating issue and merged work in one thread
+    "nothing_downstream",     # impact: nothing references it downstream
+)
+
+
+def refusal_kind(answer: Answer, as_of=None, closure=None) -> str:
+    if as_of is not None:
+        return "not_yet_recorded"
+    if closure is not None:
+        return {"not_planned": "closed_not_planned", "duplicate": "closed_duplicate"}.get(
+            closure.kind, "closed_unmerged"
+        )
+    return "no_rationale_recorded" if answer.mode is Mode.WHY else "nothing_downstream"
+
+
 def render(
     answer: Answer,
     *,
@@ -260,18 +302,7 @@ def render(
     p()
 
     if bodies:
-        context_nid = None
-        if answer.start_node_id in bodies and bodies[answer.start_node_id]:
-            context_nid = answer.start_node_id
-        else:
-            for path in answer.paths:
-                for nid in path.node_ids:
-                    if nid in bodies and bodies[nid] and path.ref(nid).node_type in ("issue", "pull_request"):
-                        context_nid = nid
-                        break
-                if context_nid:
-                    break
-
+        context_nid = context_node_id(answer, bodies)
         if context_nid and bodies.get(context_nid):
             ref_obj = None
             for path in answer.paths:
@@ -466,7 +497,8 @@ def _render_refusal(answer: Answer, p, as_of=None, closure=None) -> None:
     """
     p(bold("  No answer — and that is a result, not a failure"))
     p()
-    if as_of is not None:
+    kind = refusal_kind(answer, as_of, closure)
+    if kind == "not_yet_recorded":
         p(f"    Asked as of {as_of:%Y-%m-%d}. Nothing that answers this existed in the")
         p("    graph at that moment — edges are time-versioned, so this says when the")
         p("    evidence appeared, not that it is absent now. Drop --as-of to ask about today.")
@@ -474,9 +506,9 @@ def _render_refusal(answer: Answer, p, as_of=None, closure=None) -> None:
         p(dim(f"    engine: {answer.explanation}"))
         p()
         return
-    if closure is not None:
+    if kind.startswith("closed_"):
         _render_closure(closure, answer.mode, p)
-    elif answer.mode is Mode.WHY:
+    elif kind == "no_rationale_recorded":
         p("    Nothing in the ingested window records why this happened. The rubric needs")
         p("    a motivating issue and merged work in the same conversation; a change made")
         p("    without an issue leaves nothing to reconstruct a decision from.")

@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "kind": "no_match",
+  "query": "nonexistent thing",
+  "message": "Nothing in the graph matches. Retrieval tries exact title, then identifier, then prefix, then fuzzy, so a miss means no artifact in the ingested window resembles this."
+}

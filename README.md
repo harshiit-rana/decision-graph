@@ -110,6 +110,7 @@ need to type one to use the tool.
 | `dg query "..." --mode why` | ask why something happened, or what a change affects |
 | `dg ask "..."` | the same, asked in plain English — needs an Nvidia NIM key |
 | `dg query ... --format mermaid` | the same answer as a diagram (`dot` also available) |
+| `dg query ... --format json` | the same answer as data, for programs and coding agents: a versioned contract ([schema](docs/schema/answer.v1.json)) |
 | `dg report` | render every decision and its evidence to a browsable HTML page |
 
 ```powershell
@@ -254,6 +255,54 @@ crosses `motivated_by` backwards still shows the arrow the edge actually has.
 `ingest` and `query` forward any flag they do not recognise to the underlying tools, so
 `--months`, `--resources`, `--max-pages`, `--as-of`, `--limit`, `--all` and `--format` all
 still work.
+
+### Answers as data (`--format json`)
+
+For a program, such as a coding agent, a CI job, or the MCP server planned in #139, the
+same answer is available as JSON under a versioned contract
+([`docs/schema/answer.v1.json`](docs/schema/answer.v1.json)). It is built from the same
+objects as the text, not parsed from it, so the two can't disagree.
+
+```
+dg query "#5895" --format json
+```
+
+Every document has `schema_version` (currently `1`) and a `kind`: `answer`,
+`no_match` (exit 1), or `error` (exit 2, including argparse usage errors). Each
+`results[]` entry carries:
+
+- `found`, the start node and how it `match`ed, and `used_inferred_fallback`;
+- every path, with each step's `edge_type`, `evidence_tier`, `extractor` and walk
+  direction (`traversed`);
+- `decisions[]`, each with its `status`, credited `implementers` (and whether they merged),
+  and `reviewers`.
+
+A refusal is never a bare `null`. It is an object with a `kind`:
+
+```json
+"found": false,
+"refusal": {
+  "kind": "closed_not_planned",
+  "engine_explanation": "no path within 3 hops",
+  "inferred_fallback_tried": false,
+  "closure": {
+    "ref": "issue #5900", "kind": "not_planned", "closed_at": "2026-01-25T03:53:00+00:00",
+    "last_word": {"body": "...", "author_association": "MEMBER", "at": "...",
+                  "caveat": "This is what was said, not why it closed. ..."}
+  }
+}
+```
+
+The other refusal kinds are `closed_duplicate`, `closed_unmerged`,
+`no_rationale_recorded`, `nothing_downstream` and `not_yet_recorded` (an `--as-of` before
+the evidence existed).
+
+**Repository text is untrusted.** Titles, body excerpts and quoted comments sit only in
+the fields named by `repository_text_fields` (`title`, `excerpt`, `body`), and never inside
+a sentence this system wrote. A consumer handing the document to a model can fence exactly
+those fields. Full examples of every kind are the goldens in `tests/golden/contract/`.
+Removing or renaming a field fails `tests/test_contract.py` unless `schema_version` is
+bumped.
 
 ### What to expect
 

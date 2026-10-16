@@ -135,6 +135,31 @@ def decision_annotations(conn, node_ids: list[int]) -> dict[int, str]:
     return notes
 
 
+def decision_implementers(conn, node_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    """The same facts `decision_annotations` prints, as fields (issue #135).
+
+    It reads the same query, so the JSON contract and the text renderer can't disagree
+    about who a Decision is credited to. That has to hold, because the agent reading one
+    and the adjudicator reading the other are checking the same claim.
+    """
+    if not node_ids:
+        return {}
+    found: dict[int, list[dict[str, Any]]] = {nid: [] for nid in set(node_ids)}
+    for row in conn.execute(DECISION_FACTS_SQL, (sorted(set(node_ids)),)).fetchall():
+        if not row["implementer_ref"]:
+            continue
+        found.setdefault(row["node_id"], []).append(
+            {
+                "type": row["implementer_type"],
+                "external_id": row["implementer_ref"],
+                "ref": ref(row["implementer_type"], row["implementer_ref"]),
+                "url": row["implementer_url"],
+                "merged_at": row["merged_at"],
+            }
+        )
+    return found
+
+
 def decision_links(conn, node_ids: list[int]) -> dict[str, str]:
     """`{"PR #5898": "https://github.com/..."}` for the artifacts credited with the work.
 

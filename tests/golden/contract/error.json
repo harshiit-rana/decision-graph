@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "kind": "error",
+  "error": {
+    "code": "bad_argument",
+    "message": "--depth 0 cannot reach anything. Use 1 or more."
+  }
+}
