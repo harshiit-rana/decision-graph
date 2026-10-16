@@ -655,10 +655,42 @@ It needs `NVIDIA_API_KEY` in `.env` (get one at <https://build.nvidia.com>) and 
 `nvidia/nemotron-3-super-120b-a12b` through Nvidia NIM. **Set `DG_NLP_MODEL` in `.env` to
 use a different one** — a hosted model id has an end-of-life date the code cannot see, and
 the previous default was retired mid-project, so moving off a dead model must not require
-editing Python and rebuilding an image. **The question and the traversal paths
-leave your machine**; nothing else does, and no other command in this repository calls any
-service but GitHub. `dg doctor` reports whether the key and the package are present, so you
-find out before typing a question rather than after. Everything else works without it.
+editing Python and rebuilding an image. `dg doctor` reports whether the key and the
+package are present, so you find out before typing a question rather than after.
+Everything else works without it, and no other command in this repository calls any
+service but GitHub.
+
+**What leaves your machine.** `dg ask` makes two calls to the model. The first sends only
+`question`, to turn it into a search term. The second sends one JSON document with these
+fields, and nothing else:
+
+| field | contents |
+|---|---|
+| `question` | your question, as typed |
+| `paths` | the traversal: artifact references and **titles**, edge types, evidence tiers, extractor names |
+| `evidence_tiers_present` | which tiers the paths carry |
+| `inferred_fallback` | whether no explicit path existed |
+| `decision_facts` | what each Decision is credited to (pull request numbers, merge dates) |
+| `artifacts` | up to 1,500 characters of each issue, pull request or commit **body** on the paths |
+
+Set `DG_ASK_SEND_BODIES=0` in `.env` to leave out `artifacts`. Explanations then lose the
+motivation text, and only titles and structure are sent. This list was wrong until #119:
+it used to say only the question and the paths left the machine, while bodies were sent
+too. `tests/test_ask_boundary.py` now checks this table against the code.
+
+**Repository text is treated as data, not instructions.** Titles and bodies are written by
+anyone who can post to the repository, so they can contain text aimed at the model.
+- The instructions sit alone in a system message.
+- Everything above goes in the user message as JSON, each body in a field named
+  `untrusted_artifact_text`. No delimiter in a body can close anything, and control and
+  bidirectional-override characters are stripped.
+- The system message tells the model the tiers come only from the `tier` fields.
+- The adversarial bodies in `tests/fixtures/adversarial_bodies.json` (a fake tier claim, a
+  delimiter break, chat-template tokens, forged JSON, an attacker link) all arrive intact
+  as data in tests.
+
+This **reduces** the risk; no prompt format removes it. The defence that doesn't depend on
+the model is the trace printed above the prose. Checking the prose against it is #125.
 
 **The model does not decide anything.** Which paths exist, what tier each carries, and
 whether there is an answer at all come from the graph. Three rules keep it that way (#65):

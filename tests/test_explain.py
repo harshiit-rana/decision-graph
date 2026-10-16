@@ -23,11 +23,15 @@ class StubClient:
     def __init__(self, *replies: str) -> None:
         self._replies = list(replies)
         self.prompts: list[str] = []
+        self.messages: list[list[dict]] = []
         self.chat = self  # so `client.chat.completions.create(...)` resolves here
         self.completions = self
 
     def create(self, **kwargs):
-        self.prompts.append(kwargs["messages"][0]["content"])
+        # Every message, joined, so a test of "is X in what was sent" sees all of it. The
+        # list itself is kept for the boundary tests, which care which message holds what.
+        self.messages.append(kwargs["messages"])
+        self.prompts.append("\n".join(m["content"] for m in kwargs["messages"]))
         reply = self._replies.pop(0)
 
         class _Message:
@@ -218,8 +222,8 @@ class SummarizeTest(unittest.TestCase):
         client = StubClient("A summary.")
         explain.summarize_answer("why?", _answer(found=True, tier="corroborated"), client)
         prompt = client.prompts[0]
-        self.assertIn("evidence tier=corroborated", prompt)
-        self.assertIn("[corroborated]", prompt)
+        self.assertIn('"tier": "corroborated"', prompt)
+        self.assertIn('"evidence_tier": "corroborated"', prompt)
 
     def test_an_inferred_fallback_is_called_out_in_the_prompt(self) -> None:
         client = StubClient("A summary.")
@@ -242,21 +246,11 @@ class SummarizeTest(unittest.TestCase):
         self.assertIn("302 breaks form redirects; 303 always converts to GET.", prompt)
         self.assertIn("MOTIVATION or PROBLEM", prompt)
 
-    def test_render_context_returns_empty_when_no_bodies(self) -> None:
+    def test_artifact_documents_are_empty_when_no_bodies(self) -> None:
         ans = _answer(found=True)
-        self.assertEqual(explain.render_context(ans, None), "")
-        self.assertEqual(explain.render_context(ans, {}), "")
+        self.assertEqual(explain.artifact_documents(ans, None), [])
+        self.assertEqual(explain.artifact_documents(ans, {}), [])
 
-
-
-class RenderPathsTest(unittest.TestCase):
-    def test_every_edge_line_names_its_tier(self) -> None:
-        rendered = explain.render_paths(_answer(found=True, tier="explicit"))
-        self.assertIn("motivated_by [explicit]", rendered)
-        self.assertIn("evidence tier=explicit", rendered)
-
-    def test_no_paths_renders_empty_rather_than_inventing_a_placeholder(self) -> None:
-        self.assertEqual(explain.render_paths(_answer(found=False)), "")
 
 
 class AskPrintsItsEvidenceTest(unittest.TestCase):
