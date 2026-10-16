@@ -1,6 +1,6 @@
 # 0006 — Agent integration boundary (API / MCP)
 
-**Status:** Proposed — awaiting owner decision
+**Status:** Accepted — 2026-10-16, by the project owner
 
 ## Facts
 
@@ -68,4 +68,11 @@ not wait for them. Each tool returns refusals as structured results, not errors.
 
 ## Decision
 
-_Pending._
+**Accepted: B — a versioned JSON contract plus a thin, read-only MCP stdio adapter.**
+Decided by the owner on 2026-10-16, choosing the recommended option.
+
+Binding on #135 and #139: the JSON contract is the product and the adapter holds no logic;
+the adapter connects with a read-only database role; every repository-authored string sits in
+a field marked untrusted; the initial tool set is limited to what the engine answers today.
+The agent study (#140–#142) remains the evidence that decides whether the MCP surface is
+kept — this decision commits to building it, not to keeping it regardless of the result.

@@ -73,10 +73,10 @@ the Research milestone opens only when its named measurements say so.
 
 | Issue | Question | Recommendation |
 |---|---|---|
-| #127 | Second validation repository | `urllib3/urllib3` (measured: CODEOWNERS, 91% of sampled merged PRs reviewed, release notes cite `#N`, flask-sized) |
-| #119 | `dg ask`: drop artifact bodies from the prompt, or fence them | Fence them, with an opt-out |
-| #136 | Agent boundary (ADR 0006) | Versioned JSON plus a read-only MCP stdio adapter |
-| #147 | Code granularity and source (ADR 0005) | File level from a local clone; symbols later |
+| #127 | Second validation repository | **Decided 2026-10-16: `urllib3/urllib3`** (measured: CODEOWNERS, 91% of sampled merged PRs reviewed, release notes cite `#N`, flask-sized) |
+| #119 | `dg ask`: drop artifact bodies from the prompt, or fence them | **Decided 2026-10-16: fence them, with an opt-out** |
+| #136 | Agent boundary (ADR 0006) | **Accepted 2026-10-16:** versioned JSON plus a read-only MCP stdio adapter |
+| #147 | Code granularity and source (ADR 0005) | **Accepted 2026-10-16:** file level from a local clone; symbols later |
 | #146 | Confidence, and where co-change lives (ADR 0002) | No numeric score; co-change at query time — **reviewer dissent recorded** |
 | #154 | Declined and superseded decisions (ADR 0003) | Prior attempts first; separate `declined_decision` type only after a hand check |
 | #159 | Multi-repository use and private repositories (ADR 0007) | Many repositories, one trust domain; private only by explicit opt-in |

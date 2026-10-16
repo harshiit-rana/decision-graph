@@ -5,7 +5,8 @@ apart, for the same reason: **facts** (checked against the code or the GitHub AP
 where), **hypotheses** (plausible, unmeasured), and the **decision** (which belongs to the
 project owner).
 
-Every record below is **Proposed**. A recommendation is not a decision. Each one has a
+Records are **Proposed** until the owner decides; 0005 and 0006 were accepted on
+2026-10-16. A recommendation is not a decision. Each one has a
 matching `decision-needed` issue, and the implementation issues that depend on it are
 blocked on that issue rather than on this file.
 

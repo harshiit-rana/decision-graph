@@ -1,6 +1,6 @@
 # 0005 — Code-intelligence granularity
 
-**Status:** Proposed — awaiting owner decision
+**Status:** Accepted — 2026-10-16, by the project owner
 
 ## Facts
 
@@ -76,4 +76,10 @@ impact, the Architecture View and decision drift all need it. Every edge stays e
 
 ## Decision
 
-_Pending._
+**Accepted: B2 — file level from a local clone**, with B1 (the API) as the fallback for an
+environment that cannot clone. Symbol level (C) and a static import graph (D) remain
+deferred research. Decided by the owner on 2026-10-16, choosing the recommended option.
+
+Consequences now binding on #148: `git` is added to the image; the clone runs with hooks
+disabled and no submodule recursion; every commit present in the clone but not in the graph,
+or the reverse, is reported, never dropped.
