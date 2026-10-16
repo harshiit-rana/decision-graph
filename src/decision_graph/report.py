@@ -30,6 +30,13 @@ from . import trace
 # what a saved report renders.
 MERMAID_CDN = "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"
 
+# Subresource Integrity for exactly that file. A version pin stops a future release
+# changing the page, but not a compromised or hijacked CDN serving something else under
+# the same URL. With this, the browser refuses any script whose hash differs. The
+# diagrams then stay as readable source, which is the page's no-script fallback anyway.
+# Computed on 2026-10-17 from the jsdelivr file, and confirmed identical from unpkg.
+MERMAID_SRI = "sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr"
+
 # One query per section, kept here rather than inline so the page is obviously a view over
 # the graph and every number on it can be traced to the SQL that produced it.
 DECISIONS_SQL = """
@@ -447,7 +454,7 @@ in place.</footer>
      refuses a module import from a remote origin on a file:// page (origin "null"), so the
      module form renders every diagram as nothing on exactly the path the command produces.
      The UMD build defines a global and loads fine there. -->
-<script src="{MERMAID_CDN}"></script>
+<script src="{MERMAID_CDN}" integrity="{MERMAID_SRI}" crossorigin="anonymous"></script>
 <script>
   if (window.mermaid) {{
     var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;

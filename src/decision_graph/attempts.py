@@ -163,7 +163,7 @@ def render(query: str, attempts: list[Attempt], *, out) -> None:
             said = a.last_word
             at = f", {said.at:%Y-%m-%d}" if said.at else ""
             p(f"      the last word on it, from a {said.association}{at}:")
-            flat = " ".join(said.body.split())
+            flat = " ".join(r.safe(said.body).split())
             for line in textwrap.wrap(flat, width=64, max_lines=3, placeholder=" ..."):
                 p(f"        {r.dim(line)}")
         if a.url:

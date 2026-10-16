@@ -24,6 +24,7 @@ This module is the presentation layer that was missing. Three rules hold it in p
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 from . import trace
@@ -125,8 +126,34 @@ def plural(n: int, noun: str, suffix: str = "s") -> str:
     return f"{n} {noun}" if n == 1 else f"{n} {noun}{suffix}"
 
 
+# Characters that make a terminal do something rather than show something:
+# - C0 controls (ESC starts every ANSI/OSC sequence), DEL, and the C1 range, which
+#   includes the 8-bit CSI and OSC introducers;
+# - the bidirectional overrides and isolates, which reorder what is displayed.
+# Repository text is untrusted (#126). An issue body containing `ESC ] 8 ;; url BEL` would
+# otherwise print a hyperlink whose visible text isn't its target. `ESC [ 2 J` would clear
+# the screen, including the evidence trail above it. Tab and newline survive; each caller
+# already lays them out.
+_TERMINAL_UNSAFE = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f‪-‮⁦-⁩]")
+
+
+# Whole escape sequences go first, so no residue such as `[2J` is left behind. These are:
+# OSC (ESC ] ... BEL or ESC \), CSI (ESC [ params final byte, or the 8-bit 0x9B form),
+# and two-character ESC sequences.
+_ESCAPE_SEQUENCE = re.compile(
+    "\x1b\\][^\x07\x1b]*(?:\x07|\x1b\\\\)?"
+    "|(?:\x1b\\[|\x9b)[0-?]*[ -/]*[@-~]"
+    "|\x1b[@-Z\\\\-_]"
+)
+
+
+def safe(text: str | None) -> str:
+    """Repository text made inert for a terminal. Apply before anything is printed."""
+    return _TERMINAL_UNSAFE.sub("", _ESCAPE_SEQUENCE.sub("", text or ""))
+
+
 def _clip(text: str | None, limit: int) -> str:
-    text = (text or "").strip()
+    text = safe(text).strip()
     return text[: limit - 3] + "..." if len(text) > limit else text
 
 
@@ -134,6 +161,8 @@ def _clean_body_excerpt(body: str, max_lines: int = 5, max_chars: int = 420) -> 
     """Extract a clean, readable opening excerpt from a markdown issue/PR body."""
     import re
     import textwrap
+
+    body = safe(body)
 
     clean_lines = []
     for line in body.strip().splitlines():
@@ -424,7 +453,7 @@ def _render_last_word(said, p) -> None:
     p()
     # Collapsed to one paragraph: a comment carries its own line breaks, code blocks and
     # quoting, and reproducing those here competes with the layout around it.
-    flat = " ".join(said.body.split())
+    flat = " ".join(safe(said.body).split())
     for line in textwrap.wrap(flat, width=68, max_lines=4, placeholder=" ..."):
         p(f"      {line}")
     p()

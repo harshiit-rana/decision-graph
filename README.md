@@ -926,6 +926,12 @@ and telling those apart is the whole job during adjudication. Traces now carry t
 `implemented_by` target and its merge date, every one of them if there is more than one,
 with an unmerged or absent implementer flagged rather than omitted (issue #19).
 
+## Security
+
+[`SECURITY.md`](SECURITY.md) states what TraceMind trusts (nothing written in the ingested
+repository), what leaves your machine, what listens on the network, and how to report a
+vulnerability. Every statement in it names the code it describes.
+
 ## Tests
 
 ```bash

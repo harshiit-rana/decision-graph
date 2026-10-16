@@ -285,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
             how = _MATCH_MEANING.get(c.match, c.match)
             print(
                 f"  starting from  {render.bold(trace.ref(c.node_type, c.external_id))}"
-                f"  {(c.title or '')[:56]}"
+                f"  {render.safe(c.title)[:56]}"
             )
             print(render.dim(f"                 {how}"))
             print()
@@ -333,7 +333,7 @@ def main(argv: list[str] | None = None) -> int:
             "`--all` answers from each of them."
         ))
         for c in candidates[len(chosen):]:
-            print(render.dim(f"    {trace.ref(c.node_type, c.external_id)}  {(c.title or '')[:52]}"))
+            print(render.dim(f"    {trace.ref(c.node_type, c.external_id)}  {render.safe(c.title)[:52]}"))
         print()
 
     conn.close()

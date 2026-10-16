@@ -1024,7 +1024,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     reads identically whether it rests on four corroborated edges or one inferred guess
     (issue #65). The trace is the answer; the paragraph is a reading of it.
     """
-    from . import explain, db, query, retrieval, reasoning, trace
+    from . import explain, db, query, render, retrieval, reasoning, trace
 
     if not (args.question or "").strip():
         # Rejected here rather than at the provider: an empty question spends a real API
@@ -1052,7 +1052,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
         return 1
 
     c = candidates[0]
-    print(f"Found candidate: {trace.ref(c.node_type, c.external_id)} \"{(c.title or '')[:56]}\"\n")
+    print(f"Found candidate: {trace.ref(c.node_type, c.external_id)} \"{render.safe(c.title)[:56]}\"\n")
     print("Traversing the graph...\n")
     answer = reasoning.reason(conn, c.node_id, reasoning.Mode(mode))
     # Read the Decision facts before closing: they are a second query against the same
@@ -1086,7 +1086,8 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
         return 2
 
     heading("In plain English")
-    print(explanation)
+    # Model output can echo injected repository text, escape sequences included (#126).
+    print(render.safe(explanation))
     print()
     print(dim("Written by " + explain.model() + " from the trace above, which is the"))
     print(dim("evidence. Where the two disagree, the trace is what the graph holds."))
