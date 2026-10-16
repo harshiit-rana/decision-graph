@@ -1,0 +1,458 @@
+{
+ "window": [
+  "2025-10-17",
+  "2026-10-17"
+ ],
+ "merged_prs": 154,
+ "bot_authored_prs": 38,
+ "decision_prs_authored_by_bots": [],
+ "prs_with_any_review": 146,
+ "github_linked_prs": 37,
+ "prs_with_body_closing_keyword": 30,
+ "prs_with_closing_keyword_only_in_a_commit_message": [],
+ "prs_with_any_closing_keyword": 30,
+ "linked_by_github_but_no_keyword_anywhere": [
+  3715,
+  3721,
+  3799,
+  4954,
+  5020,
+  5093,
+  5140
+ ],
+ "keyword_but_not_github_linked": [],
+ "closing_refs_skipped_as_not_ingested_issue": {},
+ "closes_edges_predicted": 31,
+ "decision_threads": 28,
+ "decisions_with_corroboration": 27,
+ "decisions_attested": 27,
+ "decisions_published": 14,
+ "release_citations": {
+  "2.8.0": [
+   1362,
+   2577,
+   3289,
+   3594,
+   3779,
+   3785,
+   4945,
+   5019,
+   5029,
+   5044,
+   5059,
+   5071,
+   5077,
+   5079,
+   5091,
+   5092,
+   5093,
+   5094,
+   5095,
+   5097,
+   5101,
+   5103,
+   5161,
+   5166,
+   5209,
+   5211,
+   5232,
+   5234,
+   5239
+  ],
+  "2.7.0": [],
+  "2.6.3": [],
+  "2.6.2": [],
+  "2.6.1": [
+   3731
+  ],
+  "2.6.0": [
+   3622,
+   3638,
+   3649,
+   3652,
+   3653,
+   3664,
+   3666,
+   3693,
+   3696,
+   3700,
+   3710
+  ]
+ },
+ "codeowners": {
+  "path": ".github/CODEOWNERS",
+  "sha": "8a4c410e33b39d37336ec787825ecf6ff202a819",
+  "rules": [
+   {
+    "line": 4,
+    "pattern": ".github/workflows/",
+    "owners": [
+     "sethmlarson",
+     "pquentin",
+     "shazow",
+     "illia-v"
+    ]
+   },
+   {
+    "line": 5,
+    "pattern": ".github/CODEOWNERS",
+    "owners": [
+     "sethmlarson",
+     "pquentin",
+     "shazow",
+     "illia-v"
+    ]
+   },
+   {
+    "line": 6,
+    "pattern": "CHANGES.rst",
+    "owners": [
+     "sethmlarson",
+     "pquentin",
+     "shazow",
+     "illia-v"
+    ]
+   },
+   {
+    "line": 7,
+    "pattern": "pyproject.toml",
+    "owners": [
+     "sethmlarson",
+     "pquentin",
+     "shazow",
+     "illia-v"
+    ]
+   },
+   {
+    "line": 8,
+    "pattern": "ci/",
+    "owners": [
+     "sethmlarson",
+     "pquentin",
+     "shazow",
+     "illia-v"
+    ]
+   }
+  ],
+  "owns_edges": 20,
+  "distinct_owners": [
+   "illia-v",
+   "pquentin",
+   "sethmlarson",
+   "shazow"
+  ]
+ },
+ "decisions": [
+  {
+   "prs": [
+    3697
+   ],
+   "issues": [
+    3693
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3705
+   ],
+   "issues": [
+    3700
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3711
+   ],
+   "issues": [
+    3710
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3732
+   ],
+   "issues": [
+    3731
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3736
+   ],
+   "issues": [
+    3734
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3769
+   ],
+   "issues": [
+    3764
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3780
+   ],
+   "issues": [
+    3779
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3786
+   ],
+   "issues": [
+    2577
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3788
+   ],
+   "issues": [
+    3510
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    3797,
+    4974
+   ],
+   "issues": [
+    3793
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    4960
+   ],
+   "issues": [
+    3636
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    4978
+   ],
+   "issues": [
+    4971
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    4984
+   ],
+   "issues": [
+    4980
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    4989
+   ],
+   "issues": [
+    3594
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    4990
+   ],
+   "issues": [
+    3719
+   ],
+   "attested": false,
+   "published": false,
+   "corroborated": false
+  },
+  {
+   "prs": [
+    5031
+   ],
+   "issues": [
+    3785
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5054
+   ],
+   "issues": [
+    2936,
+    3789
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5055
+   ],
+   "issues": [
+    4945
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5057
+   ],
+   "issues": [
+    3289
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5062
+   ],
+   "issues": [
+    5059
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5102
+   ],
+   "issues": [
+    5077
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5103
+   ],
+   "issues": [
+    5099
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5120
+   ],
+   "issues": [
+    3546
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5182
+   ],
+   "issues": [
+    3677
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5212
+   ],
+   "issues": [
+    5211
+   ],
+   "attested": true,
+   "published": true,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5254,
+    5290
+   ],
+   "issues": [
+    5206
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5271
+   ],
+   "issues": [
+    5268
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  },
+  {
+   "prs": [
+    5276
+   ],
+   "issues": [
+    5275
+   ],
+   "attested": true,
+   "published": false,
+   "corroborated": true
+  }
+ ]
+}
