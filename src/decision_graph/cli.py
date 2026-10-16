@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import argparse
 import os
+import secrets
 import shutil
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 PROJECT_DIR = Path(os.environ.get("DG_PROJECT_DIR", "/work"))
 ENV_FILE = PROJECT_DIR / ".env"
@@ -113,6 +115,12 @@ def load_env_into_os() -> dict[str, str]:
 
 
 def write_env(values: dict[str, str]) -> None:
+    """Write `values` into .env, keeping every key already there that `values` omits.
+
+    It used to write only what it was given, so `dg init --reconfigure` silently deleted
+    NVIDIA_API_KEY, DG_NLP_MODEL, and anything else it did not ask about.
+    """
+    values = {**read_env(), **values}
     lines = [
         "# decision-graph configuration.",
         "# Read automatically by every `dg` command — never export these by hand.",
@@ -164,14 +172,62 @@ def explain_db_error(exc: Exception) -> tuple[str, str]:
             "wait a few seconds and retry; if it persists, run `dg doctor`",
         )
     if "authentication" in text or "password" in text:
+        # Never advise `docker compose down -v` here. It deletes the graph to fix what is
+        # only a mismatch between two copies of a password (#118).
         return (
-            "the database rejected our credentials",
-            "the volume may predate a config change — `docker compose down -v` resets it "
-            "(this deletes ingested data)",
+            "the database's password and DG_DB_PASSWORD in .env disagree — no data is lost",
+            "set the database to match .env: docker compose exec db psql -U postgres -c "
+            "\"ALTER ROLE postgres PASSWORD '<DG_DB_PASSWORD from .env>'\"",
         )
     if "does not exist" in text and "database" in text:
         return ("the database has not been created", "run `dg init`")
     return (str(exc).strip().splitlines()[0], "run `dg doctor`")
+
+
+# The password docker-compose.yml falls back to. It is printed in a public repository, so a
+# database still using it is protected by nothing except the network binding.
+DEFAULT_DB_PASSWORD = "dg"
+
+
+def uses_default_db_password(dsn: str) -> bool:
+    """True when `dsn` is the compose-managed database still on the published password.
+
+    Only the compose database (host `db`) is ours to change. A DATABASE_URL pointing
+    anywhere else belongs to whoever set it, and rotating its superuser password would be
+    a surprise, not a fix.
+    """
+    parts = urlsplit(dsn)
+    return parts.hostname == "db" and parts.password == DEFAULT_DB_PASSWORD
+
+
+def rotate_db_password(conn) -> str:
+    """Give the connected role a random password and record it in .env — or do neither.
+
+    ALTER ROLE is transactional, so the database change commits only once .env holds the
+    new value, and .env is restored if the commit fails. Ending with the database on one
+    password and .env on another is the lockout this ordering exists to prevent. It is
+    recoverable even so: see explain_db_error.
+    """
+    from psycopg import sql
+
+    new = secrets.token_urlsafe(24)  # [A-Za-z0-9_-]: safe in a DSN and in compose's .env
+    previous = ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.exists() else None
+    conn.rollback()
+    conn.execute(sql.SQL("ALTER ROLE CURRENT_USER PASSWORD {}").format(sql.Literal(new)))
+    try:
+        write_env({"DG_DB_PASSWORD": new})
+    except BaseException:
+        conn.rollback()
+        raise
+    try:
+        conn.commit()
+    except BaseException:
+        if previous is None:
+            ENV_FILE.unlink(missing_ok=True)
+        else:
+            ENV_FILE.write_text(previous, encoding="utf-8")
+        raise
+    return new
 
 
 def _github(token: str, path: str) -> tuple[int, dict | list | None]:
@@ -234,6 +290,16 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(red(f"        cannot reach the database: {why}"))
         print(f"        {yellow('→')} {fix}")
         return 1
+
+    if uses_default_db_password(dsn):
+        try:
+            rotate_db_password(conn)
+        except Exception as exc:
+            print(red(f"        could not replace the default database password: {exc}"))
+            print(f"        {yellow('→')} nothing was changed; re-run `dg init`")
+            return 1
+        print("        replaced the published default password with a random one")
+        print(dim("        stored in .env as DG_DB_PASSWORD; your data is untouched"))
 
     # --- 2. GitHub token ---------------------------------------------------
     step(2, total, "GitHub token")
@@ -473,6 +539,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         return _verdict(states)
 
     states.append(check(PASS, "database reachable"))
+
+    if uses_default_db_password(dsn):
+        states.append(
+            check(
+                FAIL,
+                "database still uses the published default password",
+                "anyone who can reach its port can log in as superuser and rewrite the graph",
+                "run `dg init` — it sets a random password and keeps your data",
+            )
+        )
+    elif urlsplit(dsn).hostname == "db":
+        states.append(check(PASS, "database password is not the published default"))
 
     from . import migrate
 

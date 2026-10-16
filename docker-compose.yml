@@ -4,11 +4,12 @@ services:
   db:
     image: postgres:16
     environment:
-      # Not a secret. This is a disposable local development credential for a container
-      # that holds only public GitHub data, is reachable only on this compose network,
-      # and is destroyed by `docker compose down -v`. Secret scanners will flag it; there
-      # is nothing here to protect.
-      POSTGRES_PASSWORD: dg
+      # Read only when the volume is first created; after that the password lives in the
+      # database. The `dg` fallback is public, so `dg init` replaces it with a random one,
+      # in the database and in .env as DG_DB_PASSWORD, without touching any data (#118).
+      # The graph is public GitHub content, but its integrity is the product: anyone who
+      # can log in as this superuser can rewrite the evidence.
+      POSTGRES_PASSWORD: ${DG_DB_PASSWORD:-dg}
       POSTGRES_USER: postgres
       POSTGRES_DB: dg
     volumes:
@@ -17,7 +18,12 @@ services:
       # Published only so you *can* reach it with your own tools. Nothing in `dg` uses
       # this — the app talks to `db:5432` over the compose network — so a conflict here
       # is harmless. Change it with DG_DB_PORT=55444 if 55434 is taken.
-      - "${DG_DB_PORT:-55434}:5432"
+      #
+      # Bound to 127.0.0.1, so only this machine can connect. Without a host IP, Docker
+      # publishes on every interface and its iptables rules bypass most host firewalls, so
+      # anyone on the same network could reach the superuser (#118). To expose it on
+      # purpose, set DG_DB_BIND=0.0.0.0, and only once a strong DG_DB_PASSWORD is in place.
+      - "${DG_DB_BIND:-127.0.0.1}:${DG_DB_PORT:-55434}:5432"
     healthcheck:
       # `dg` must not start before Postgres accepts connections, or first-run init fails
       # with a confusing "connection refused" that resolves itself on retry.
@@ -37,7 +43,9 @@ services:
       # Not user-managed, by design. The database lives at a fixed address on this
       # network, so exporting a DSN by hand was never configuration — it was an
       # implementation detail leaking onto the host.
-      DATABASE_URL: postgresql://postgres:dg@db:5432/dg
+      # The password comes from .env (written by `dg init`); compose reads that file for
+      # substitution. It is URL-safe by construction, so it needs no escaping here.
+      DATABASE_URL: postgresql://postgres:${DG_DB_PASSWORD:-dg}@db:5432/dg
       DG_PROJECT_DIR: /work
     volumes:
       # The project itself: source, migrations, and .env. Bind-mounted rather than copied

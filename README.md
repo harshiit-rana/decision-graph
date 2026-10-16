@@ -286,7 +286,18 @@ Database
 
 - **"Docker is installed but not running"** — start Docker Desktop and wait for it to settle.
 - **Port already in use** — the database is published on 55434 only so you *can* reach it
-  with your own tools; nothing in `dg` uses it. Set `DG_DB_PORT=55444` to move it.
+  with your own tools; nothing in `dg` uses it. Set `DG_DB_PORT=55444` to move it. It
+  listens on `127.0.0.1` only. `DG_DB_BIND=0.0.0.0` exposes it to your network, which
+  lets anyone there who knows the password rewrite the graph.
+- **"database still uses the published default password"** — run `dg init`. It gives the
+  database a random password, stores it in `.env` as `DG_DB_PASSWORD`, and keeps all your
+  data. To connect with your own tools afterwards, use
+  `postgresql://postgres:<DG_DB_PASSWORD>@localhost:55434/dg`.
+- **"the database's password and DG_DB_PASSWORD in .env disagree"** — nothing is lost. Set
+  the database back to the value in `.env`:
+  `docker compose exec db psql -U postgres -c "ALTER ROLE postgres PASSWORD '<value>'"`
+  (inside the container, the local socket needs no password). Don't delete the volume
+  to fix this.
 - **Rebuilding after a Dockerfile change** — `dg rebuild`.
 - **Starting over** — `docker compose down -v` deletes the database volume and everything
   ingested. `.env` survives.
