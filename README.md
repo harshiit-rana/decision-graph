@@ -372,6 +372,21 @@ the fields named by `repository_text_fields` (`title`, `excerpt`, `body`), and n
 a sentence this system wrote. A consumer handing the document to a model can fence exactly
 those fields.
 
+**And it can be replayed (#176).** Every document carries `provenance`:
+- `request`: the query's own arguments (command, query, mode, `as_of`, depth, limits, quotes);
+- `engine`: the package version, the schema version, and the migration ledger (how many are
+  applied, the last one and its checksum, and a digest of the whole ledger, so any schema
+  change alters it);
+- `used`: the node ids the document is built from, and for each edge it crossed its id, type,
+  tier, `observed_at`, `valid_from` and `created_at`.
+
+It holds no timestamp of its own, so two runs over an unchanged database give identical
+provenance, and when an answer changes between two runs the difference says whether the
+graph, the code or the question moved. It never holds the DSN, a token or any `.env` value:
+`request` is built from query arguments only, and a test checks that no `postgresql://`
+string can appear. It is plain fields, not a PROV-O serialisation; mapping them to PROV-O or
+SLSA terms as a separate view remains optional (#176).
+
 **And it says who wrote it (#177).** Every object carrying one of those fields also has
 `author_association` (GitHub's word: OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE, ...) and
 `untrusted`, which is true unless the author is an OWNER, MEMBER or COLLABORATOR. GitHub

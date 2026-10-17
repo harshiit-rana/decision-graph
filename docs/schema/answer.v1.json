@@ -607,7 +607,8 @@
         "repository_text_fields",
         "results",
         "other_candidates",
-        "quotes"
+        "quotes",
+        "provenance"
       ],
       "properties": {
         "schema_version": {
@@ -653,6 +654,9 @@
         },
         "quotes": {
           "$ref": "#/$defs/quotes"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
         }
       }
     },
@@ -835,7 +839,8 @@
         "repository_text_fields",
         "attempts",
         "caveats",
-        "quotes"
+        "quotes",
+        "provenance"
       ],
       "properties": {
         "schema_version": {
@@ -867,6 +872,9 @@
         },
         "quotes": {
           "$ref": "#/$defs/quotes"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
         }
       }
     },
@@ -916,7 +924,8 @@
         "gaps",
         "budget",
         "truncated",
-        "quotes"
+        "quotes",
+        "provenance"
       ],
       "properties": {
         "schema_version": {
@@ -1005,6 +1014,9 @@
         },
         "quotes": {
           "$ref": "#/$defs/quotes"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
         }
       }
     },
@@ -1026,6 +1038,134 @@
         "suppressed": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request",
+        "engine",
+        "used"
+      ],
+      "description": "What was asked, which engine and schema answered, and exactly which rows were read (issue #176). It holds no timestamp of its own, so two runs over an unchanged database give identical provenance. It never holds the DSN, a token or .env values.",
+      "properties": {
+        "request": {
+          "type": "object",
+          "description": "The query's own arguments: command, query, mode, as_of, depth, limits, quotes. Built from arguments only."
+        },
+        "engine": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "package_version",
+            "schema_version",
+            "migrations"
+          ],
+          "properties": {
+            "package_version": {
+              "type": "string"
+            },
+            "schema_version": {
+              "type": "integer"
+            },
+            "migrations": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "applied",
+                "last",
+                "last_checksum",
+                "ledger_sha256"
+              ],
+              "properties": {
+                "applied": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "last": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "last_checksum": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ledger_sha256": {
+                  "type": "string",
+                  "description": "Digest of every applied migration's name and checksum. Any schema change alters it."
+                }
+              }
+            }
+          }
+        },
+        "used": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nodes",
+            "edges"
+          ],
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "edge_id",
+                  "edge_type",
+                  "evidence_tier",
+                  "observed_at",
+                  "valid_from",
+                  "created_at"
+                ],
+                "properties": {
+                  "edge_id": {
+                    "type": "integer"
+                  },
+                  "edge_type": {
+                    "type": "string"
+                  },
+                  "evidence_tier": {
+                    "type": "string"
+                  },
+                  "observed_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "ISO 8601, or null."
+                  },
+                  "valid_from": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "ISO 8601, or null."
+                  },
+                  "created_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "ISO 8601, or null."
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

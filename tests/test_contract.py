@@ -158,13 +158,28 @@ def closure(kind: str, last_word: bool = True) -> Closure:
 ASSOC = {ISSUE: "MEMBER", PR: "CONTRIBUTOR"}
 
 
+# What `contract.engine_facts` reads from a real ledger, as a fixed fixture. Provenance holds
+# no timestamp, so a document built from fixed parts is byte-stable and can be a golden.
+FIXTURE_ENGINE = {
+    "package_version": "0.1.0", "schema_version": 1,
+    "migrations": {"applied": 15, "last": "0015_comment_artifacts.sql",
+                   "last_checksum": "0123456789abcdef", "ledger_sha256": "fedcba9876543210"},
+}
+
+
+def finished(doc, assoc, quotes="all", request=None):
+    """finish() plus a fixture provenance block: everything `finish_from_db` does, no database."""
+    contract.finish(doc, assoc, quotes)
+    return contract.attach_provenance(doc, request or {"command": "fixture"}, FIXTURE_ENGINE, [])
+
+
 def doc_for(c, answer, facts=None, *, as_of=None, clo=None, others=(), quotes="all") -> dict:
     result = contract.result_doc(c, answer, facts or contract.Facts(), as_of=as_of, closure=clo)
     doc = contract.answer_document(
         query="#5895", mode=answer.mode.value, as_of=as_of, max_depth=3,
         results=[result], other_candidates=list(others),
     )
-    return contract.finish(doc, ASSOC, quotes)
+    return finished(doc, ASSOC, quotes)
 
 
 CASES = {
@@ -199,6 +214,9 @@ V1_FIELDS = frozenset({
     "truncated", "paths_omitted", "quote_chars_cut",
     # Added within v1 by #177: who wrote each quoted field, and what `--quotes` did.
     "author_association", "untrusted", "suppressed", "quotes", "mode",
+    # Added within v1 by #176: what was asked, which engine answered, and what it read.
+    "provenance", "request", "engine", "used", "package_version", "migrations", "applied",
+    "last", "last_checksum", "ledger_sha256", "edges", "observed_at", "valid_from", "created_at",
 })
 
 

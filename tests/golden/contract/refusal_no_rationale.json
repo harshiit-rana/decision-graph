@@ -41,5 +41,26 @@
   "quotes": {
     "mode": "all",
     "suppressed": 0
+  },
+  "provenance": {
+    "request": {
+      "command": "fixture"
+    },
+    "engine": {
+      "package_version": "0.1.0",
+      "schema_version": 1,
+      "migrations": {
+        "applied": 15,
+        "last": "0015_comment_artifacts.sql",
+        "last_checksum": "0123456789abcdef",
+        "ledger_sha256": "fedcba9876543210"
+      }
+    },
+    "used": {
+      "nodes": [
+        620
+      ],
+      "edges": []
+    }
   }
 }

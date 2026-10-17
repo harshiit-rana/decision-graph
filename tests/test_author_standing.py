@@ -29,7 +29,7 @@ from decision_graph.reasoning import Mode
 
 from tests.test_attempts import _attempt
 from tests.test_contract import (
-    ASSOC, DECISION, ISSUE, PR, SCHEMA, candidate, closure, doc_for, explicit_answer,
+    ASSOC, DECISION, ISSUE, PR, SCHEMA, candidate, finished, closure, doc_for, explicit_answer,
     explicit_facts, refused, roundtrip, validate,
 )
 
@@ -62,7 +62,7 @@ def _with(assoc, quotes):
     result = contract.result_doc(c, explicit_answer(), explicit_facts())
     doc = contract.answer_document(query="q", mode="why", as_of=None, max_depth=3,
                                    results=[result], other_candidates=[])
-    return contract.finish(doc, assoc, quotes)
+    return finished(doc, assoc, quotes)
 
 
 class EveryQuotedFieldHasAnAuthorTest(unittest.TestCase):
@@ -72,8 +72,8 @@ class EveryQuotedFieldHasAnAuthorTest(unittest.TestCase):
         impact = contract.result_doc(c, refused(Mode.IMPACT), contract.Facts())
         docs = {
             "answer": doc_for(c, explicit_answer(), explicit_facts()),
-            "attempts": contract.finish(attempts.document("q", [_attempt()]), {41: "NONE", 42: "OWNER"}),
-            "context": contract.finish(
+            "attempts": finished(attempts.document("q", [_attempt()]), {41: "NONE", 42: "OWNER"}),
+            "context": finished(
                 context.assemble("q", why, impact, attempts.document("q", [_attempt()])["attempts"]), ASSOC),
             "refusal": doc_for(c, refused(), clo=closure("not_planned")),
         }
@@ -131,7 +131,7 @@ class AdversarialCorpusTest(unittest.TestCase):
                 facts.bodies = {ISSUE: case["body"]}
                 c = candidate()
                 result = contract.result_doc(c, explicit_answer(), facts)
-                doc = contract.finish(contract.answer_document(
+                doc = finished(contract.answer_document(
                     query="q", mode="why", as_of=None, max_depth=3, results=[result],
                     other_candidates=[]), {ISSUE: "NONE"})
                 excerpt = doc["results"][0]["context"]
@@ -174,19 +174,19 @@ class MaintainersOnlyTest(unittest.TestCase):
 
     def test_a_non_maintainers_closing_comment_is_removed_too(self) -> None:
         clo = closure("not_planned")
-        doc = contract.finish(doc_for(candidate(), refused(), clo=clo), {}, quotes="maintainers")
+        doc = finished(doc_for(candidate(), refused(), clo=clo), {}, quotes="maintainers")
         # The fixture's last word is from a MEMBER, so it stays.
         self.assertIsNotNone(doc["results"][0]["refusal"]["closure"]["last_word"]["body"])
         from decision_graph.trace import Closure, Standing
         outsider = Closure("issue #1", "not_planned", None, Standing("drive-by text", "NONE", None))
-        doc = contract.finish(doc_for(candidate(), refused(), clo=outsider), {}, quotes="maintainers")
+        doc = finished(doc_for(candidate(), refused(), clo=outsider), {}, quotes="maintainers")
         said = doc["results"][0]["refusal"]["closure"]["last_word"]
         self.assertIsNone(said["body"])
         self.assertTrue(said["suppressed"])
 
     def test_an_unknown_mode_is_refused(self) -> None:
         with self.assertRaises(ValueError):
-            contract.finish({}, {}, quotes="everyone")
+            finished({}, {}, quotes="everyone")
 
 
 def run_query(argv):

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from decision_graph import attempts, contract, retrieval
 from decision_graph.trace import Standing
 
-from tests.test_contract import SCHEMA, validate
+from tests.test_contract import SCHEMA, finished, validate
 
 DSN = os.environ.get("DATABASE_URL")
 T = datetime(2026, 1, 10, tzinfo=timezone.utc)
@@ -85,7 +85,7 @@ class RenderTest(unittest.TestCase):
 
 class DocumentTest(unittest.TestCase):
     def test_validates_and_keeps_repository_text_in_its_fields(self) -> None:
-        doc = json.loads(contract.dumps(contract.finish(
+        doc = json.loads(contract.dumps(finished(
             attempts.document("redirect 303", [_attempt()]), {41: "CONTRIBUTOR", 42: "MEMBER"})))
         self.assertEqual(validate(doc, SCHEMA), [])
         a = doc["attempts"][0]
@@ -94,7 +94,7 @@ class DocumentTest(unittest.TestCase):
         self.assertIn("not why it closed", a["last_word"]["caveat"])
 
     def test_empty_document_still_carries_its_caveats(self) -> None:
-        doc = json.loads(contract.dumps(contract.finish(attempts.document("x", []), {})))
+        doc = json.loads(contract.dumps(finished(attempts.document("x", []), {})))
         self.assertEqual(validate(doc, SCHEMA), [])
         self.assertEqual(doc["attempts"], [])
         self.assertIn(attempts.LEXICAL_CAVEAT, doc["caveats"])

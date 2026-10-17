@@ -385,8 +385,109 @@ def finish(doc: dict, associations: dict[int, str | None], quotes: str = "all") 
     return doc
 
 
-def finish_from_db(conn, doc: dict, quotes: str = "all") -> dict:
-    return finish(doc, read_associations(conn, node_ids_in(doc)), quotes)
+def finish_from_db(conn, doc: dict, quotes: str = "all", *, request: dict | None = None) -> dict:
+    """Label authors, apply the quote mode, and record provenance (issues #177, #176)."""
+    finish(doc, read_associations(conn, node_ids_in(doc)), quotes)
+    doc["provenance"] = provenance(conn, doc, request or {})
+    return doc
+
+
+# ---------------------------------------------------------------------------
+# Provenance (issue #176)
+# ---------------------------------------------------------------------------
+#
+# An answer that can't be replayed can't be diffed: when it changes between two runs, nothing
+# in it says whether the graph, the code or the question changed. So every document records
+# what was asked, which engine and schema produced it, and the exact rows it read. That is
+# the shape of PROV-O's Activity / Entity split and SLSA's externalParameters /
+# resolvedDependencies, kept as plain fields. It deliberately holds no timestamp of its own,
+# so two runs over an unchanged database produce identical provenance.
+#
+# It never holds the DSN, a token, or anything from .env: `request` is built by the caller
+# from query arguments only, and `engine` is read from the migration ledger.
+
+
+def package_version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("decision-graph")
+    except Exception:  # not installed: running from a checkout, as the test suite does
+        import tomllib
+        from pathlib import Path
+
+        pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+        try:
+            return tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+        except Exception:
+            return "unknown"
+
+
+def engine_facts(conn) -> dict[str, Any]:
+    """Which schema produced this answer, from the migration ledger."""
+    import hashlib
+
+    from . import migrate
+
+    ledger = migrate.ledger(conn)
+    last = max(ledger) if ledger else None
+    digest = hashlib.sha256(
+        "\n".join(f"{name}:{ledger[name]}" for name in sorted(ledger)).encode("utf-8")
+    ).hexdigest()[:16]
+    return {
+        "package_version": package_version(),
+        "schema_version": SCHEMA_VERSION,
+        "migrations": {
+            "applied": len(ledger),
+            "last": last,
+            "last_checksum": ledger.get(last) if last else None,
+            "ledger_sha256": digest,
+        },
+    }
+
+
+def _step_edge_ids(doc: dict) -> list[int]:
+    return sorted({o["edge_id"] for o in _objects(doc)
+                   if "edge_id" in o and isinstance(o["edge_id"], int)})
+
+
+def _all_node_ids(doc: dict) -> list[int]:
+    return sorted({o["node_id"] for o in _objects(doc)
+                   if "node_id" in o and isinstance(o["node_id"], int)})
+
+
+def used_rows(conn, doc: dict) -> dict[str, Any]:
+    """The edges and nodes the document was built from, with when each was recorded."""
+    edge_ids = _step_edge_ids(doc)
+    edges = []
+    if edge_ids:
+        edges = [
+            {
+                "edge_id": r["id"], "edge_type": r["edge_type"],
+                "evidence_tier": r["evidence_tier"], "observed_at": r["observed_at"],
+                "valid_from": r["valid_from"], "created_at": r["created_at"],
+            }
+            for r in conn.execute(
+                "SELECT id, edge_type::text AS edge_type, evidence_tier::text AS evidence_tier, "
+                "observed_at, valid_from, created_at FROM edge WHERE id = ANY(%s) ORDER BY id",
+                (edge_ids,),
+            ).fetchall()
+        ]
+    return {"nodes": _all_node_ids(doc), "edges": edges}
+
+
+def attach_provenance(doc: dict, request: dict, engine: dict, edges: list[dict]) -> dict:
+    """The pure half: assemble the block from parts already read. Tests use it without a database."""
+    doc["provenance"] = {
+        "request": request, "engine": engine,
+        "used": {"nodes": _all_node_ids(doc), "edges": edges},
+    }
+    return doc
+
+
+def provenance(conn, doc: dict, request: dict) -> dict[str, Any]:
+    used = used_rows(conn, doc)
+    return attach_provenance({**doc}, request, engine_facts(conn), used["edges"])["provenance"]
 
 
 def _default(value: Any) -> Any:

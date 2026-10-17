@@ -122,7 +122,10 @@ def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth
         query=query, mode=mode, as_of=as_of, max_depth=max_depth, results=results,
         other_candidates=candidates[len(chosen):], urls=urls,
     )
-    return contract.finish_from_db(conn, doc, quotes)
+    return contract.finish_from_db(conn, doc, quotes, request={
+        "command": "query", "query": query, "mode": mode, "as_of": as_of,
+        "max_depth": max_depth, "all": answer_all, "quotes": quotes,
+    })
 
 
 def _print_json(conn, args, candidates, as_of) -> int:
@@ -258,7 +261,10 @@ def main(argv: list[str] | None = None) -> int:
         # An empty list is a result, like a refusal: exit 0, and say what it does not mean.
         if as_json:
             print(contract.dumps(contract.finish_from_db(
-                conn, attempts.document(args.query, found), args.quotes)))
+                conn, attempts.document(args.query, found), args.quotes, request={
+                    "command": "query", "query": args.query, "mode": "attempts",
+                    "limit": args.limit, "quotes": args.quotes,
+                })))
         else:
             attempts.render(args.query, found, out=sys.stdout)
         conn.close()

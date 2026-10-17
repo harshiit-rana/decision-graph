@@ -161,7 +161,10 @@ def build(conn, query: str, *, repo_node_id: int | None = None,
     attempt_docs = attempts.document(query, found)["attempts"]
     doc = assemble(query, result(Mode.WHY), result(Mode.IMPACT), attempt_docs,
                    max_paths=max_paths, max_quote_chars=max_quote_chars)
-    return contract.finish_from_db(conn, doc, quotes)
+    return contract.finish_from_db(conn, doc, quotes, request={
+        "command": "context", "query": query, "max_depth": max_depth, "max_paths": max_paths,
+        "max_quote_chars": max_quote_chars, "quotes": quotes,
+    })
 
 
 def main(argv: list[str] | None = None) -> int:
