@@ -363,12 +363,21 @@ def render(
     if conflicts:
         _render_conflicts(conflicts, p)
 
-    p(bold(f"  Evidence trail  ({plural(len(answer.paths), 'path')})"))
+    shown = plural(len(answer.paths), 'path')
+    if answer.paths_omitted:
+        shown += f" shown of {len(answer.paths) + answer.paths_omitted}"
+    p(bold(f"  Evidence trail  ({shown})"))
     p(dim("    Each path is an independent chain of links. More paths = more kinds of evidence;"))
     p(dim("    a corroborated answer has at least 3 independent kinds all pointing the same way."))
 
     for i, path in enumerate(sorted(answer.paths, key=lambda x: (x.depth, x.target_id)), 1):
         _render_path(path, i, annotations, statuses, verbose, p, reviewers)
+
+    if answer.paths_omitted:
+        p(_c("33", bold(f"  ! {plural(answer.paths_omitted, 'more path')} not shown")))
+        p(dim(f"    The answer is capped at {answer.max_paths} (--max-paths). These are the first"))
+        p(dim("    ones in the walk's own order (shortest first). Nothing was filtered or ranked."))
+        p()
 
     urls = _urls(answer)
     # Artifacts the answer NAMES but no path passes through -- chiefly the credited

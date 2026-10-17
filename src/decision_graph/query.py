@@ -105,7 +105,7 @@ def _wants_json(argv: list[str]) -> bool:
 
 def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth: int,
                     answer_all: bool = False, quotes: str = "all",
-                    as_recorded=None) -> dict:
+                    as_recorded=None, max_paths: int | None = None) -> dict:
     """The JSON contract for one query (issue #135). Takes a connection so it can be tested
     inside a rolled-back fixture transaction, and so the MCP server (#139) can call it."""
     chosen = candidates if answer_all else candidates[:1]
@@ -113,7 +113,7 @@ def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth
     results = []
     for c in chosen:
         answer = reasoning.reason(conn, c.node_id, Mode(mode), max_depth=max_depth, as_of=as_of,
-                                  as_recorded=as_recorded)
+                                  as_recorded=as_recorded, max_paths=max_paths)
         facts = contract.read_facts(conn, answer)
         # The same rule as the text path: a closure explains only a refusal, and only
         # for the node the walk started from.
@@ -129,14 +129,14 @@ def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth
     return contract.finish_from_db(conn, doc, quotes, request={
         "command": "query", "query": query, "mode": mode, "as_of": as_of,
         "max_depth": max_depth, "all": answer_all, "quotes": quotes,
-        "as_recorded": as_recorded,
+        "as_recorded": as_recorded, "max_paths": max_paths,
     })
 
 
 def _print_json(conn, args, candidates, as_of, as_recorded=None) -> int:
     doc = answer_document(
         conn, query=args.query, mode=args.mode, candidates=candidates, as_of=as_of,
-        as_recorded=as_recorded,
+        as_recorded=as_recorded, max_paths=args.max_paths,
         max_depth=args.depth, answer_all=args.all, quotes=args.quotes,
     )
     print(contract.dumps(doc))
@@ -159,6 +159,12 @@ def main(argv: list[str] | None = None) -> int:
         help="ISO timestamp for a point-in-time query: what the repository said then, as "
         "TraceMind now understands it. Uses valid_from/valid_to and hides retracted edges at "
         "every time (ADR 0009)",
+    )
+    parser.add_argument(
+        "--max-paths", type=int, default=None,
+        help="keep at most N paths per answer (the first N in the walk's own order, shortest "
+        "first) and say how many were left out. Off by default: flask's largest answer is 17. "
+        "A tracking issue referenced by hundreds of PRs can return thousands (issue #130)",
     )
     parser.add_argument(
         "--as-recorded",
@@ -247,6 +253,9 @@ def main(argv: list[str] | None = None) -> int:
     # mistake as a fact is worse than an error, because it is believable (issues #77, #82).
     if args.depth < 1:
         return fail(f"--depth {args.depth} cannot reach anything. Use 1 or more.")
+    if args.max_paths is not None and args.max_paths < 1:
+        return fail(f"--max-paths {args.max_paths} would keep no paths, so every answer would "
+                    "look like a refusal. Use 1 or more.")
 
     # The same defect one argument over, missed when --depth was guarded (issue #99). A
     # zero-candidate retrieval cannot match anything, so `find_candidates` correctly
@@ -336,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
 
         answer = reasoning.reason(
             conn, c.node_id, Mode(args.mode), max_depth=args.depth, as_of=as_of,
-            as_recorded=as_recorded,
+            as_recorded=as_recorded, max_paths=args.max_paths,
         )
         if graphical:
             # Raw, so it pipes into a .mmd or .dot file. A refusal produces nothing at all

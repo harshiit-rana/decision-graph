@@ -26,6 +26,7 @@
       "found": true,
       "used_inferred_fallback": false,
       "scope": "other_thread",
+      "truncated": null,
       "tiers": {
         "corroborated": {
           "meaning": "explicit, and the thread carries 3 of 4 independent kinds of signal",

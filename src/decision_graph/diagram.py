@@ -166,6 +166,9 @@ def to_mermaid(answer: Answer) -> str:
         cls = _TYPE_CLASS.get(node_type or "", "other")
         lines.append(f"  class n{node_id} {cls};")
 
+    if answer.paths_omitted:
+        lines.append(f"  %% {answer.paths_omitted} more path(s) not drawn (capped at {answer.max_paths})")
+
     return "\n".join(lines)
 
 
@@ -198,6 +201,8 @@ def to_dot(answer: Answer) -> str:
         style = _DOT_STYLE.get(step.evidence_tier, "style=solid")
         lines.append(f'  n{src} -> n{dst} [label="{label}", {style}];')
 
+    if answer.paths_omitted:
+        lines.append(f"  // {answer.paths_omitted} more path(s) not drawn (capped at {answer.max_paths})")
     lines.append("}")
     return "\n".join(lines)
 

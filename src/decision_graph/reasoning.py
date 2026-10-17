@@ -191,6 +191,11 @@ class Answer:
     paths: list[Path]
     used_inferred_fallback: bool
     explanation: str
+    # An opt-in bound on how many paths an answer carries (issue #130). When it applies, the
+    # paths kept are the first `max_paths` in the walk's own (depth, node) order, and the rest are
+    # COUNTED here rather than dropped silently. Every renderer says so.
+    max_paths: int | None = None
+    paths_omitted: int = 0
 
     @property
     def found(self) -> bool:
@@ -392,6 +397,19 @@ def _is_answer(mode: Mode, start_type: str | None, path: Path) -> bool:
     return True
 
 
+def _bounded(paths: list[Path], max_paths: int | None) -> tuple[list[Path], int]:
+    """Keep the first `max_paths` paths, in the walk's own order, and COUNT the rest.
+
+    The walk is ordered by (depth, node path), so the paths kept are the shortest, and the same
+    ones every time. The cap bounds what an answer carries (its rendering, its JSON, an agent's
+    context). It does not bound the database's work: that is bounded by the depth limit, and
+    measured (issue #130).
+    """
+    if max_paths is None or len(paths) <= max_paths:
+        return paths, 0
+    return paths[:max_paths], len(paths) - max_paths
+
+
 def reason(
     conn: psycopg.Connection,
     start_node_id: int,
@@ -400,6 +418,7 @@ def reason(
     max_depth: int = DEFAULT_MAX_DEPTH,
     as_of: datetime | None = None,
     as_recorded: datetime | None = None,
+    max_paths: int | None = None,
 ) -> Answer:
     """Answer a Why or Impact query, honouring the §5.3 explicit-first fallback order."""
     row = conn.execute(
@@ -424,14 +443,17 @@ def reason(
     if answers:
         # §5.3 step 3: an explicit route exists, so inferred edges are excluded from
         # this answer entirely. Not filtered out afterwards -- never fetched.
+        kept, omitted = _bounded(answers, max_paths)
         return Answer(
             mode=mode,
             start_node_id=start_node_id,
-            paths=answers,
+            paths=kept,
             used_inferred_fallback=False,
             explanation=(
                 f"{len(answers)} explicit path(s) found; inferred edges not consulted"
             ),
+            max_paths=max_paths,
+            paths_omitted=omitted,
         )
 
     # Pass 2 — the gap-bridging fallback. Reached only because pass 1 found nothing.
@@ -456,13 +478,16 @@ def reason(
             explanation="no path found, explicit or inferred",
         )
 
+    kept, omitted = _bounded(fallback_answers, max_paths)
     return Answer(
         mode=mode,
         start_node_id=start_node_id,
-        paths=fallback_answers,
+        paths=kept,
         used_inferred_fallback=True,
         explanation=(
             f"no explicit path existed; {len(fallback_answers)} path(s) found only by "
             "admitting inferred edges"
         ),
+        max_paths=max_paths,
+        paths_omitted=omitted,
     )

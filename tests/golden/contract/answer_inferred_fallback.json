@@ -26,6 +26,7 @@
       "found": true,
       "used_inferred_fallback": true,
       "scope": "none",
+      "truncated": null,
       "tiers": {
         "inferred": {
           "meaning": "the system's own guess; no explicit path existed, so this is not a record",

@@ -314,6 +314,8 @@ V1_FIELDS = frozenset({
     "conflicts", "sides", "label", "edge", "facts", "node",
     # Added within v1 by #129: where a Why answer leaves the artifact's own thread.
     "crosses_thread", "scope", "step_index", "from_thread", "to_thread",
+    # Added within v1 by #130: an opt-in path cap, with the omitted paths counted.
+    "truncated", "paths_returned",
 })
 
 

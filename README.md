@@ -372,6 +372,19 @@ the fields named by `repository_text_fields` (`title`, `excerpt`, `body`), and n
 a sentence this system wrote. A consumer handing the document to a model can fence exactly
 those fields.
 
+**Answers can be bounded, and say so (#130).** An impact walk is bounded by depth but not by path
+count. Measured on *synthetic* graphs in a scratch database (not flask, and not a claim about any
+real repository): a hub issue closed by 1,000 PRs with 3 commits each returned 4,000 paths in 2.4 s
+at depth 3, and a tangled 400-PR graph returned 23,200. flask's largest answer is 17, so this is a
+risk for a busy repository, or an agent looping over one. `--max-paths N` (off by default; the
+right default is the owner's call) keeps the first N paths in the walk's own order (shortest first,
+nothing ranked or filtered) and **counts the rest**: the text says "N more paths not shown", JSON has
+`truncated: {max_paths, paths_omitted, paths_returned}`, Mermaid and DOT carry a comment, and `dg ask`
+tells the model the answer is incomplete. Below the cap, and with no cap, an answer is exactly what it
+was. It bounds what an answer *carries*, not the database's work, which the depth limit bounds.
+`eval/measure_traversal.py` gives the distribution (path count and latency, p50/p95/max, the five worst
+starts) for the real graphs; that run needs the restored database (#173).
+
 **A Why answer says whose reason it is (#129).** A Why-walk answers "why does *this* artifact
 exist" with a Decision, and `references` (a bare `#N` mention, the weakest explicit signal) is
 in the Why edge set. So an unrelated PR that says "similar to #123" was answered with #123's
@@ -920,6 +933,7 @@ fields, and nothing else:
 | `paths` | the traversal: artifact references and **titles**, edge types, evidence tiers, extractor names |
 | `evidence_tiers_present` | which tiers the paths carry |
 | `inferred_fallback` | whether no explicit path existed |
+| `paths_omitted` | how many further paths a path cap left out (0 unless `--max-paths` applied) |
 | `decision_facts` | what each Decision is credited to (pull request numbers, merge dates) |
 | `artifacts` | up to 1,500 characters of each issue, pull request or commit **body** on the paths |
 

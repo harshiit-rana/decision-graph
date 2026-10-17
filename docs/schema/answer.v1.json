@@ -553,7 +553,8 @@
         "context",
         "refusal",
         "conflicts",
-        "scope"
+        "scope",
+        "truncated"
       ],
       "properties": {
         "start": {
@@ -620,6 +621,16 @@
             "none"
           ],
           "description": "Whose reason a Why answer is. own_thread: every Decision reached belongs to the start artifact's thread. other_thread: every one crossed into a different thread. mixed: both. none: no Decision reached, or not a Why answer."
+        },
+        "truncated": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/truncation"
+            }
+          ]
         }
       }
     },
@@ -1512,6 +1523,30 @@
         },
         "to_thread": {
           "type": "string"
+        }
+      }
+    },
+    "truncation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_paths",
+        "paths_omitted",
+        "paths_returned"
+      ],
+      "description": "Present when a path cap applied (issue #130). The paths returned are the first `max_paths` in the walk's own order (shortest first); the rest are counted here, never dropped silently.",
+      "properties": {
+        "max_paths": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "paths_omitted": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "paths_returned": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }

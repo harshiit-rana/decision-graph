@@ -83,6 +83,7 @@ SENT_FIELDS = {
     "extractor names",
     "evidence_tiers_present": "which tiers the paths carry",
     "inferred_fallback": "whether no explicit path existed",
+    "paths_omitted": "how many further paths a path cap left out (0 unless a cap applied)",
     "decision_facts": "what each Decision is credited to (pull request numbers, merge dates)",
     "artifacts": f"up to {BODY_LIMIT:,} characters of each issue, pull request or commit "
     f"body on the paths; not sent when {SEND_BODIES_ENV}=0",
@@ -150,6 +151,8 @@ Explain the result of this query clearly, thoroughly, and informatively in plain
   not contain.
 - Name the evidence tier of what you assert. "explicit" and "corroborated" are recorded
   facts; "inferred" is the system's own guess and must be labelled as one.
+- If "paths_omitted" is above zero, the paths shown are only the first of more. Say so, and do
+  not describe the answer as complete.
 - A path whose "crosses_thread" is not null leaves the artifact's own thread, usually across a
   mention. The Decision it reaches belongs to ANOTHER thread. Never present it as this
   artifact's own reason: say that the artifact mentions the other one, and that no decision of
@@ -359,6 +362,7 @@ def answer_payload(
         "paths": [contract.path_doc(p) for p in answer.paths],
         "evidence_tiers_present": sorted({p.tier for p in answer.paths}),
         "inferred_fallback": answer.used_inferred_fallback,
+        "paths_omitted": answer.paths_omitted,
         "decision_facts": facts,
     }
     if sends_bodies():

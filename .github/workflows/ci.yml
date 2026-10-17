@@ -169,3 +169,4 @@ jobs:
           # The Python measurement scripts too. CI's database is empty, so they print zeros; what
           # is checked is that they still run (#129).
           python eval/measure_cross_thread.py
+          python eval/measure_traversal.py

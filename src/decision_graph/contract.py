@@ -238,6 +238,11 @@ def result_doc(candidate, answer: Answer, facts: Facts, *, as_of=None,
         "used_inferred_fallback": answer.used_inferred_fallback,
         # Whose reason a Why answer is: own_thread, other_thread, mixed, or none (#129).
         "scope": answer.scope,
+        # Null unless a path cap applied (#130). Never a silent drop: the omitted paths are counted.
+        "truncated": None if not answer.paths_omitted else {
+            "max_paths": answer.max_paths, "paths_omitted": answer.paths_omitted,
+            "paths_returned": len(answer.paths),
+        },
         "tiers": tier_legend(p.tier for p in paths),
         "paths": [path_doc(p) for p in paths],
         "decisions": [decision_doc(nid, facts) for nid in _ordered_decisions(answer)],
