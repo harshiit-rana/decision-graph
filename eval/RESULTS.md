@@ -18,6 +18,14 @@ It is reported with its disclosures attached because a bare 100% on an 18-query 
 curated by the person who built the system is not evidence of accuracy — it is evidence
 that the system behaves as its author expected on cases its author chose.
 
+> **Where these numbers come from.** The counts below are recomputed, not typed:
+> `python -m decision_graph.evaluation score eval` reads the committed labels in
+> [`labels/builder.json`](labels/builder.json) (transcribed from the adjudication in this document;
+> no verdict was re-judged) and prints each ratio with a Wilson 95% interval and the always-refuse
+> baseline. 18 of 18 is a range, 82.4% to 100%. `H6` is flagged there as contested (its "nothing" is
+> the known #14 gap): counted wrong, the figure is 17 of 18. The scorer assigns no verdicts; a person
+> writes the labels (issue #128).
+
 ### What the denominator actually contains
 
 | outcome | queries | note |

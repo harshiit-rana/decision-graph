@@ -1,0 +1,120 @@
+{
+ "format": 1,
+ "repo": "pallets/flask",
+ "judge": "builder",
+ "judge_role": "the author of the system (not independent). Identity and per-item dates were not recorded in the original adjudication.",
+ "source": "transcribed from eval/RESULTS.md as of the 12-month-window re-run (commit a76f596); no verdict was re-judged",
+ "disclosures": [
+  "The judge also built the system and chose the query set. An independent second judge is #143.",
+  "No per-item evidence URLs were recorded in RESULTS.md, so none are given here. A label without one can be re-checked only by repeating the comparison with GitHub.",
+  "7 of the 18 verdicts are correct by construction or are controls, not independent checks (RESULTS.md counts the 2 controls inside its 7)."
+ ],
+ "labels": [
+  {
+   "item": "F1",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "explicit"
+  },
+  {
+   "item": "F2",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "corroborated+explicit"
+  },
+  {
+   "item": "H1",
+   "verdict": "correct-refusal",
+   "basis": "checked_directly",
+   "note": "Regression guard for #16/#17."
+  },
+  {
+   "item": "H2",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "corroborated+explicit"
+  },
+  {
+   "item": "H3",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "corroborated"
+  },
+  {
+   "item": "H4",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "explicit"
+  },
+  {
+   "item": "H5",
+   "verdict": "correct",
+   "basis": "control",
+   "tier": "explicit",
+   "note": "Control: reaches the same Decision as F1 by a bare identifier. Confirms consistency, not correctness."
+  },
+  {
+   "item": "H6",
+   "verdict": "correct-refusal",
+   "basis": "by_construction",
+   "note": "RESULTS.md: 'nothing' is a genuine gap (#14, a commit cannot walk back to its Decision), 'counted as correct-by-construction rather than as a passing case'. Recorded here as originally adjudicated; read as `missed` it would make the overall figure 17/18.",
+   "contested": true
+  },
+  {
+   "item": "H7",
+   "verdict": "correct-refusal",
+   "basis": "checked_directly",
+   "note": "Thread retracted by #17."
+  },
+  {
+   "item": "H8",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "corroborated+explicit"
+  },
+  {
+   "item": "H9",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "explicit"
+  },
+  {
+   "item": "H10",
+   "verdict": "correct",
+   "basis": "checked_directly",
+   "tier": "explicit"
+  },
+  {
+   "item": "N1",
+   "verdict": "correct-refusal",
+   "basis": "checked_directly"
+  },
+  {
+   "item": "N2",
+   "verdict": "correct-refusal",
+   "basis": "by_construction"
+  },
+  {
+   "item": "N3",
+   "verdict": "correct-refusal",
+   "basis": "by_construction"
+  },
+  {
+   "item": "N4",
+   "verdict": "correct-refusal",
+   "basis": "by_construction"
+  },
+  {
+   "item": "T1",
+   "verdict": "correct-refusal",
+   "basis": "by_construction"
+  },
+  {
+   "item": "T2",
+   "verdict": "correct",
+   "basis": "control",
+   "tier": "corroborated+explicit",
+   "note": "Control: re-runs F2 through the time filter. Confirms consistency, not correctness."
+  }
+ ]
+}

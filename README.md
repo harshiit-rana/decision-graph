@@ -1094,6 +1094,16 @@ only automatic assertion is `contract` — mechanical properties of the engine s
 "must return no answer for an artifact outside the window" — which are claims about the
 code rather than about flask.
 
+**Scoring is computed from labels, not typed (#128).** `python -m decision_graph.evaluation score eval`
+(no database needed) reads the human verdicts committed under `eval/labels/` and prints overall
+correctness, precision on answered queries, abstention precision and recall, and precision by
+tier, each with a Wilson 95% interval, the n behind it, and the always-refuse baseline beside the
+overall figure. On flask it reproduces 18/18 (95% CI 82.4% to 100%) against a baseline of 8/18, and
+flags `H6` as contested: counted wrong, 17/18. It refuses a label with no verdict, since it never
+assigns one, and a label that contradicts what the runner recorded the engine returning. The flask
+labels are transcribed from `eval/RESULTS.md` by the system's author, not re-judged and not
+independent (#143).
+
 **Adjudicated: 18 of 18 correct, no failures — see [`eval/RESULTS.md`](eval/RESULTS.md)
 for the figure with its disclosures.** Read them before quoting the number. 8 of the 18
 correct outcomes are the system returning nothing, so a degenerate engine that always

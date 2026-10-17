@@ -236,6 +236,12 @@ def main(argv: list[str] | None = None) -> int:
     #82). That file is the record of an adjudicated run, and a module whose only mode is
     "overwrite the record" has no safe way to be explored.
     """
+    given = sys.argv[1:] if argv is None else argv
+    if given and given[0] == "score":
+        # Scoring reads committed labels and needs no database (issue #128).
+        from decision_graph import scoring
+
+        return scoring.main(given[1:])
     args = build_parser().parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -273,7 +279,7 @@ def build_parser():
         epilog=(
             "The runner grades nothing: `verdict` is emitted null for every query and "
             "filled in by a human against the repository's real history. Adjudication "
-            "lives in eval/RESULTS.md, not in the JSON."
+            "lives in eval/labels/, and `score` computes the figures from it."
         ),
     )
     parser.add_argument(
