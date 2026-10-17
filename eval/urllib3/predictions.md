@@ -90,3 +90,46 @@ commit the result as an annotation. Don't edit this file.
 
 *(Results, and anything that turns out to have been mis-specified, go below in later
 commits. Nothing above this line is edited.)*
+
+### 2026-10-17, before ingestion: the window is 360 days, not 12 calendar months
+
+*Annotation. Nothing above is changed. Found while reading `cursors.load` for #174, with
+urllib3 still not ingested.*
+
+`cursors.load` pins the window floor at first contact as `now - 30 * backfill_months` days,
+so a 12-month backfill is **360 days**. The predictions above assumed a floor of 2025-10-17
+(365 days before 2026-10-17). The floor moves one day later for every day ingestion is
+delayed, and issues and pull requests are pulled by `updated_at`, so anything last touched
+before the floor is never ingested.
+
+`predict_inputs.py --ingest-date D` computes the inputs for the window a first run on day D
+will pin (`D - 360 days` to `D`). Committed alongside this annotation:
+`predict_inputs.2026-10-17.json`. Results for three ingestion dates:
+
+| Ingest on | Window floor | Decisions | Corroborated | Explicit (published) | Merged PRs |
+|---|---|---|---|---|---|
+| on or before **2026-10-23** | 2025-10-22 to 2025-10-28 | **28** | 27 | 14 | 154 |
+| 2026-10-25 | 2025-10-30 | **27** | 26 | 13 | 148 |
+| 2026-11-15 | 2025-11-20 | 27 | 26 | 13 | 148 |
+
+**One thread drives the difference.** PR #3697 (merged 2025-10-28) and the issue it closes,
+#3693 (last updated 2025-10-28), fall out of the window once the floor passes 2025-10-28.
+That removes one Decision, one corroborated thread and one explicit thread, and it changes
+two registered queries:
+
+- **R6** (`#3693`): the registered prediction (an answer crediting #3697) holds only for an
+  ingestion on or before 2026-10-23. For a later one, #3693 is not ingested, so R6 is
+  predicted to return **no candidates**, which is a recall effect of the window, not a
+  wrong answer. R6 is then no longer a test of the sidebar-link finding.
+- **I2** (`#3693`, impact): the same, for the same reason.
+
+The other 27 registered queries and the predicted `owns` count (20) don't depend on the
+floor. The random draw is unaffected: it was made from PRs merged 2025-11-01 or later, and
+the earliest drawn PR (#3721) was merged 2025-11-21, so it stays in the window for any
+ingestion up to about 2026-11-16. (`select_queries.py` says "any ingestion made by
+2026-11-01", which with a 360-day window is true only for merges from 2025-11-06 onward.
+The drawn PRs are all later.)
+
+**Rule for the ingestion run (#132):** record the actual date, run
+`predict_inputs.py --ingest-date <that date>` and commit its output *before* adjudicating,
+so the prediction being tested is the one for the window that was actually ingested.

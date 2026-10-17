@@ -5,7 +5,14 @@ been ingested. It applies the same pure functions the extractors use (`refs.clos
 `refs.mentioned_refs`, `refs.parse_codeowners`) to public text, then applies the rubric's
 rules as a set computation, to say what ingestion should produce.
 
-    python eval/urllib3/predict_inputs.py        # writes predict_inputs.json
+    python eval/urllib3/predict_inputs.py                      # writes predict_inputs.json
+    python eval/urllib3/predict_inputs.py --ingest-date 2026-10-25
+        # the window TraceMind will actually pin, written to predict_inputs.<date>.json
+
+The window is NOT 12 calendar months. `cursors.load` pins the floor at first contact as
+`now - 30 * backfill_months` days, so 12 months is 360 days. `--ingest-date D` sets the
+window to [D - 360 days, D], which is what a run on day D will see. The committed default
+(2025-10-17 to 2026-10-17) used 365 days: see the 2026-10-17 annotation in predictions.md.
 
 What it can and cannot see, stated up front because predictions are only as good as this:
 
@@ -41,6 +48,17 @@ from decision_graph import refs  # noqa: E402
 
 REPO = "urllib3/urllib3"
 WINDOW_FROM, WINDOW_TO = "2025-10-17", "2026-10-17"
+OUT_NAME = "predict_inputs.json"
+
+
+def set_ingest_date(date: str) -> None:
+    """Re-aim the window at the one `cursors.load` would pin for a first run on `date`."""
+    import datetime as dt
+
+    global WINDOW_FROM, WINDOW_TO, OUT_NAME
+    d = dt.date.fromisoformat(date)
+    WINDOW_FROM, WINDOW_TO = (d - dt.timedelta(days=360)).isoformat(), d.isoformat()
+    OUT_NAME = f"predict_inputs.{date}.json"
 
 PR_QUERY = """
 query($q: String!, $after: String) {
@@ -223,7 +241,7 @@ def main() -> int:
         "codeowners": owners,
         "decisions": decisions,
     }
-    (HERE / "predict_inputs.json").write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
+    (HERE / OUT_NAME).write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
     print({k: v for k, v in out.items() if k not in ("decisions", "release_citations", "codeowners",
                                                      "closing_refs_skipped_as_not_ingested_issue")})
     print("codeowners owns edges:", (owners or {}).get("owns_edges"))
@@ -232,4 +250,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--ingest-date"]:
+        set_ingest_date(sys.argv[2])
     raise SystemExit(main())

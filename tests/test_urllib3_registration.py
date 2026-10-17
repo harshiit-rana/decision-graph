@@ -16,6 +16,7 @@ is earlier than any ingestion. That is the git history, recorded in the issue.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import re
@@ -36,6 +37,42 @@ QUERIES = json.loads((DIR / "query_set.json").read_text(encoding="utf-8"))["quer
 DRAW = json.loads((DIR / "draw.json").read_text(encoding="utf-8"))
 INPUTS = json.loads((DIR / "predict_inputs.json").read_text(encoding="utf-8"))
 PREDICTIONS = (DIR / "predictions.md").read_text(encoding="utf-8")
+
+
+# The registered content, pinned. These hashes are of the files as committed in 6d09dd3, with
+# line endings normalised. Editing the predictions above `## Annotations`, the query set, or
+# the draw changes a hash, so the edit has to appear as a change to THIS file, in the diff,
+# where a reviewer can see that a pre-registered prediction was altered. Annotations go below
+# the marker and don't affect the first hash.
+REGISTERED = {
+    "predictions.md (above ## Annotations)":
+        "77b2645d1be59c4fe2e7ecc6ff7bf72709778ebc01295a8e820bd80d391ec570",
+    "query_set.json": "c18e4059e23c7ed178e89f9d260e589ef03b1463456fd897292204fd90035924",
+    "draw.json": "bb89b64f3a9468898dbbb31470745988d49cb20feecfb83614e630882a4978d8",
+}
+
+
+def _digest(text: str) -> str:
+    return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
+class RegistrationIsImmutableTest(unittest.TestCase):
+    def test_the_registered_predictions_are_unchanged(self) -> None:
+        text = (DIR / "predictions.md").read_text(encoding="utf-8").replace("\r\n", "\n")
+        self.assertEqual(_digest(text[:text.index("## Annotations")]),
+                         REGISTERED["predictions.md (above ## Annotations)"],
+                         "a registered prediction was edited; annotate it below the marker instead")
+
+    def test_the_query_set_and_draw_are_unchanged(self) -> None:
+        for name in ("query_set.json", "draw.json"):
+            with self.subTest(file=name):
+                self.assertEqual(_digest((DIR / name).read_text(encoding="utf-8")), REGISTERED[name],
+                                 f"{name} was edited after registration")
+
+    def test_annotations_exist_only_below_the_marker(self) -> None:
+        text = PREDICTIONS.replace("\r\n", "\n")
+        self.assertEqual(text.count("## Annotations"), 1)
+        self.assertGreater(len(text.split("## Annotations")[1]), 100)
 
 
 class RandomArmTest(unittest.TestCase):
