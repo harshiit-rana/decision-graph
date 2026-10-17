@@ -212,7 +212,8 @@ def node_urls(conn, node_ids: Iterable[int]) -> dict[int, str]:
 
 
 def result_doc(candidate, answer: Answer, facts: Facts, *, as_of=None,
-               closure=None, url: str | None = None) -> dict[str, Any]:
+               closure=None, url: str | None = None,
+               conflicts: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """One answered (or refused) start node."""
     start = node_doc(candidate.node_id, candidate.node_type, candidate.external_id,
                      candidate.title, url or _url_of(answer, candidate.node_id))
@@ -226,6 +227,8 @@ def result_doc(candidate, answer: Answer, facts: Facts, *, as_of=None,
         "tiers": tier_legend(p.tier for p in paths),
         "paths": [path_doc(p) for p in paths],
         "decisions": [decision_doc(nid, facts) for nid in _ordered_decisions(answer)],
+        # Conflicting evidence, listed and never resolved (#175). No field names a winner.
+        "conflicts": conflicts or [],
         "context": _context_doc(answer, facts) if found else None,
         "refusal": None if found else refusal_doc(answer, as_of=as_of, closure=closure),
     }

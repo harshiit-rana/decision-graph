@@ -92,6 +92,7 @@
           ]
         }
       ],
+      "conflicts": [],
       "context": {
         "node_id": 620,
         "ref": "issue #5895",

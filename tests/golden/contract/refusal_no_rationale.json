@@ -28,6 +28,7 @@
       "tiers": {},
       "paths": [],
       "decisions": [],
+      "conflicts": [],
       "context": null,
       "refusal": {
         "kind": "no_rationale_recorded",

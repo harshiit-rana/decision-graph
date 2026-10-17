@@ -35,6 +35,7 @@
     "tiers": {},
     "paths": [],
     "decisions": [],
+    "conflicts": [],
     "context": null,
     "refusal": {
       "kind": "closed_not_planned",
@@ -71,6 +72,7 @@
     "tiers": {},
     "paths": [],
     "decisions": [],
+    "conflicts": [],
     "context": null,
     "refusal": {
       "kind": "nothing_downstream",

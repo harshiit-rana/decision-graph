@@ -193,13 +193,54 @@ def finished(doc, assoc, quotes="all", request=None):
     return contract.attach_provenance(doc, request or {"command": "fixture"}, FIXTURE_ENGINE, [])
 
 
-def doc_for(c, answer, facts=None, *, as_of=None, clo=None, others=(), quotes="all") -> dict:
-    result = contract.result_doc(c, answer, facts or contract.Facts(), as_of=as_of, closure=clo)
+def doc_for(c, answer, facts=None, *, as_of=None, clo=None, others=(), quotes="all",
+            conflicts=None) -> dict:
+    result = contract.result_doc(c, answer, facts or contract.Facts(), as_of=as_of, closure=clo,
+                                 conflicts=conflicts)
     doc = contract.answer_document(
         query="#5895", mode=answer.mode.value, as_of=as_of, max_depth=3,
         results=[result], other_candidates=list(others),
     )
     return finished(doc, ASSOC, quotes)
+
+
+def canned_conflicts() -> list[dict]:
+    """One conflict of each type, built with the module's own constructors, from fixed data."""
+    from decision_graph import conflicts as c
+
+    def node(i, t, ext, title):
+        return contract.node_doc(i, t, ext, title, f"https://github.com/pallets/flask/{ext}")
+
+    def edge(i, kind, t, observed):
+        return {"edge_id": i, "edge_type": kind, "evidence_tier": t, "extractor": "synthesis_closes_cluster",
+                "source_ref": "thread:30:pr-5867", "observed_at": observed}
+
+    early, late = datetime(2026, 1, 20, tzinfo=timezone.utc), datetime(2026, 1, 25, tzinfo=timezone.utc)
+    decision = node(DECISION, "decision", "thread:30:pr-5867", "change default redirect code to 303")
+    pr_a, pr_b = node(PR, "pull_request", "5898", "use 303"), node(7, "pull_request", "5867", "first try")
+    issue = node(ISSUE, "issue", "5895", "change default redirect code to 303")
+    return [
+        c._conflict("multiple_implementers", decision, [
+            c._side("credited implementer", pr_b, edge(12, "implemented_by", "explicit", early),
+                    {"merged": True, "merged_at": early}),
+            c._side("credited implementer", pr_a, edge(11, "implemented_by", "corroborated", late),
+                    {"merged": True, "merged_at": late})]),
+        c._conflict("multiple_closing_prs", issue, [
+            c._side("states it closes this issue", pr_a, edge(13, "closes", "explicit", late),
+                    {"merged": True, "merged_at": late}),
+            c._side("states it closes this issue", pr_b, edge(14, "closes", "explicit", early),
+                    {"merged": True, "merged_at": early})]),
+        c._conflict("superseded", decision, [
+            c._side("this supersedes the other", decision, edge(15, "supersedes", "explicit", late), {}),
+            c._side("the other side of the link", node(9, "decision", "thread:30:pr-4000", "older decision"), None, {})]),
+        c._conflict("reopened", issue, [
+            c._side("recorded by GitHub as reopened", issue, None,
+                    {"state": "open", "state_reason": "reopened", "closed_at": early}),
+            c._side("Decision reached on this trail", decision, None, {})]),
+        c._conflict("implementer_not_merged", decision, [
+            c._side("credited implementer, not merged", pr_b, edge(12, "implemented_by", "explicit", early),
+                    {"merged": False, "merged_at": None})]),
+    ]
 
 
 def _no_match_coverage() -> dict:
@@ -214,6 +255,8 @@ def _no_match_coverage() -> dict:
 CASES = {
     "answer_explicit": lambda: doc_for(candidate(), explicit_answer(), explicit_facts(),
                                        others=[candidate(PR, "fuzzy")]),
+    "answer_conflicts": lambda: doc_for(candidate(), explicit_answer(), explicit_facts(),
+                                        conflicts=canned_conflicts()),
     "answer_inferred_fallback": lambda: doc_for(candidate(PR), inferred_answer()),
     "refusal_not_planned": lambda: doc_for(candidate(), refused(), clo=closure("not_planned")),
     "refusal_duplicate": lambda: doc_for(candidate(), refused(), clo=closure("duplicate", False)),
@@ -251,6 +294,8 @@ V1_FIELDS = frozenset({
     "coverage", "repository", "checks", "subject", "reason", "resources", "phase", "window_floor",
     "through", "ingested_through", "last_ingested_at", "last_run_status", "last_run_note",
     "resource", "lowest_number_in_window", "name",
+    # Added within v1 by #175: conflicting evidence, listed and never resolved.
+    "conflicts", "sides", "label", "edge", "facts", "node",
 })
 
 

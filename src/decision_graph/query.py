@@ -19,7 +19,7 @@ import os
 import sys
 from datetime import datetime
 
-from . import attempts, contract, db, diagram, reasoning, render, retrieval, trace
+from . import attempts, conflicts, contract, db, diagram, reasoning, render, retrieval, trace
 from .reasoning import Answer, Mode
 
 # Not a reasoning.Mode: it walks no edges. It is a filtered retrieval over closure facts.
@@ -53,11 +53,12 @@ def render_answer(
     closure=None,
     verbose: bool = False,
     out=None,
+    conflicts=None,
 ) -> None:
     render.render(
         answer, annotations=annotations, statuses=statuses, links=links,
         bodies=bodies, reviewers=reviewers, as_of=as_of, closure=closure,
-        verbose=verbose, out=out,
+        verbose=verbose, out=out, conflicts=conflicts,
     )
 
 
@@ -116,7 +117,8 @@ def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth
         # for the node the walk started from.
         closure = None if answer.found else trace.closure_fact(conn, c.node_id)
         results.append(contract.result_doc(
-            c, answer, facts, as_of=as_of, closure=closure, url=urls.get(c.node_id)
+            c, answer, facts, as_of=as_of, closure=closure, url=urls.get(c.node_id),
+            conflicts=conflicts.detect(conn, answer),
         ))
     doc = contract.answer_document(
         query=query, mode=mode, as_of=as_of, max_depth=max_depth, results=results,
@@ -344,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
         render_answer(
             answer, annotations=annotations, statuses=statuses, links=links,
             bodies=bodies, reviewers=reviewers, as_of=as_of, closure=closure,
-            verbose=args.verbose,
+            verbose=args.verbose, conflicts=conflicts.detect(conn, answer),
         )
         if not answer.found:
             # A refusal can be misread as "nothing happened" when the evidence was outside what

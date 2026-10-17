@@ -76,3 +76,17 @@ the adapter connects with a read-only database role; every repository-authored s
 a field marked untrusted; the initial tool set is limited to what the engine answers today.
 The agent study (#140–#142) remains the evidence that decides whether the MCP surface is
 kept — this decision commits to building it, not to keeping it regardless of the result.
+
+## Addendum, 2026-10-17: a contract guarantee (#175)
+
+This doesn't change the decision above. It records a guarantee the JSON contract now makes,
+so a consumer of the MCP adapter can rely on it.
+
+**TraceMind returns conflicting evidence and never resolves it.** Each result has a
+`conflicts` list. When the graph holds evidence pointing two ways, every side is listed with
+its tier, extractor, source and timestamp, and no field names a preferred side. Sides are
+ordered chronologically, which is not a ranking. An empty list is a statement that the graph
+holds no conflict for that answer. Competing agent-memory products resolve contradictions
+silently (recency, deletion or last-write-wins), so an agent acts on a winner it never knew
+was contested. `tests/test_conflicts.py` asserts that no key in any conflict, in the data or
+in `docs/schema/answer.v1.json`, names a winner.

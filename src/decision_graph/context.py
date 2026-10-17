@@ -28,7 +28,7 @@ import os
 import sys
 from typing import Any
 
-from . import attempts, contract, reasoning, retrieval, trace
+from . import attempts, conflicts, contract, reasoning, retrieval, trace
 from .reasoning import Mode
 
 ATTEMPT_LIMIT = 5
@@ -156,7 +156,8 @@ def build(conn, query: str, *, repo_node_id: int | None = None,
         answer = reasoning.reason(conn, c.node_id, mode, max_depth=max_depth)
         facts = contract.read_facts(conn, answer)
         closure = None if answer.found else trace.closure_fact(conn, c.node_id)
-        return contract.result_doc(c, answer, facts, closure=closure, url=url)
+        return contract.result_doc(c, answer, facts, closure=closure, url=url,
+                                   conflicts=conflicts.detect(conn, answer))
 
     found = [
         a for a in attempts.find_attempts(conn, c.title or query, repo_node_id=repo_node_id,

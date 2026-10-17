@@ -306,6 +306,7 @@ def render(
     closure=None,
     verbose: bool = False,
     out=None,
+    conflicts=None,
 ) -> None:
     out = out or sys.stdout
     annotations = annotations or {}
@@ -355,6 +356,9 @@ def render(
         p(f"  evidence: {_tier_colour(tier, bold(tier))}{dim(strength_label)} — {dim(trace.TIER_MEANING[tier])}")
     p()
 
+    if conflicts:
+        _render_conflicts(conflicts, p)
+
     p(bold(f"  Evidence trail  ({plural(len(answer.paths), 'path')})"))
     p(dim("    Each path is an independent chain of links. More paths = more kinds of evidence;"))
     p(dim("    a corroborated answer has at least 3 independent kinds all pointing the same way."))
@@ -372,6 +376,22 @@ def render(
         p(bold("  Check it on GitHub"))
         for text, url in urls:
             p(f"    {text:<24} {dim(url)}")
+        p()
+
+
+def _render_conflicts(conflicts: list, p) -> None:
+    """Evidence that points two ways, shown before the trail and never resolved (#175).
+
+    The sides are listed in the order they were recorded, which says nothing about which is
+    right. No line here names a winner, and the heading says so.
+    """
+    from . import conflicts as conflict_module
+
+    p(_c("33", bold("  ! Conflicting evidence — shown, not resolved")))
+    for c in conflicts:
+        p(f"    {c['detail']}")
+        for side in c["sides"]:
+            p(f"      - {conflict_module.line_for(side)}")
         p()
 
 

@@ -99,6 +99,7 @@
         ]
       }
     ],
+    "conflicts": [],
     "context": {
       "node_id": 620,
       "ref": "issue #5895",
@@ -125,6 +126,7 @@
     "tiers": {},
     "paths": [],
     "decisions": [],
+    "conflicts": [],
     "context": null,
     "refusal": {
       "kind": "nothing_downstream",

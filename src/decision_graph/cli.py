@@ -1024,7 +1024,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     reads identically whether it rests on four corroborated edges or one inferred guess
     (issue #65). The trace is the answer; the paragraph is a reading of it.
     """
-    from . import explain, db, query, render, retrieval, reasoning, trace
+    from . import conflicts, explain, db, query, render, retrieval, reasoning, trace
 
     if not (args.question or "").strip():
         # Rejected here rather than at the provider: an empty question spends a real API
@@ -1062,6 +1062,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     # The same lookup `dg query` does, for the same reason and before the same close: one
     # renderer means nothing if the two callers feed it different facts.
     closure = None if answer.found else trace.closure_fact(conn, c.node_id)
+    evidence_conflicts = conflicts.detect(conn, answer)
     conn.close()
 
     # The evidence, in the same form `dg query` prints it -- one renderer, so the prose and
@@ -1070,7 +1071,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
     # redirection, including the one the test for this uses.
     query.render_answer(
         answer, annotations=annotations, statuses=statuses, links=links, bodies=bodies,
-        reviewers=reviewers, closure=closure, out=sys.stdout,
+        reviewers=reviewers, closure=closure, out=sys.stdout, conflicts=evidence_conflicts,
     )
 
     try:

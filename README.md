@@ -372,6 +372,27 @@ the fields named by `repository_text_fields` (`title`, `excerpt`, `body`), and n
 a sentence this system wrote. A consumer handing the document to a model can fence exactly
 those fields.
 
+**Conflicting evidence is returned, never resolved (#175).** When the graph holds evidence
+pointing two ways, each result carries a `conflicts` list: both (or all) sides, with their
+tiers, extractors, sources and timestamps, and **no field names a winner**. This is a
+contract guarantee. Memory and context products resolve contradictions silently (by recency,
+by deletion, last-write-wins), and an agent then acts on the winner without knowing there
+was a conflict. The types, detected mechanically from rows already in the graph:
+
+| type | when |
+|---|---|
+| `multiple_implementers` | more than one current `implemented_by` edge on one Decision |
+| `multiple_closing_prs` | more than one merged PR states it closes one issue |
+| `superseded` | a current `supersedes` / `superseded_by` link touches a node on the trail |
+| `reopened` | GitHub records an issue on the trail as reopened, while the trail reaches a Decision that treats it as resolved |
+| `implementer_not_merged` | the PR credited with a Decision isn't merged (the rubric forbids it, so this is a canary) |
+
+Sides are listed in the order they were recorded, which says nothing about which is right. A
+conflict is never *concluded*: "this was later reverted" isn't asserted, only that a second
+source disagrees with the first. A revert type arrives with #156. An empty list means the
+graph holds no conflict for that answer. The text output shows a "Conflicting evidence"
+block before the trail, and `dg ask` shows it too.
+
 **And it says what the window could have contained (#174).** A refusal can be misread as
 "nothing happened" when the evidence was simply outside what was ingested. Every document
 carries `coverage`: the repository's pinned window (`window_floor`, `ingested_through`,

@@ -74,6 +74,7 @@
         }
       ],
       "decisions": [],
+      "conflicts": [],
       "context": null,
       "refusal": null
     }

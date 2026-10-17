@@ -28,6 +28,7 @@
       "tiers": {},
       "paths": [],
       "decisions": [],
+      "conflicts": [],
       "context": null,
       "refusal": {
         "kind": "nothing_downstream",
