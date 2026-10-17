@@ -59,7 +59,7 @@ LEFT JOIN pull_request pr ON pr.node_id = src.id
 LEFT JOIN issue iss       ON iss.node_id = dst.id
 WHERE e.edge_type = 'closes'
   AND e.tag       = 'explicit'
-  AND e.valid_to IS NULL
+  AND e.valid_to IS NULL AND e.retracted_at IS NULL
   AND dst.node_type = 'issue'
   AND src.repo_node_id = %(repo)s
   AND src.thread_key IS NOT NULL
@@ -161,7 +161,7 @@ JOIN node dn  ON dn.thread_key = art.thread_key AND dn.node_type = 'decision'
 JOIN decision d ON d.node_id = dn.id
 WHERE e.edge_type = 'deployed_by'
   AND e.tag       = 'explicit'
-  AND e.valid_to IS NULL
+  AND e.valid_to IS NULL AND e.retracted_at IS NULL
   AND rel.node_type = 'release'
   AND art.repo_node_id = %(repo)s
   AND art.thread_key IS NOT NULL
@@ -298,6 +298,7 @@ def _promote(conn: psycopg.Connection, repo_node_id: int, row: dict) -> bool:
         WHERE src_node_id = %(decision)s
           AND edge_type IN ('motivated_by', 'implemented_by')
           AND valid_to IS NULL
+          AND retracted_at IS NULL
           AND valid_from < now()
           AND dst_node_id NOT IN (%(motivator)s, %(implementer)s)
         """,

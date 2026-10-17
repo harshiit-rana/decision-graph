@@ -131,7 +131,7 @@ def detect(conn, answer: Answer) -> list[dict[str, Any]]:
                    p.merged_at
               FROM edge e JOIN node n ON n.id = e.dst_node_id
               LEFT JOIN pull_request p ON p.node_id = n.id
-             WHERE e.src_node_id = ANY(%s) AND e.edge_type = 'implemented_by' AND e.valid_to IS NULL
+             WHERE e.src_node_id = ANY(%s) AND e.edge_type = 'implemented_by' AND e.valid_to IS NULL AND e.retracted_at IS NULL
             """, (decisions,)).fetchall():
             impl.setdefault(r["decision_id"], []).append(r)
     for decision_id, rows in impl.items():
@@ -155,7 +155,7 @@ def detect(conn, answer: Answer) -> list[dict[str, Any]]:
                    p.merged_at
               FROM edge e JOIN node n ON n.id = e.src_node_id
               JOIN pull_request p ON p.node_id = n.id
-             WHERE e.dst_node_id = ANY(%s) AND e.edge_type = 'closes' AND e.valid_to IS NULL
+             WHERE e.dst_node_id = ANY(%s) AND e.edge_type = 'closes' AND e.valid_to IS NULL AND e.retracted_at IS NULL
                AND p.merged_at IS NOT NULL
             """, (issues,)).fetchall():
             closers.setdefault(r["issue_id"], []).append(r)
@@ -183,7 +183,7 @@ def detect(conn, answer: Answer) -> list[dict[str, Any]]:
         SELECT e.id AS edge_id, e.edge_type::text AS edge_type, e.evidence_tier::text AS evidence_tier,
                e.extractor, e.source_ref, e.observed_at, e.src_node_id, e.dst_node_id
           FROM edge e
-         WHERE e.edge_type IN ('supersedes', 'superseded_by') AND e.valid_to IS NULL
+         WHERE e.edge_type IN ('supersedes', 'superseded_by') AND e.valid_to IS NULL AND e.retracted_at IS NULL
            AND (e.src_node_id = ANY(%(ids)s) OR e.dst_node_id = ANY(%(ids)s))
         """, {"ids": node_ids}).fetchall():
         pair = [r["src_node_id"], r["dst_node_id"]]

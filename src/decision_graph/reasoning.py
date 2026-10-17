@@ -160,6 +160,27 @@ class Answer:
         return bool(self.paths)
 
 
+# Which edges a walk may cross, as ADR 0009 defines it. An edge has two different ends:
+# `valid_to` (the repository stopped saying it, event time) and `retracted_at` (TraceMind
+# stopped believing it, system time).
+#
+# CURRENT and --as-of T: what the repository said at T, as TraceMind now understands it.
+# A retracted edge is hidden at EVERY T, because we now believe the repository never said it.
+_CURRENT_CLAUSE = """e.valid_from <= COALESCE(%(as_of)s::timestamptz, now())
+          AND (e.valid_to IS NULL OR e.valid_to > COALESCE(%(as_of)s::timestamptz, now()))
+          AND e.retracted_at IS NULL"""
+
+# --as-recorded R [--as-of T]: what TraceMind's graph held at moment R. T defaults to R. An
+# edge retracted AFTER R is visible (we believed it then). An edge whose validity end we only
+# LEARNED after R is still valid as far as R is concerned: we had not seen the edit yet.
+_RECORDED_CLAUSE = """e.created_at <= %(recorded)s::timestamptz
+          AND (e.retracted_at IS NULL OR e.retracted_at > %(recorded)s::timestamptz)
+          AND e.valid_from <= COALESCE(%(as_of)s::timestamptz, %(recorded)s::timestamptz)
+          AND (e.valid_to IS NULL
+               OR e.valid_to > COALESCE(%(as_of)s::timestamptz, %(recorded)s::timestamptz)
+               OR e.valid_to_recorded_at > %(recorded)s::timestamptz)"""
+
+
 # Recursive walk. Both orientations are followed in one CTE so a single implementation
 # serves "what led to this" and "what does this affect"; the mode's edge set is what
 # gives the walk its direction of meaning.
@@ -189,16 +210,14 @@ WITH RECURSIVE walk AS (
         FROM edge e
         WHERE e.src_node_id = w.node_id
           AND e.edge_type = ANY(%(types)s::edge_type[])
-          AND e.valid_from <= COALESCE(%(as_of)s::timestamptz, now())
-          AND (e.valid_to IS NULL OR e.valid_to > COALESCE(%(as_of)s::timestamptz, now()))
+          AND {time_clause}
           {tag_clause}
         UNION ALL
         SELECT e.id, e.src_node_id
         FROM edge e
         WHERE e.dst_node_id = w.node_id
           AND e.edge_type = ANY(%(types)s::edge_type[])
-          AND e.valid_from <= COALESCE(%(as_of)s::timestamptz, now())
-          AND (e.valid_to IS NULL OR e.valid_to > COALESCE(%(as_of)s::timestamptz, now()))
+          AND {time_clause}
           {tag_clause}
     ) nxt
     WHERE w.depth < %(max_depth)s
@@ -219,12 +238,16 @@ def _walk(
     allow_inferred: bool,
     max_depth: int,
     as_of: datetime | None,
+    as_recorded: datetime | None = None,
 ) -> list[Path]:
     """One pass of the traversal. `allow_inferred` is the ONLY difference between passes."""
     # Explicit-only is expressed as tag = 'explicit'. Per the 0001 invariant that is
     # exactly {explicit, corroborated} by tier, which is what §5.3 step 1 asks for.
     tag_clause = "" if allow_inferred else "AND e.tag = 'explicit'"
-    sql = _WALK_SQL.format(tag_clause=tag_clause)
+    sql = _WALK_SQL.format(
+        tag_clause=tag_clause,
+        time_clause=_CURRENT_CLAUSE if as_recorded is None else _RECORDED_CLAUSE,
+    )
 
     rows = conn.execute(
         sql,
@@ -233,6 +256,7 @@ def _walk(
             "types": list(edge_types),
             "max_depth": max_depth,
             "as_of": as_of,
+            "recorded": as_recorded,
         },
     ).fetchall()
 
@@ -309,6 +333,7 @@ def reason(
     *,
     max_depth: int = DEFAULT_MAX_DEPTH,
     as_of: datetime | None = None,
+    as_recorded: datetime | None = None,
 ) -> Answer:
     """Answer a Why or Impact query, honouring the §5.3 explicit-first fallback order."""
     row = conn.execute(
@@ -326,6 +351,7 @@ def reason(
         allow_inferred=False,
         max_depth=max_depth,
         as_of=as_of,
+        as_recorded=as_recorded,
     )
     answers = [p for p in explicit_paths if _is_answer(mode, start_type, p)]
 
@@ -351,6 +377,7 @@ def reason(
         allow_inferred=True,
         max_depth=max_depth,
         as_of=as_of,
+        as_recorded=as_recorded,
     )
     fallback_answers = [p for p in fallback_paths if _is_answer(mode, start_type, p)]
 

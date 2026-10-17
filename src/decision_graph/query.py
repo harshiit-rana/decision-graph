@@ -104,14 +104,16 @@ def _wants_json(argv: list[str]) -> bool:
 
 
 def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth: int,
-                    answer_all: bool = False, quotes: str = "all") -> dict:
+                    answer_all: bool = False, quotes: str = "all",
+                    as_recorded=None) -> dict:
     """The JSON contract for one query (issue #135). Takes a connection so it can be tested
     inside a rolled-back fixture transaction, and so the MCP server (#139) can call it."""
     chosen = candidates if answer_all else candidates[:1]
     urls = contract.node_urls(conn, (c.node_id for c in candidates))
     results = []
     for c in chosen:
-        answer = reasoning.reason(conn, c.node_id, Mode(mode), max_depth=max_depth, as_of=as_of)
+        answer = reasoning.reason(conn, c.node_id, Mode(mode), max_depth=max_depth, as_of=as_of,
+                                  as_recorded=as_recorded)
         facts = contract.read_facts(conn, answer)
         # The same rule as the text path: a closure explains only a refusal, and only
         # for the node the walk started from.
@@ -127,12 +129,14 @@ def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth
     return contract.finish_from_db(conn, doc, quotes, request={
         "command": "query", "query": query, "mode": mode, "as_of": as_of,
         "max_depth": max_depth, "all": answer_all, "quotes": quotes,
+        "as_recorded": as_recorded,
     })
 
 
-def _print_json(conn, args, candidates, as_of) -> int:
+def _print_json(conn, args, candidates, as_of, as_recorded=None) -> int:
     doc = answer_document(
         conn, query=args.query, mode=args.mode, candidates=candidates, as_of=as_of,
+        as_recorded=as_recorded,
         max_depth=args.depth, answer_all=args.all, quotes=args.quotes,
     )
     print(contract.dumps(doc))
@@ -152,7 +156,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--depth", type=int, default=reasoning.DEFAULT_MAX_DEPTH)
     parser.add_argument(
         "--as-of",
-        help="ISO timestamp for a point-in-time query; uses edge valid_from/valid_to",
+        help="ISO timestamp for a point-in-time query: what the repository said then, as "
+        "TraceMind now understands it. Uses valid_from/valid_to and hides retracted edges at "
+        "every time (ADR 0009)",
+    )
+    parser.add_argument(
+        "--as-recorded",
+        help="ISO timestamp: what TraceMind's graph HELD at that moment, including an edge "
+        "retracted since and an edit it had not yet seen (ADR 0009). With --as-of, asks what "
+        "the repository said at that time as recorded then; alone, it uses the same instant",
     )
     parser.add_argument(
         "--limit", type=int, default=None,
@@ -218,6 +230,14 @@ def main(argv: list[str] | None = None) -> int:
         # out of the standard library (issue #82).
         return fail(
             f"--as-of {args.as_of!r} is not a timestamp. Use YYYY-MM-DD, or a full "
+            "ISO instant like 2026-03-01T00:00:00Z."
+        )
+
+    try:
+        as_recorded = datetime.fromisoformat(args.as_recorded) if args.as_recorded else None
+    except ValueError:
+        return fail(
+            f"--as-recorded {args.as_recorded!r} is not a timestamp. Use YYYY-MM-DD, or a full "
             "ISO instant like 2026-03-01T00:00:00Z."
         )
 
@@ -293,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if as_json:
-        code = _print_json(conn, args, candidates, as_of)
+        code = _print_json(conn, args, candidates, as_of, as_recorded)
         conn.close()
         return code
 
@@ -315,7 +335,8 @@ def main(argv: list[str] | None = None) -> int:
             print()
 
         answer = reasoning.reason(
-            conn, c.node_id, Mode(args.mode), max_depth=args.depth, as_of=as_of
+            conn, c.node_id, Mode(args.mode), max_depth=args.depth, as_of=as_of,
+            as_recorded=as_recorded,
         )
         if graphical:
             # Raw, so it pipes into a .mmd or .dot file. A refusal produces nothing at all

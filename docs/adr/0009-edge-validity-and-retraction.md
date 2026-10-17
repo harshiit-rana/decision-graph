@@ -108,6 +108,38 @@ A second example: an edited-out reference, `valid_from` 2026-01-01, `valid_to`
    retracted edge with its reason and times. Answers say how many edges touching their
    nodes were retracted, and point to `--as-recorded`.
 
+## Implementation notes, 2026-10-17
+
+The decision above is unchanged. These record what building it found.
+
+- **Migration 0016** adds `retracted_at`, `retraction_reason` and `valid_to_recorded_at`; the
+  guard trigger; the four partial indexes with the new predicate; `retract_edge()`;
+  `v_edge_retraction_audit`; and `decision_withdrawal`. Every definition that decides what a
+  "current edge" is (the inferred-edge gate, `decision_rubric`, both corroboration views,
+  `apply_corroboration`) is redefined from its latest source with only the predicate added.
+  There were fewer than the 18 occurrences the facts above counted, because migrations 0002,
+  0006, 0008 and 0010 redefine each other. The effective definitions are 2 views, 3
+  functions and 4 indexes, and a test checks the definitions Postgres actually holds.
+- **Rejected: a filtered view named `edge`.** It would have made "current belief" the default
+  for every future query. `upsert_explicit_edge` detects insert-versus-update with
+  `(xmax = 0)`, and a view has no `xmax`. Explicit predicates it is, enforced by a test that
+  scans `src/`, `eval/` and the live database definitions.
+- **"No deletes" has one exception the facts didn't foresee.** Withdrawing a Decision deletes
+  its node, and the edges go with it by `ON DELETE CASCADE`. The guard permits the cascade
+  (an endpoint is already gone) and refuses a direct `DELETE FROM edge`. `decision_withdrawal`
+  keeps the record. A later change could mark Decisions withdrawn instead of deleting them.
+- **A Decision outlived the evidence for it.** `decision_rubric` doesn't read `closes`, so
+  ending or retracting the closing edge never failed the rubric, and the Decision stood.
+  `retract_unsupported_decisions()` now also withdraws a Decision whose thread holds no
+  current closing edge. This was needed for #121's own acceptance criterion.
+- **`apply_corroboration` updated retracted rows.** Its demotion step would have tried to
+  change a frozen edge. It now skips retracted rows, which keep the tier they held.
+- **`--as-recorded`** exists in `reasoning.reason` and `dg query`.
+- **What was not done:** thread membership is not recomputed, and the flask graph has not been
+  migrated or measured. The migration is applied by `dg init`, which snapshots a populated
+  database first (#122). It has been tested on a database upgraded from schema 0015 with
+  populated data, and on an empty one.
+
 ## Consequences
 
 - Every query helper filters both columns. A test enumerates the "current edge" predicates

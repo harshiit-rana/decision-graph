@@ -188,7 +188,7 @@ def upsert_explicit_edge(
         VALUES (%(src)s, %(dst)s, %(edge_type)s, %(tag)s, %(tier)s,
                 %(extractor)s, %(source_ref)s, %(observed_at)s,
                 COALESCE(%(observed_at)s, now()))
-        ON CONFLICT (src_node_id, dst_node_id, edge_type) WHERE valid_to IS NULL
+        ON CONFLICT (src_node_id, dst_node_id, edge_type) WHERE valid_to IS NULL AND retracted_at IS NULL
         DO UPDATE SET
             extractor   = EXCLUDED.extractor,
             source_ref  = COALESCE(EXCLUDED.source_ref, edge.source_ref),

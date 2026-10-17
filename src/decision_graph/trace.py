@@ -84,7 +84,7 @@ SELECT d.node_id,
 FROM decision d
 LEFT JOIN edge e  ON e.src_node_id = d.node_id
                  AND e.edge_type   = 'implemented_by'
-                 AND e.valid_to IS NULL
+                 AND e.valid_to IS NULL AND e.retracted_at IS NULL
 LEFT JOIN node im ON im.id = e.dst_node_id
 LEFT JOIN pull_request pr ON pr.node_id = im.id
 WHERE d.node_id = ANY(%s)
@@ -340,12 +340,12 @@ def decision_reviewers(conn, node_ids: list[int]) -> dict[int, list[str]]:
           FROM edge impl
           JOIN edge e        ON e.dst_node_id = impl.dst_node_id
                             AND e.edge_type = 'reviewed'
-                            AND e.valid_to IS NULL
+                            AND e.valid_to IS NULL AND e.retracted_at IS NULL
           JOIN node reviewer ON reviewer.id = e.src_node_id
                             AND reviewer.node_type = 'person'
          WHERE impl.src_node_id = ANY(%s)
            AND impl.edge_type = 'implemented_by'
-           AND impl.valid_to IS NULL
+           AND impl.valid_to IS NULL AND impl.retracted_at IS NULL
            AND reviewer.title IS NOT NULL
          GROUP BY 1, 2
          ORDER BY 1, 3 NULLS LAST, 2

@@ -562,6 +562,40 @@ A CHECK ties them (`tag='inferred' ⟺ evidence_tier='inferred'`), so only expli
 are ever eligible for the corroborated upgrade and inference cannot launder itself into
 a higher tier. §5.3's "explicit and corroborated first" pass is then just `tag='explicit'`.
 
+### An edge has two different ends (ADR 0009)
+
+| column | meaning | set when |
+|---|---|---|
+| `valid_to` | the **repository** stopped saying it (event time) | an author edits `Fixes #12` out of a PR body. Set to the payload's `updated_at` |
+| `retracted_at` | **TraceMind** stopped believing it (system time) | the extractor no longer yields an edge from text that didn't change, or an explicit `retract_edge()`. Set once, by the database clock, with a `retraction_reason` |
+| `valid_to_recorded_at` | when TraceMind *learned* `valid_to` | by trigger whenever `valid_to` is set |
+
+Reusing `valid_to` for retraction would have made `--as-of T` answer "what we believe now
+about T" instead of "what the repository said at T": an edge retracted today would vanish
+from a query about last March, when the repository really did say it. What each query sees:
+
+| query | an edge is visible when |
+|---|---|
+| current | `valid_to IS NULL AND retracted_at IS NULL` |
+| `--as-of T` | the repository said it at T, as TraceMind now understands it: `valid_from <= T`, `valid_to` unset or after T, **and not retracted**. A retracted edge is hidden at *every* T |
+| `--as-recorded R` | TraceMind's graph held it at R: created by R, not yet retracted at R, and either valid at T (default T = R) or its validity end was only learned after R. Reproduces an answer as it stood, including an edge retracted since |
+
+Auditability is enforced in the database, not in calling code:
+- **No `DELETE` on `edge`.** The one exception is the cascade when a *node* is deleted, which
+  withdrawing a Decision depends on. A Decision withdrawn that way is first written to
+  `decision_withdrawal` with its reason, so withdrawal erases the Decision but not the record
+  that it existed.
+- **Retraction is one way.** A retracted edge is frozen: it can't be edited or un-retracted.
+- **Validity is append-only:** `valid_from` never changes, and `valid_to` can't change once set.
+- **Re-asserting is a new row.** The retracted one stays, because the unique index on
+  current edges excludes it.
+- `v_edge_retraction_audit` lists every retraction.
+
+Thread membership is *not* recomputed when an edge is withdrawn: `threads.union` has no
+inverse. What does follow is the Decision: one whose thread no longer holds any current
+closing edge is withdrawn by `retract_unsupported_decisions()`. The rubric alone wouldn't have
+done that, since it doesn't read `closes`.
+
 ### The reconstructed-Decision rubric is executable
 
 §5.1's rubric exists in three forms, all one implementation:

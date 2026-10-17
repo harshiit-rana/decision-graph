@@ -58,7 +58,7 @@ WHERE NOT thread_landed(t.thread_key)
   AND EXISTS (SELECT 1 FROM edge e
                 JOIN node s ON s.id = e.src_node_id
                 JOIN node d ON d.id = e.dst_node_id
-               WHERE e.edge_type = 'closes' AND e.valid_to IS NULL
+               WHERE e.edge_type = 'closes' AND e.valid_to IS NULL AND e.retracted_at IS NULL
                  AND s.thread_key = t.thread_key
                  AND d.thread_key = t.thread_key)
 ORDER BY t.thread_key

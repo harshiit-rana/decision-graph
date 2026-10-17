@@ -290,9 +290,11 @@ $t$;
 
 
 -- ===========================================================================
--- T10 REJECT: stranding a passing Decision by deleting its motivated_by edge.
+-- T10 REJECT: stranding a passing Decision by retracting its motivated_by edge.
 --     Without the edge-side guard this would silently leave a reconstructed
---     Decision with no evidence of "why".
+--     Decision with no evidence of "why". (Until 0016 this DELETEd the edge. Edges are no
+--     longer deletable, and retraction is the event that can strand a Decision. The
+--     assertion also checks that it is the RUBRIC guard that refused, not the delete guard.)
 -- ===========================================================================
 DO $t$
 DECLARE d bigint; ok boolean; err text;
@@ -300,14 +302,16 @@ BEGIN
     SET CONSTRAINTS ALL DEFERRED;
     BEGIN
         SELECT id INTO d FROM node WHERE external_id = 't1-dec';
-        DELETE FROM edge WHERE src_node_id = d AND edge_type = 'motivated_by';
+        PERFORM retract_edge(id, 'test: stranding a Decision')
+           FROM edge WHERE src_node_id = d AND edge_type = 'motivated_by' AND retracted_at IS NULL;
         SET CONSTRAINTS ALL IMMEDIATE;
         ok := true;
     EXCEPTION WHEN others THEN ok := false; err := SQLERRM;
     END;
 
     INSERT INTO test_result (name, expect, passed, detail)
-    VALUES ('T10 deleting motivated_by strands a Decision', 'rejected', NOT ok, err);
+    VALUES ('T10 retracting motivated_by strands a Decision', 'rejected by the rubric guard',
+            NOT ok AND err NOT LIKE 'edges are never deleted%', err);
 END;
 $t$;
 

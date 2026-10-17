@@ -157,6 +157,16 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
         )
         return stored["id"]
 
+    # The stored body, read before it is overwritten: whether the BODY changed decides whether a
+    # vanished reference is the repository's edit (ends validity) or the extractor's change
+    # (retracts). See _withdraw_unsupported_edges.
+    old_body = None
+    if stored is not None:
+        row = ctx.conn.execute(
+            f"SELECT body FROM {node_type} WHERE node_id = %s", (stored["id"],)  # noqa: S608
+        ).fetchone()
+        old_body = row["body"] if row else None
+
     node_id = ctx.node(
         node_type=node_type,
         external_id=str(number),
@@ -216,6 +226,10 @@ def extract_issue_or_pr(ctx: Context, payload: dict[str, Any]) -> int:
         ctx, node_id, body, source_ref=payload.get("html_url"), observed_at=updated,
         source_type="pr_body",
     )
+    _withdraw_unsupported_edges(
+        ctx, node_id, body, "pr_body", event_at=updated,
+        body_changed=old_body is not None and (old_body or "") != body,
+    )
     return node_id
 
 
@@ -272,6 +286,113 @@ def _stored_bodies(ctx: Context):
         for row in rows:
             if row["text"]:
                 yield row["id"], row["text"], source_type
+
+
+def _withdraw_unsupported_edges(
+    ctx: Context,
+    src_node_id: int,
+    text: str,
+    source_type: str,
+    *,
+    event_at: datetime | None,
+    body_changed: bool,
+) -> tuple[int, int]:
+    """Withdraw body-derived edges the body no longer yields (issues #121, ADR 0009).
+
+    When an artifact is re-read, a reference that has DISAPPEARED from its text used to leave
+    its `closes` edge standing: it kept counting as Validation under the section 5.1 rubric,
+    and the Decision it had promoted outlived the evidence for it. Webhooks make it routine:
+    `edited` deliveries re-run extraction on the new body.
+
+    Two different events, two different columns, because they mean different things:
+
+    - **The body was edited** (`body_changed`): the REPOSITORY stopped saying it. The edge's
+      validity ends at the payload's `updated_at` (event time). It stays visible to
+      `--as-of` a moment before the edit, because it was true then.
+    - **The body is unchanged**: so the EXTRACTOR changed its mind. TraceMind stopped
+      believing the edge, and it is retracted with a reason (system time). It is hidden at
+      every `--as-of`, because the repository never said it, as far as we now know.
+
+    Scoped to the two extractors whose only input is the text being re-read
+    (`<source>_closing_keyword` and `<source>_issue_mention`). Review edges, commit lists and
+    release citations come from other sources and are never touched here. A reference to a
+    target not yet in the graph is queued, not an edge, so it is not considered.
+
+    Thread membership is NOT recomputed. A merge `threads.union` made on the strength of a
+    withdrawn edge stays; there is no inverse, and splitting a thread is a larger decision
+    than this one. `retract_unsupported_decisions()` withdraws any Decision whose thread no
+    longer holds a closing edge, which is where the consequence lands.
+
+    Returns (validity ended, retracted).
+    """
+    produced: set[tuple[int, str, str]] = set()
+    for number, edge_type, extractor in _parsed_references(
+        text, ctx.settings.target_repo, source_type
+    ):
+        target = _lookup_by_number(ctx, number)
+        if target is not None:
+            produced.add((target, edge_type, extractor))
+
+    rows = ctx.conn.execute(
+        """
+        SELECT e.id, e.dst_node_id, e.edge_type::text AS edge_type, e.extractor,
+               n.external_id AS dst_ref
+          FROM edge e JOIN node n ON n.id = e.dst_node_id
+         WHERE e.src_node_id = %s
+           AND e.extractor = ANY(%s)
+           AND e.edge_type IN ('closes', 'references')
+           AND e.valid_to IS NULL AND e.retracted_at IS NULL
+        """,
+        (src_node_id, [f"{source_type}_closing_keyword", f"{source_type}_issue_mention"]),
+    ).fetchall()
+
+    ended = retracted = 0
+    for row in rows:
+        if (row["dst_node_id"], row["edge_type"], row["extractor"]) in produced:
+            continue
+        what = f"{row['edge_type']} #{row['dst_ref']} (was {row['extractor']})"
+        if body_changed:
+            # valid_to must exceed valid_from (migration 0001). The edit time normally does;
+            # the GREATEST only matters when a re-read carries the same timestamp.
+            ctx.conn.execute(
+                "UPDATE edge SET valid_to = GREATEST(COALESCE(%s::timestamptz, now()), "
+                "valid_from + interval '1 microsecond') WHERE id = %s",
+                (event_at, row["id"]),
+            )
+            ended += 1
+            ctx.stats.note_skip("edge_ended_by_body_edit")
+            log.info("ended %s: the body was edited and no longer says it", what)
+        else:
+            ctx.conn.execute(
+                "SELECT retract_edge(%s, %s)",
+                (
+                    row["id"],
+                    "re-parsing the source text with the current extractors no longer "
+                    f"yields {what}",
+                ),
+            )
+            retracted += 1
+            ctx.stats.note_skip("edge_retracted_by_extractor_change")
+            log.info("retracted %s: the current extractors no longer yield it", what)
+    return ended, retracted
+
+
+def retract_unsupported_edges(ctx: Context) -> int:
+    """Under --reconcile: retract resolved edges the current extractors no longer yield.
+
+    The edge-level sibling of `retract_stale_references`, which does the same for queued
+    references. It re-reads STORED text, so the body is by definition unchanged: every
+    difference is the extractor's, which is retraction and not a validity end. Costs no API
+    calls. A body with no stored text is skipped: silence is not evidence.
+    """
+    total = 0
+    for src_node_id, text, source_type in _stored_bodies(ctx):
+        _, retracted = _withdraw_unsupported_edges(
+            ctx, src_node_id, text, source_type, event_at=None, body_changed=False
+        )
+        total += retracted
+    log.info("unsupported edges: %s retracted", total)
+    return total
 
 
 def _link_body_refs(
@@ -747,6 +868,11 @@ def extract_commit(ctx: Context, payload: dict[str, Any]) -> int:
     _link_body_refs(
         ctx, node_id, message, source_ref=sha, observed_at=committed,
         source_type="commit_message",
+    )
+    # A commit message cannot be edited, so a reference it no longer yields is the extractor's
+    # change and not the repository's: retraction, not a validity end (ADR 0009).
+    _withdraw_unsupported_edges(
+        ctx, node_id, message, "commit_message", event_at=None, body_changed=False
     )
 
     for parent in payload.get("parents") or []:

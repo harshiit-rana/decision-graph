@@ -68,7 +68,7 @@ FROM edge e
 JOIN node o ON o.id = CASE WHEN e.src_node_id = ANY(%(ids)s)
                            THEN e.dst_node_id ELSE e.src_node_id END
 WHERE (e.src_node_id = ANY(%(ids)s) OR e.dst_node_id = ANY(%(ids)s))
-  AND e.valid_to IS NULL
+  AND e.valid_to IS NULL AND e.retracted_at IS NULL
 ORDER BY e.edge_type, o.external_id
 """
 
@@ -97,7 +97,7 @@ FROM edge e
 JOIN node s ON s.id = e.src_node_id
 JOIN node d ON d.id = e.dst_node_id
 WHERE (s.repo_node_id = %(repo)s OR d.repo_node_id = %(repo)s)
-  AND e.valid_to IS NULL
+  AND e.valid_to IS NULL AND e.retracted_at IS NULL
 GROUP BY 1 ORDER BY 2 DESC
 """
 
@@ -116,10 +116,10 @@ FROM decision d
 JOIN node dn   ON dn.id = d.node_id
 JOIN edge impl ON impl.src_node_id = d.node_id
               AND impl.edge_type = 'implemented_by'
-              AND impl.valid_to IS NULL
+              AND impl.valid_to IS NULL AND impl.retracted_at IS NULL
 JOIN edge made ON made.dst_node_id = impl.dst_node_id
               AND made.edge_type = 'created'
-              AND made.valid_to IS NULL
+              AND made.valid_to IS NULL AND made.retracted_at IS NULL
 JOIN node author ON author.id = made.src_node_id AND author.node_type = 'person'
 WHERE dn.repo_node_id = %(repo)s
 GROUP BY 1 ORDER BY 2 DESC, 1
@@ -131,7 +131,7 @@ FROM node pr
 JOIN pull_request p ON p.node_id = pr.id AND p.merged_at IS NOT NULL
 JOIN edge made ON made.dst_node_id = pr.id
               AND made.edge_type = 'created'
-              AND made.valid_to IS NULL
+              AND made.valid_to IS NULL AND made.retracted_at IS NULL
 JOIN node author ON author.id = made.src_node_id AND author.node_type = 'person'
 WHERE pr.repo_node_id = %(repo)s
 GROUP BY 1 ORDER BY 2 DESC, 1

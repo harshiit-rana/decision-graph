@@ -77,6 +77,8 @@ SENTINELS: dict[str, str] = {
     "0014": """EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
                 WHERE t.typname = 'node_type' AND e.enumlabel = 'comment')""",
     "0015": "to_regclass('public.comment') IS NOT NULL",
+    "0016": """EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'edge' AND column_name = 'retracted_at')""",
 }
 
 

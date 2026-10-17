@@ -62,6 +62,10 @@ def ingest(
             # meaningful against stored text, and --reconcile is the pass that re-reads it.
             extractors.retract_stale_references(ctx)
             conn.commit()
+            # The same for edges already resolved (#121, ADR 0009): this re-reads stored text,
+            # so a difference is the extractor's change, which retracts.
+            extractors.retract_unsupported_edges(ctx)
+            conn.commit()
 
         for resource in resources:
             log.info("--- %s ---", resource)

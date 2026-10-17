@@ -259,7 +259,7 @@ FROM decision d
 JOIN node n ON n.id = d.node_id
 LEFT JOIN edge e ON e.src_node_id = d.node_id
                 AND e.edge_type = 'motivated_by'
-                AND e.valid_to IS NULL
+                AND e.valid_to IS NULL AND e.retracted_at IS NULL
 LEFT JOIN node iss ON iss.id = e.dst_node_id AND iss.node_type = 'issue'
 ORDER BY d.decided_at DESC NULLS LAST, d.node_id
 """
