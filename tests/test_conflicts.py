@@ -267,7 +267,11 @@ class DetectionTest(unittest.TestCase):
 
 
 def validate_conflict(c) -> list:
-    return validate(json.loads(contract.dumps(c)), {"$ref": "#/$defs/conflict"})
+    # Nodes inside a conflict are labelled with their author by the same pass that labels
+    # everything else (`finish_from_db`), so label before validating a bare conflict.
+    labelled = json.loads(contract.dumps(c))
+    contract.label_authors(labelled, {})
+    return validate(labelled, {"$ref": "#/$defs/conflict"})
 
 
 if __name__ == "__main__":
