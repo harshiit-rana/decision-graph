@@ -245,7 +245,8 @@
         "tier",
         "hops",
         "nodes",
-        "steps"
+        "steps",
+        "crosses_thread"
       ],
       "properties": {
         "tier": {
@@ -274,6 +275,16 @@
             "$ref": "#/$defs/step"
           },
           "description": "steps[i] joins nodes[i] to nodes[i+1]."
+        },
+        "crosses_thread": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/thread_crossing"
+            }
+          ]
         }
       }
     },
@@ -541,7 +552,8 @@
         "decisions",
         "context",
         "refusal",
-        "conflicts"
+        "conflicts",
+        "scope"
       ],
       "properties": {
         "start": {
@@ -599,6 +611,15 @@
             "$ref": "#/$defs/conflict"
           },
           "description": "Empty when the graph holds no conflicting evidence for this answer."
+        },
+        "scope": {
+          "enum": [
+            "own_thread",
+            "other_thread",
+            "mixed",
+            "none"
+          ],
+          "description": "Whose reason a Why answer is. own_thread: every Decision reached belongs to the start artifact's thread. other_thread: every one crossed into a different thread. mixed: both. none: no Decision reached, or not a Why answer."
         }
       }
     },
@@ -1457,6 +1478,40 @@
           "items": {
             "$ref": "#/$defs/conflict_side"
           }
+        }
+      }
+    },
+    "thread_crossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_index",
+        "from_node_id",
+        "to_node_id",
+        "edge_type",
+        "from_thread",
+        "to_thread"
+      ],
+      "description": "Where a path leaves the start artifact's own thread (issue #129). A Decision reached by crossing is real and honestly graded, but it is another thread's: the answer to a different question, typically reached across a bare mention.",
+      "properties": {
+        "step_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "from_node_id": {
+          "type": "integer"
+        },
+        "to_node_id": {
+          "type": "integer"
+        },
+        "edge_type": {
+          "type": "string"
+        },
+        "from_thread": {
+          "type": "string"
+        },
+        "to_thread": {
+          "type": "string"
         }
       }
     }

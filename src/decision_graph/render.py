@@ -325,6 +325,10 @@ def render(
         # sentence must already have been told it is a guess.
         p(_c("33", bold("  ! INFERRED — no explicit path existed; this is not a record")))
 
+    foreign = answer.foreign_decision_paths()
+    if foreign:
+        _render_other_thread(answer, foreign, p)
+
     p(bold("  What the graph says"))
     p(dim("    (a summary built only from the links below — every sentence is traceable to an edge)"))
     for line in summarize(answer, annotations, statuses):
@@ -395,9 +399,31 @@ def _render_conflicts(conflicts: list, p) -> None:
         p()
 
 
+def _render_other_thread(answer: Answer, foreign: list, p) -> None:
+    """Say where an answer left the artifact's own thread, before anything calls it a reason (#129).
+
+    The Decision is real and its tier is honest. But a mention (`similar to #123`) is not
+    the artifact's reason for existing, and an answer graded `explicit` that rests on one reads
+    as though it were. So the crossing is named, and the Decision is called what it is: another
+    thread's.
+    """
+    p(_c("33", bold("  ! Reached through a mention, in another thread — not this artifact's own reason")))
+    for path in foreign:
+        c = path.thread_crossing
+        here, there = path.ref(c.from_node_id), path.ref(c.to_node_id)
+        p(f"    {trace.ref(here.node_type, here.external_id)} "
+          f"{phrase(c.edge_type, path.steps[c.step_index].to_node_id == c.to_node_id)} "
+          f"{trace.ref(there.node_type, there.external_id)}, which belongs to a different thread.")
+    p(dim("    The decision below is that thread's. The graph records no decision in this"))
+    p(dim("    artifact's own thread."))
+    p()
+
+
 def _render_path(path, index, annotations, statuses, verbose, p, reviewers=None) -> None:
     mark = "" if _COLOR else trace.TIER_MARK.get(path.tier, "??") + " "
-    p(f"  [{index}] {mark}{_tier_colour(path.tier, path.tier)}  {plural(path.depth, 'hop')}")
+    crossing = path.thread_crossing
+    note = "  (crosses into another thread)" if crossing and path.ref(path.target_id).node_type == "decision" else ""
+    p(f"  [{index}] {mark}{_tier_colour(path.tier, path.tier)}  {plural(path.depth, 'hop')}{note}")
     p(f"      {label(path, path.node_ids[0], verbose=verbose)}")
     # Including the start node. A query that matched a Decision directly begins there, and
     # skipping it meant the one node whose label is deliberately uninformative -- see

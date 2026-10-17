@@ -25,6 +25,7 @@
       },
       "found": false,
       "used_inferred_fallback": true,
+      "scope": "none",
       "tiers": {},
       "paths": [],
       "decisions": [],

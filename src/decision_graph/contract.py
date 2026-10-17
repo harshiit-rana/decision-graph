@@ -113,9 +113,21 @@ def path_doc(path: Path) -> dict[str, Any]:
                 "source_ref": step.source_ref,
             }
         )
+    c = path.thread_crossing
     return {
         "tier": path.tier,
         "hops": path.depth,
+        # Where this path leaves the start artifact's own thread, or null. A Decision reached
+        # by crossing is real and honestly graded, but it is another thread's, not this
+        # artifact's own reason (issue #129).
+        "crosses_thread": None if c is None else {
+            "step_index": c.step_index,
+            "from_node_id": c.from_node_id,
+            "to_node_id": c.to_node_id,
+            "edge_type": c.edge_type,
+            "from_thread": c.from_thread,
+            "to_thread": c.to_thread,
+        },
         "nodes": [_path_node(path, nid) for nid in path.node_ids],
         "steps": steps,
     }
@@ -224,6 +236,8 @@ def result_doc(candidate, answer: Answer, facts: Facts, *, as_of=None,
         "start": start,
         "found": found,
         "used_inferred_fallback": answer.used_inferred_fallback,
+        # Whose reason a Why answer is: own_thread, other_thread, mixed, or none (#129).
+        "scope": answer.scope,
         "tiers": tier_legend(p.tier for p in paths),
         "paths": [path_doc(p) for p in paths],
         "decisions": [decision_doc(nid, facts) for nid in _ordered_decisions(answer)],

@@ -25,6 +25,7 @@
       },
       "found": true,
       "used_inferred_fallback": true,
+      "scope": "none",
       "tiers": {
         "inferred": {
           "meaning": "the system's own guess; no explicit path existed, so this is not a record",
@@ -35,6 +36,7 @@
         {
           "tier": "inferred",
           "hops": 1,
+          "crosses_thread": null,
           "nodes": [
             {
               "node_id": 641,

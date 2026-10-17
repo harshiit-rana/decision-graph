@@ -372,6 +372,19 @@ the fields named by `repository_text_fields` (`title`, `excerpt`, `body`), and n
 a sentence this system wrote. A consumer handing the document to a model can fence exactly
 those fields.
 
+**A Why answer says whose reason it is (#129).** A Why-walk answers "why does *this* artifact
+exist" with a Decision, and `references` (a bare `#N` mention, the weakest explicit signal) is
+in the Why edge set. So an unrelated PR that says "similar to #123" was answered with #123's
+Decision, graded `explicit`, with nothing hinting at the mismatch: real edge, honest tier,
+answer to a different question. Each path now carries `crosses_thread` (null, or where it left
+the start artifact's own thread and on which edge), and each result a `scope`: `own_thread`,
+`other_thread`, `mixed` or `none`. The text output says "Reached through a mention, in another
+thread: not this artifact's own reason" before the summary and marks the path; Mermaid and DOT
+label the crossing edge "other thread"; `dg ask` sends the field and tells the model never to
+present such a Decision as the artifact's own reason. **No answer changed:** the walk, the paths
+and the tiers are as they were. Which rule to apply (restrict to the artifact's own thread, or
+keep and demote) needs the flask measurement (`eval/measure_cross_thread.py`, #173).
+
 **Conflicting evidence is returned, never resolved (#175).** When the graph holds evidence
 pointing two ways, each result carries a `conflicts` list: both (or all) sides, with their
 tiers, extractors, sources and timestamps, and **no field names a winner**. This is a

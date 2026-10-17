@@ -166,3 +166,6 @@ jobs:
             psql -h localhost -U postgres -d dg -v ON_ERROR_STOP=1 -v repo=1 -f "$f"
             echo "::endgroup::"
           done
+          # The Python measurement scripts too. CI's database is empty, so they print zeros; what
+          # is checked is that they still run (#129).
+          python eval/measure_cross_thread.py

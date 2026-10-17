@@ -106,6 +106,21 @@ class NodeRef:
     title: str | None = None
     external_id: str | None = None
     url: str | None = None
+    # The conversation cluster this node belongs to (nodes.thread_key). Carried so a path can say
+    # where it LEFT the start artifact's own thread (issue #129).
+    thread_key: str | None = None
+
+
+@dataclass(frozen=True)
+class ThreadCrossing:
+    """Where a path leaves the start artifact's own thread, and what it crossed."""
+
+    step_index: int
+    from_node_id: int
+    to_node_id: int
+    edge_type: str
+    from_thread: str
+    to_thread: str
 
 
 @dataclass
@@ -136,6 +151,28 @@ class Path:
         return self.node_ids[-1]
 
     @property
+    def thread_crossing(self) -> ThreadCrossing | None:
+        """The first step that moves between two different known threads, or None.
+
+        A Why-walk answers "why does THIS artifact exist" with a Decision, and a Decision belongs
+        to one thread. When the path reaches it by crossing into a different thread (typically
+        across a `references` edge: a bare `#N` mention), the Decision is real and the tier is
+        honest, but it is the answer to a different question: the mentioned artifact's, not the
+        start's. Nodes with no thread (people, releases) are skipped, not treated as a break
+        (issue #129).
+        """
+        known = [
+            (i, nid, self.ref(nid).thread_key)
+            for i, nid in enumerate(self.node_ids)
+            if self.ref(nid).thread_key
+        ]
+        for (i, a, ta), (j, b, tb) in zip(known, known[1:]):
+            if ta != tb:
+                step = self.steps[j - 1]
+                return ThreadCrossing(j - 1, a, b, step.edge_type, ta, tb)
+        return None
+
+    @property
     def depth(self) -> int:
         return len(self.steps)
 
@@ -158,6 +195,34 @@ class Answer:
     @property
     def found(self) -> bool:
         return bool(self.paths)
+
+    def foreign_decision_paths(self) -> list[Path]:
+        """Paths that reach a Decision belonging to a different thread than the start (#129).
+
+        Only a Why answer has the problem: it is the one that says "this is the reason". The start
+        must have a thread of its own, or there is nothing to compare, and a path that begins at
+        a Decision is its own answer.
+        """
+        if self.mode is not Mode.WHY:
+            return []
+        return [
+            p for p in self.paths
+            if p.ref(p.node_ids[0]).node_type != "decision"
+            and p.ref(p.target_id).node_type == "decision"
+            and p.thread_crossing is not None
+        ]
+
+    @property
+    def scope(self) -> str:
+        """Whose reason a Why answer is: `own_thread`, `other_thread`, `mixed`, or `none`."""
+        why = [p for p in self.paths if p.ref(p.target_id).node_type == "decision"]
+        if not why or self.mode is not Mode.WHY:
+            return "none"
+        foreign = {id(p) for p in self.foreign_decision_paths()}
+        mine = [p for p in why if id(p) not in foreign]
+        if foreign and mine:
+            return "mixed"
+        return "other_thread" if foreign else "own_thread"
 
 
 # Which edges a walk may cross, as ADR 0009 defines it. An edge has two different ends:
@@ -289,9 +354,10 @@ def _walk(
             title=n["title"],
             external_id=n["external_id"],
             url=n["url"],
+            thread_key=n["thread_key"],
         )
         for n in conn.execute(
-            "SELECT id, node_type, title, external_id, url FROM node WHERE id = ANY(%s)",
+            "SELECT id, node_type, title, external_id, url, thread_key FROM node WHERE id = ANY(%s)",
             (list(node_ids),),
         ).fetchall()
     }

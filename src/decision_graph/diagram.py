@@ -87,6 +87,16 @@ def _walked(answer: Answer):
     return nodes, edges
 
 
+def _crossings(answer: Answer) -> set[int]:
+    """Edge ids where a Why answer leaves the start artifact's thread (issue #129).
+
+    Written on the label as well as available to the reader's eye, for the same reason the tier
+    is: a picture is read as the whole story, and an `explicit` edge into another thread's
+    Decision would otherwise look like the artifact's own reason.
+    """
+    return {p.steps[p.thread_crossing.step_index].edge_id for p in answer.foreign_decision_paths()}
+
+
 def _title(node_type: str | None, external_id: str | None, title: str | None) -> tuple[str, str]:
     head = trace.ref(node_type, external_id)
     return head, render._clip(title, 48)
@@ -124,10 +134,12 @@ def to_mermaid(answer: Answer) -> str:
             text += "<br/>" + _escape_mermaid(short)
         lines.append(f'  n{node_id}{open_}"{text}"{close}')
 
-    for _edge_id, (src, dst, step) in edges.items():
+    crossing = _crossings(answer)
+    for edge_id, (src, dst, step) in edges.items():
         arrow = _MERMAID_LINK.get(step.evidence_tier, "-->")
         verb = render.phrase(step.edge_type, True)
-        label = _escape_mermaid(f"{verb} · {step.evidence_tier}")
+        other = " · other thread" if edge_id in crossing else ""
+        label = _escape_mermaid(f"{verb} · {step.evidence_tier}{other}")
         lines.append(f'  n{src} {arrow}|"{label}"| n{dst}')
 
     # Per-type class definitions. Colors are chosen for contrast on white and for
@@ -178,9 +190,11 @@ def to_dot(answer: Answer) -> str:
         href = f', URL="{_escape_dot(url)}"' if url else ""
         lines.append(f'  n{node_id} [label="{label}", shape={shape}{href}];')
 
-    for _edge_id, (src, dst, step) in edges.items():
+    crossing = _crossings(answer)
+    for edge_id, (src, dst, step) in edges.items():
         verb = render.phrase(step.edge_type, True)  # graph direction; see to_mermaid
-        label = _escape_dot(f"{verb} ({step.evidence_tier})")
+        other = ", other thread" if edge_id in crossing else ""
+        label = _escape_dot(f"{verb} ({step.evidence_tier}{other})")
         style = _DOT_STYLE.get(step.evidence_tier, "style=solid")
         lines.append(f'  n{src} -> n{dst} [label="{label}", {style}];')
 

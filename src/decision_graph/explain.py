@@ -150,6 +150,10 @@ Explain the result of this query clearly, thoroughly, and informatively in plain
   not contain.
 - Name the evidence tier of what you assert. "explicit" and "corroborated" are recorded
   facts; "inferred" is the system's own guess and must be labelled as one.
+- A path whose "crosses_thread" is not null leaves the artifact's own thread, usually across a
+  mention. The Decision it reaches belongs to ANOTHER thread. Never present it as this
+  artifact's own reason: say that the artifact mentions the other one, and that no decision of
+  its own is recorded.
 """
 
 INFERRED_CAVEAT = """

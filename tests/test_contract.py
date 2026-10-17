@@ -204,6 +204,19 @@ def doc_for(c, answer, facts=None, *, as_of=None, clo=None, others=(), quotes="a
     return finished(doc, ASSOC, quotes)
 
 
+def other_thread_answer() -> Answer:
+    """PR 9100 (thread Z) mentions issue 5895 (thread X), whose Decision is in X: a crossing."""
+    mention = Step(21, "references", "explicit", "explicit", 9100, ISSUE, "pr_body_issue_mention", None)
+    motivated = Step(22, "motivated_by", "explicit", "corroborated", DECISION, ISSUE,
+                     "synthesis_closes_cluster", "thread:30:pr-5867")
+    path = WalkPath(
+        [9100, ISSUE, DECISION], [mention, motivated],
+        {9100: NodeRef("pull_request", "unrelated change", "9100", "https://github.com/pallets/flask/pull/9100", "thread:30:pr-9100"),
+         ISSUE: NodeRef("issue", NODES[ISSUE].title, "5895", NODES[ISSUE].url, "thread:30:pr-5867"),
+         DECISION: NodeRef("decision", NODES[DECISION].title, "thread:30:pr-5867", None, "thread:30:pr-5867")})
+    return Answer(Mode.WHY, 9100, [path], False, "1 path")
+
+
 def canned_conflicts() -> list[dict]:
     """One conflict of each type, built with the module's own constructors, from fixed data."""
     from decision_graph import conflicts as c
@@ -255,6 +268,9 @@ def _no_match_coverage() -> dict:
 CASES = {
     "answer_explicit": lambda: doc_for(candidate(), explicit_answer(), explicit_facts(),
                                        others=[candidate(PR, "fuzzy")]),
+    "answer_other_thread": lambda: doc_for(
+        retrieval.Candidate(9100, "pull_request", "9100", "unrelated change", "identifier", 1.0),
+        other_thread_answer(), explicit_facts()),
     "answer_conflicts": lambda: doc_for(candidate(), explicit_answer(), explicit_facts(),
                                         conflicts=canned_conflicts()),
     "answer_inferred_fallback": lambda: doc_for(candidate(PR), inferred_answer()),
@@ -296,6 +312,8 @@ V1_FIELDS = frozenset({
     "resource", "lowest_number_in_window", "name",
     # Added within v1 by #175: conflicting evidence, listed and never resolved.
     "conflicts", "sides", "label", "edge", "facts", "node",
+    # Added within v1 by #129: where a Why answer leaves the artifact's own thread.
+    "crosses_thread", "scope", "step_index", "from_thread", "to_thread",
 })
 
 

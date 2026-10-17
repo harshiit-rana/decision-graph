@@ -32,6 +32,7 @@
     },
     "found": true,
     "used_inferred_fallback": false,
+    "scope": "own_thread",
     "tiers": {
       "corroborated": {
         "meaning": "explicit, and the thread carries 3 of 4 independent kinds of signal",
@@ -42,6 +43,7 @@
       {
         "tier": "corroborated",
         "hops": 1,
+        "crosses_thread": null,
         "nodes": [
           {
             "node_id": 620,
@@ -123,6 +125,7 @@
     },
     "found": false,
     "used_inferred_fallback": false,
+    "scope": "none",
     "tiers": {},
     "paths": [],
     "decisions": [],
