@@ -71,6 +71,13 @@ The point-in-time control is the load-bearing one: F1 returns 1 path and T1 retu
 asked as of 2025-06, while F2 and T2 both return 17 as of 2026-12. The filter restricts in
 one direction only. Had it been silently ignored, both pairs would have matched.
 
+What the control does not establish (#124): T1 returns 0 whether the filter is exact or an edge
+is dated later than the repository wrote it. An edge extracted from text is dated by the
+artifact's `updated_at` when it was first ingested, not by when the reference was written, so
+`--as-of` is "first observed by T", and the error runs toward refusal. The control shows the
+filter is not ignored. It does not show the dates are precise, and the size of the gap on flask
+has not been measured.
+
 ## The finding that matters most
 
 **Neither defect found during this evaluation cycle was caught by the evaluation set.**

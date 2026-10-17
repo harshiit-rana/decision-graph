@@ -243,7 +243,7 @@ FOLLOW_UPS = [
     ("d", "diagram", "draw the answer as a graph (paste at mermaid.live or into GitHub)"),
     ("v", "details", "show what rule produced each link, and the internal node IDs"),
     ("a", "all matches", "show answers for every matched artifact, not just the closest one"),
-    ("t", "as of a date", "replay the graph at a past date — did this decision exist then?"),
+    ("t", "as of a date", "replay the graph at a past date — what had been recorded by then?"),
     ("s", "switch mode", "flip between 'why did this happen?' and 'what does this affect?'"),
 ]
 

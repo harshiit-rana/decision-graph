@@ -99,7 +99,7 @@ they are toggles, so the bar shows what is currently on:
   d  diagram       [on]          as a mermaid graph you can paste into GitHub
   v  details                     node ids and the extractor behind every edge
   a  all matches                 answer from every candidate, not just the best
-  t  as of a date  [2025-06-01]  what the graph knew at a point in time
+  t  as of a date  [2025-06-01]  what the graph recorded as of a date
   s  switch mode   [why]         ask the other question about the same thing
   Enter  back
 ```
@@ -670,6 +670,25 @@ Rate limiting is first-class: a 12-month backfill of a repo flask's size sits cl
 enough to the 5,000 req/hour budget that exhaustion is expected. The client stops
 cleanly at a configurable floor and the next run resumes.
 
+### Edges follow edits (#121)
+
+Re-reading an artifact re-derives the edges its text yields, and withdraws the ones it no
+longer does, in two different ways because they mean different things:
+- **The body was edited** (a closing keyword removed from a PR description): the repository
+  stopped saying it. The edge's validity ends at the payload's `updated_at`. `--as-of` a moment
+  before the edit still returns it.
+- **The body is unchanged, but the extractor no longer yields the edge** (a parser change,
+  found by `--reconcile`, or a commit message): TraceMind stopped believing it. It is
+  *retracted* with a reason, hidden at every `--as-of`, and visible only to `--as-recorded` and
+  the audit view.
+
+Only the two extractors whose sole input is the text being re-read are touched
+(`*_closing_keyword` and `*_issue_mention`); review edges, commit lists and release citations
+never are. A stale delivery can't end an edge the current body states (#120). A Decision whose
+thread no longer holds any closing edge is withdrawn, and written to `decision_withdrawal` with
+its reason first. Thread membership is not recomputed: `threads.union` has no inverse. See "An
+edge has two different ends" above.
+
 ### The reference queue can now be un-said
 
 A `#N` whose target is not in the graph yet is queued rather than dropped (issue #3) —
@@ -742,8 +761,21 @@ Two consequences worth knowing:
 
 - Because no inferred edge may touch a Decision (§5.1), the Why fallback can never fire
   on its *first* hop from a Decision node. Any inferred bridge has to be further out.
-- Point-in-time queries work via `--as-of`, using the `valid_from` / `valid_to` window
-  that migration 0001 insisted on from v1.
+- **What `--as-of` computes, exactly (#124).** It returns the edges that were *first
+  observed* by T and not since ended or retracted. It does not return "the edges the
+  repository had written by T". Two kinds of date are involved:
+  - A **Decision's own edges** (`motivated_by`, `implemented_by`) are dated by the Decision's
+    `decided_at`: the implementing pull request's merge time, falling back to its close time or
+    the issue's. That is a real event time, so a Why query as of a date before the merge refuses.
+  - **Edges extracted from text** (`closes`, `references`, ...) are dated by the artifact's
+    `updated_at` *when it was first ingested*. A reference written when the issue was opened,
+    but ingested after later edits or comments, therefore carries a **later** date than it
+    deserves, so an `--as-of` between the artifact's creation and that update can miss an edge
+    that already existed. The error runs toward refusal, never toward a false answer.
+  - Correcting it needs the timeline API to date each edit, which is not ingested. How large
+    the gap is on flask hasn't been measured (#173).
+  - Retraction (ADR 0009) is separate: `--as-of` hides a retracted edge at every T, and
+    `--as-recorded` replays what the graph held.
 
 ```bash
 dg-query "change default redirect code to 303" --mode why
@@ -1050,7 +1082,10 @@ has no power over correctness.
 
 The point-in-time control is the load-bearing mechanical check: F1 returns 1 path and drops
 to 0 when asked as of 2025-06, while F2 returns 17 both now and as of 2026-12 — so the time
-filter restricts in one direction only, rather than being silently ignored.
+filter restricts in one direction only, rather than being silently ignored. **What it does not
+show:** T1 returns 0 whether the filter is exact or the edge is simply dated later than the
+repository wrote it (see `--as-of` above), so it can't distinguish those. It establishes that the
+filter isn't ignored, not that the dates are precise (#124).
 
 **Every Decision in a trace names the artifact it is credited to.** A Why-walk reaching a
 Decision across `motivated_by` stops there and never traverses `implemented_by`, so the
