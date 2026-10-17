@@ -140,7 +140,7 @@ def assemble(query: str, why: dict, impact: dict, attempt_docs: list[dict], *,
 
 def build(conn, query: str, *, repo_node_id: int | None = None,
           max_depth: int = reasoning.DEFAULT_MAX_DEPTH, max_paths: int | None = None,
-          max_quote_chars: int | None = None) -> dict:
+          max_quote_chars: int | None = None, quotes: str = "all") -> dict:
     candidates = retrieval.find_candidates(conn, query, repo_node_id=repo_node_id, limit=1)
     if not candidates:
         return contract.no_match_document(query)
@@ -159,8 +159,9 @@ def build(conn, query: str, *, repo_node_id: int | None = None,
         if a.candidate.node_id != c.node_id
     ][:ATTEMPT_LIMIT]
     attempt_docs = attempts.document(query, found)["attempts"]
-    return assemble(query, result(Mode.WHY), result(Mode.IMPACT), attempt_docs,
-                    max_paths=max_paths, max_quote_chars=max_quote_chars)
+    doc = assemble(query, result(Mode.WHY), result(Mode.IMPACT), attempt_docs,
+                   max_paths=max_paths, max_quote_chars=max_quote_chars)
+    return contract.finish_from_db(conn, doc, quotes)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -174,6 +175,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--depth", type=int, default=reasoning.DEFAULT_MAX_DEPTH)
     parser.add_argument("--max-paths", type=int, default=None,
                         help="keep at most N paths per answer; the rest are counted in `truncated`")
+    parser.add_argument("--quotes", choices=contract.QUOTE_MODES, default="all",
+                        help="`maintainers` removes the text of anything not written by an OWNER, "
+                        "MEMBER or COLLABORATOR, and counts what it removed (issue #177)")
     parser.add_argument("--max-quote-chars", type=int, default=None,
                         help="cut each quoted text to N characters; the cut is counted")
 
@@ -208,7 +212,8 @@ def main(argv: list[str] | None = None) -> int:
             if repo_node_id is None:
                 return fail(f"repo {args.repo!r} has not been ingested")
         doc = build(conn, args.query, repo_node_id=repo_node_id, max_depth=args.depth,
-                    max_paths=args.max_paths, max_quote_chars=args.max_quote_chars)
+                    max_paths=args.max_paths, max_quote_chars=args.max_quote_chars,
+                    quotes=args.quotes)
     finally:
         conn.close()
     print(contract.dumps(doc))

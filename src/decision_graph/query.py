@@ -103,7 +103,7 @@ def _wants_json(argv: list[str]) -> bool:
 
 
 def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth: int,
-                    answer_all: bool = False) -> dict:
+                    answer_all: bool = False, quotes: str = "all") -> dict:
     """The JSON contract for one query (issue #135). Takes a connection so it can be tested
     inside a rolled-back fixture transaction, and so the MCP server (#139) can call it."""
     chosen = candidates if answer_all else candidates[:1]
@@ -118,16 +118,17 @@ def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth
         results.append(contract.result_doc(
             c, answer, facts, as_of=as_of, closure=closure, url=urls.get(c.node_id)
         ))
-    return contract.answer_document(
+    doc = contract.answer_document(
         query=query, mode=mode, as_of=as_of, max_depth=max_depth, results=results,
         other_candidates=candidates[len(chosen):], urls=urls,
     )
+    return contract.finish_from_db(conn, doc, quotes)
 
 
 def _print_json(conn, args, candidates, as_of) -> int:
     doc = answer_document(
         conn, query=args.query, mode=args.mode, candidates=candidates, as_of=as_of,
-        max_depth=args.depth, answer_all=args.all,
+        max_depth=args.depth, answer_all=args.all, quotes=args.quotes,
     )
     print(contract.dumps(doc))
     return 0
@@ -164,6 +165,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "-v", "--verbose", action="store_true",
         help="show node ids and the extractor behind each edge",
+    )
+    parser.add_argument(
+        "--quotes", choices=contract.QUOTE_MODES, default="all",
+        help="with --format json: `maintainers` removes the text of anything not written by an "
+        "OWNER, MEMBER or COLLABORATOR, and counts what it removed (issue #177)",
     )
     parser.add_argument(
         "--format",
@@ -230,6 +236,10 @@ def main(argv: list[str] | None = None) -> int:
             "Use 1 or more."
         )
 
+    if args.quotes != "all" and not as_json:
+        return fail("--quotes applies to --format json; the text output is for a person reading "
+                    "the repository anyway")
+
     if args.mode == ATTEMPTS and args.format not in ("text", "json"):
         return fail(f"--mode attempts lists artifacts; it has no {args.format} diagram")
 
@@ -245,12 +255,13 @@ def main(argv: list[str] | None = None) -> int:
         found = attempts.find_attempts(
             conn, args.query, repo_node_id=repo_node_id, limit=args.limit
         )
-        conn.close()
         # An empty list is a result, like a refusal: exit 0, and say what it does not mean.
         if as_json:
-            print(contract.dumps(attempts.document(args.query, found)))
+            print(contract.dumps(contract.finish_from_db(
+                conn, attempts.document(args.query, found), args.quotes)))
         else:
             attempts.render(args.query, found, out=sys.stdout)
+        conn.close()
         return 0
 
     candidates = retrieval.find_candidates(

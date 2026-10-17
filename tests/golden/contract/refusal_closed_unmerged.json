@@ -19,7 +19,9 @@
         "ref": "pull request #5898",
         "url": null,
         "title": "use 303 for redirect",
-        "match": "identifier"
+        "match": "identifier",
+        "author_association": "CONTRIBUTOR",
+        "untrusted": true
       },
       "found": false,
       "used_inferred_fallback": false,
@@ -40,5 +42,9 @@
       }
     }
   ],
-  "other_candidates": []
+  "other_candidates": [],
+  "quotes": {
+    "mode": "all",
+    "suppressed": 0
+  }
 }

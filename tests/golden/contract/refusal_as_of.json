@@ -19,7 +19,9 @@
         "ref": "issue #5895",
         "url": null,
         "title": "change default redirect code to 303",
-        "match": "identifier"
+        "match": "identifier",
+        "author_association": "MEMBER",
+        "untrusted": false
       },
       "found": false,
       "used_inferred_fallback": false,
@@ -35,5 +37,9 @@
       }
     }
   ],
-  "other_candidates": []
+  "other_candidates": [],
+  "quotes": {
+    "mode": "all",
+    "suppressed": 0
+  }
 }

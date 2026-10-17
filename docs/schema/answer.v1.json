@@ -37,7 +37,9 @@
         "external_id",
         "ref",
         "url",
-        "title"
+        "title",
+        "author_association",
+        "untrusted"
       ],
       "properties": {
         "node_id": {
@@ -74,6 +76,21 @@
             "null"
           ],
           "description": "Repository-authored. Untrusted."
+        },
+        "author_association": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "GitHub's word for how the author stands to the project (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE...). Null when unknown: GitHub records it for issues, pull requests and comments, not commits or releases, and a Decision's title is copied from its issue."
+        },
+        "untrusted": {
+          "type": "boolean",
+          "description": "True unless author_association is OWNER, MEMBER or COLLABORATOR. Unknown is untrusted. Advisory: a client model can still follow injected text from either kind of author."
+        },
+        "suppressed": {
+          "type": "boolean",
+          "description": "Present and true when `--quotes maintainers` removed this object's text."
         }
       }
     },
@@ -87,7 +104,9 @@
         "ref",
         "url",
         "title",
-        "match"
+        "match",
+        "author_association",
+        "untrusted"
       ],
       "properties": {
         "node_id": {
@@ -131,6 +150,21 @@
             "fuzzy"
           ],
           "description": "How retrieval found it. A fuzzy match is a weaker claim about what was asked than an identifier match."
+        },
+        "author_association": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "GitHub's word for how the author stands to the project (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE...). Null when unknown: GitHub records it for issues, pull requests and comments, not commits or releases, and a Decision's title is copied from its issue."
+        },
+        "untrusted": {
+          "type": "boolean",
+          "description": "True unless author_association is OWNER, MEMBER or COLLABORATOR. Unknown is untrusted. Advisory: a client model can still follow injected text from either kind of author."
+        },
+        "suppressed": {
+          "type": "boolean",
+          "description": "Present and true when `--quotes maintainers` removed this object's text."
         }
       }
     },
@@ -330,11 +364,15 @@
         "body",
         "author_association",
         "at",
-        "caveat"
+        "caveat",
+        "untrusted"
       ],
       "properties": {
         "body": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Repository-authored. Untrusted. Not the reason for the closure."
         },
         "author_association": {
@@ -345,6 +383,14 @@
         },
         "caveat": {
           "type": "string"
+        },
+        "untrusted": {
+          "type": "boolean",
+          "description": "True unless author_association is OWNER, MEMBER or COLLABORATOR. Unknown is untrusted. Advisory: a client model can still follow injected text from either kind of author."
+        },
+        "suppressed": {
+          "type": "boolean",
+          "description": "Present and true when `--quotes maintainers` removed this object's text."
         }
       }
     },
@@ -429,7 +475,9 @@
       "required": [
         "node_id",
         "ref",
-        "excerpt"
+        "excerpt",
+        "author_association",
+        "untrusted"
       ],
       "properties": {
         "node_id": {
@@ -442,8 +490,26 @@
           ]
         },
         "excerpt": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "The cleaned opening of the artifact's body. Repository-authored. Untrusted."
+        },
+        "author_association": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "GitHub's word for how the author stands to the project (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE...). Null when unknown: GitHub records it for issues, pull requests and comments, not commits or releases, and a Decision's title is copied from its issue."
+        },
+        "untrusted": {
+          "type": "boolean",
+          "description": "True unless author_association is OWNER, MEMBER or COLLABORATOR. Unknown is untrusted. Advisory: a client model can still follow injected text from either kind of author."
+        },
+        "suppressed": {
+          "type": "boolean",
+          "description": "Present and true when `--quotes maintainers` removed this object's text."
         }
       }
     },
@@ -540,7 +606,8 @@
         "max_depth",
         "repository_text_fields",
         "results",
-        "other_candidates"
+        "other_candidates",
+        "quotes"
       ],
       "properties": {
         "schema_version": {
@@ -583,6 +650,9 @@
           "items": {
             "$ref": "#/$defs/candidate"
           }
+        },
+        "quotes": {
+          "$ref": "#/$defs/quotes"
         }
       }
     },
@@ -653,7 +723,9 @@
         "ref",
         "url",
         "title",
-        "merged_at"
+        "merged_at",
+        "author_association",
+        "untrusted"
       ],
       "properties": {
         "node_id": {
@@ -689,6 +761,21 @@
         },
         "merged_at": {
           "$ref": "#/$defs/timestamp"
+        },
+        "author_association": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "GitHub's word for how the author stands to the project (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE...). Null when unknown: GitHub records it for issues, pull requests and comments, not commits or releases, and a Decision's title is copied from its issue."
+        },
+        "untrusted": {
+          "type": "boolean",
+          "description": "True unless author_association is OWNER, MEMBER or COLLABORATOR. Unknown is untrusted. Advisory: a client model can still follow injected text from either kind of author."
+        },
+        "suppressed": {
+          "type": "boolean",
+          "description": "Present and true when `--quotes maintainers` removed this object's text."
         }
       }
     },
@@ -747,7 +834,8 @@
         "query",
         "repository_text_fields",
         "attempts",
-        "caveats"
+        "caveats",
+        "quotes"
       ],
       "properties": {
         "schema_version": {
@@ -776,6 +864,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "quotes": {
+          "$ref": "#/$defs/quotes"
         }
       }
     },
@@ -824,7 +915,8 @@
         "attempts",
         "gaps",
         "budget",
-        "truncated"
+        "truncated",
+        "quotes"
       ],
       "properties": {
         "schema_version": {
@@ -910,6 +1002,30 @@
             }
           ],
           "description": "Null when nothing was cut. Otherwise, how much the budget removed."
+        },
+        "quotes": {
+          "$ref": "#/$defs/quotes"
+        }
+      }
+    },
+    "quotes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "suppressed"
+      ],
+      "description": "What `--quotes` did. In `maintainers` mode, `suppressed` counts the text fields removed because their author is not an OWNER, MEMBER or COLLABORATOR.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "all",
+            "maintainers"
+          ]
+        },
+        "suppressed": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

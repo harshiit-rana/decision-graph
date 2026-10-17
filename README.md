@@ -370,7 +370,19 @@ the evidence existed).
 **Repository text is untrusted.** Titles, body excerpts and quoted comments sit only in
 the fields named by `repository_text_fields` (`title`, `excerpt`, `body`), and never inside
 a sentence this system wrote. A consumer handing the document to a model can fence exactly
-those fields. Full examples of every kind are the goldens in `tests/golden/contract/`.
+those fields.
+
+**And it says who wrote it (#177).** Every object carrying one of those fields also has
+`author_association` (GitHub's word: OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE, ...) and
+`untrusted`, which is true unless the author is an OWNER, MEMBER or COLLABORATOR. GitHub
+records the association for issues, pull requests and comments, and not for commits or
+releases; a Decision's title is copied from its issue. Where it is unknown, it is `null` and
+the text is `untrusted`. Unknown is never promoted. `--quotes maintainers` (on `dg query
+--format json` and `dg context`) removes the text of every untrusted object, keeps the
+object marked `suppressed: true`, and reports the count in `quotes.suppressed`. **These labels
+are advisory.** A client model can still follow injected text from any author, and nothing
+here stops it. They let a consumer fence or drop what it shouldn't trust, which is a
+reduction, not a defence. Full examples of every kind are the goldens in `tests/golden/contract/`.
 Removing or renaming a field fails `tests/test_contract.py` unless `schema_version` is
 bumped.
 

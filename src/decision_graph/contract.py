@@ -284,6 +284,111 @@ def error_document(message: str, code: str = "bad_argument") -> dict[str, Any]:
     return _envelope("error", error={"code": code, "message": message})
 
 
+# ---------------------------------------------------------------------------
+# Who wrote the text (issue #177)
+# ---------------------------------------------------------------------------
+#
+# The contract confines repository text to named fields (REPOSITORY_TEXT_FIELDS), but a title
+# from a drive-by account and one from a maintainer looked identical to an agent, and that is
+# the channel prompt-injection attacks on agent tools use. So each object carrying such a
+# field also carries `author_association` (GitHub's own word for how the author stands to the
+# project) and `untrusted`.
+#
+# `untrusted` is true unless the association is OWNER, MEMBER or COLLABORATOR, the same set
+# `trace._STANDING` uses to decide whose last word is quoted. Where the association isn't
+# known it is null and the text is untrusted: GitHub records it for issues, pull requests and
+# comments, but not for commits or releases, and a Decision's title is copied from the issue
+# that motivated it. Unknown is never promoted to trusted.
+#
+# These labels are advisory. A client model can still follow injected text from a maintainer's
+# account, or from a drive-by one it ignores the label on. SECURITY.md says so.
+
+TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+QUOTE_MODES = ("all", "maintainers")
+
+
+def is_untrusted(association: str | None) -> bool:
+    return (association or "").upper() not in TRUSTED_ASSOCIATIONS
+
+
+def read_associations(conn, node_ids: Iterable[int]) -> dict[int, str | None]:
+    """author_association per node, from the comment column or the stored GitHub payload."""
+    ids = sorted(set(node_ids))
+    if not ids:
+        return {}
+    rows = conn.execute(
+        """
+        SELECT n.id, COALESCE(c.author_association, n.raw->>'author_association') AS a
+          FROM node n LEFT JOIN comment c ON c.node_id = n.id
+         WHERE n.id = ANY(%s)
+        """,
+        (ids,),
+    ).fetchall()
+    return {r["id"]: (r["a"] or None) for r in rows}
+
+
+def _objects(value: Any) -> Iterable[dict]:
+    if isinstance(value, dict):
+        yield value
+        for v in value.values():
+            yield from _objects(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _objects(v)
+
+
+def _carries_text(obj: dict) -> bool:
+    return any(k in obj for k in REPOSITORY_TEXT_FIELDS)
+
+
+def node_ids_in(doc: dict) -> set[int]:
+    """Every node id of an object that carries repository text."""
+    return {o["node_id"] for o in _objects(doc)
+            if "node_id" in o and _carries_text(o) and isinstance(o["node_id"], int)}
+
+
+def label_authors(doc: dict, associations: dict[int, str | None]) -> None:
+    """Add `author_association` and `untrusted` beside every repository-text field, in place."""
+    for obj in _objects(doc):
+        if "node_id" in obj and _carries_text(obj):
+            assoc = associations.get(obj["node_id"])
+            obj["author_association"] = assoc
+            obj["untrusted"] = is_untrusted(assoc)
+        elif "author_association" in obj and "body" in obj and "untrusted" not in obj:
+            obj["untrusted"] = is_untrusted(obj["author_association"])  # a closing comment
+
+
+def suppress_untrusted(doc: dict) -> int:
+    """Remove the text of every untrusted object, in place; return how many fields went.
+
+    The object stays, with `suppressed: true`, so a consumer sees that something was there
+    and who wrote it rather than a silent gap.
+    """
+    removed = 0
+    for obj in _objects(doc):
+        if obj.get("untrusted") is True:
+            for key in REPOSITORY_TEXT_FIELDS:
+                if obj.get(key) is not None:
+                    obj[key] = None
+                    obj["suppressed"] = True
+                    removed += 1
+    return removed
+
+
+def finish(doc: dict, associations: dict[int, str | None], quotes: str = "all") -> dict:
+    """Label, and in `maintainers` mode suppress, then say what was done."""
+    if quotes not in QUOTE_MODES:
+        raise ValueError(f"quotes must be one of {QUOTE_MODES}, not {quotes!r}")
+    label_authors(doc, associations)
+    removed = suppress_untrusted(doc) if quotes == "maintainers" else 0
+    doc["quotes"] = {"mode": quotes, "suppressed": removed}
+    return doc
+
+
+def finish_from_db(conn, doc: dict, quotes: str = "all") -> dict:
+    return finish(doc, read_associations(conn, node_ids_in(doc)), quotes)
+
+
 def _default(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()

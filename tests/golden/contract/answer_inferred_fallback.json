@@ -19,7 +19,9 @@
         "ref": "pull request #5898",
         "url": "https://github.com/pallets/flask/pull/5898",
         "title": "use 303 for redirect",
-        "match": "identifier"
+        "match": "identifier",
+        "author_association": "CONTRIBUTOR",
+        "untrusted": true
       },
       "found": true,
       "used_inferred_fallback": true,
@@ -40,7 +42,9 @@
               "external_id": "5898",
               "ref": "pull request #5898",
               "url": "https://github.com/pallets/flask/pull/5898",
-              "title": "use 303 for redirect"
+              "title": "use 303 for redirect",
+              "author_association": "CONTRIBUTOR",
+              "untrusted": true
             },
             {
               "node_id": 620,
@@ -48,7 +52,9 @@
               "external_id": "5895",
               "ref": "issue #5895",
               "url": "https://github.com/pallets/flask/issues/5895",
-              "title": "change default redirect code to 303"
+              "title": "change default redirect code to 303",
+              "author_association": "MEMBER",
+              "untrusted": false
             }
           ],
           "steps": [
@@ -72,5 +78,9 @@
       "refusal": null
     }
   ],
-  "other_candidates": []
+  "other_candidates": [],
+  "quotes": {
+    "mode": "all",
+    "suppressed": 0
+  }
 }

@@ -24,7 +24,7 @@ from decision_graph.reasoning import Mode
 
 from tests.test_attempts import _attempt
 from tests.test_contract import (
-    GOLDEN, SCHEMA, T, candidate, closure, explicit_answer, explicit_facts, inferred_answer,
+    ASSOC, GOLDEN, SCHEMA, T, candidate, closure, explicit_answer, explicit_facts, inferred_answer,
     refused, roundtrip, validate,
 )
 
@@ -36,14 +36,15 @@ def answered(**budget) -> dict:
     why = contract.result_doc(c, explicit_answer(), explicit_facts())
     impact = contract.result_doc(c, refused(Mode.IMPACT), contract.Facts())
     attempt_docs = attempts.document("q", [_attempt()])["attempts"]
-    return context.assemble("#5895", why, impact, attempt_docs, **budget)
+    doc = context.assemble("#5895", why, impact, attempt_docs, **budget)
+    return contract.finish(doc, ASSOC)
 
 
 def refused_pack() -> dict:
     c = candidate()
     why = contract.result_doc(c, refused(), contract.Facts(), closure=closure("not_planned"))
     impact = contract.result_doc(c, refused(Mode.IMPACT), contract.Facts())
-    return context.assemble("#5900", why, impact, [])
+    return contract.finish(context.assemble("#5900", why, impact, []), ASSOC)
 
 
 def codes(doc: dict) -> list[str]:

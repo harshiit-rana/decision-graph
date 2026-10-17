@@ -85,7 +85,8 @@ class RenderTest(unittest.TestCase):
 
 class DocumentTest(unittest.TestCase):
     def test_validates_and_keeps_repository_text_in_its_fields(self) -> None:
-        doc = json.loads(contract.dumps(attempts.document("redirect 303", [_attempt()])))
+        doc = json.loads(contract.dumps(contract.finish(
+            attempts.document("redirect 303", [_attempt()]), {41: "CONTRIBUTOR", 42: "MEMBER"})))
         self.assertEqual(validate(doc, SCHEMA), [])
         a = doc["attempts"][0]
         self.assertEqual(a["ending"], "unmerged")
@@ -93,7 +94,7 @@ class DocumentTest(unittest.TestCase):
         self.assertIn("not why it closed", a["last_word"]["caveat"])
 
     def test_empty_document_still_carries_its_caveats(self) -> None:
-        doc = json.loads(contract.dumps(attempts.document("x", [])))
+        doc = json.loads(contract.dumps(contract.finish(attempts.document("x", []), {})))
         self.assertEqual(validate(doc, SCHEMA), [])
         self.assertEqual(doc["attempts"], [])
         self.assertIn(attempts.LEXICAL_CAVEAT, doc["caveats"])

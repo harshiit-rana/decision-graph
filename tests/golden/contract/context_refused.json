@@ -14,7 +14,9 @@
     "ref": "issue #5895",
     "url": null,
     "title": "change default redirect code to 303",
-    "match": "identifier"
+    "match": "identifier",
+    "author_association": "MEMBER",
+    "untrusted": false
   },
   "why": {
     "start": {
@@ -24,7 +26,9 @@
       "ref": "issue #5895",
       "url": null,
       "title": "change default redirect code to 303",
-      "match": "identifier"
+      "match": "identifier",
+      "author_association": "MEMBER",
+      "untrusted": false
     },
     "found": false,
     "used_inferred_fallback": false,
@@ -44,7 +48,8 @@
           "body": "Closing, this is not something we will add.",
           "author_association": "MEMBER",
           "at": "2026-01-25T03:53:00+00:00",
-          "caveat": "This is what was said, not why it closed. The graph records no link between the comment and the closure."
+          "caveat": "This is what was said, not why it closed. The graph records no link between the comment and the closure.",
+          "untrusted": false
         }
       }
     }
@@ -57,7 +62,9 @@
       "ref": "issue #5895",
       "url": null,
       "title": "change default redirect code to 303",
-      "match": "identifier"
+      "match": "identifier",
+      "author_association": "MEMBER",
+      "untrusted": false
     },
     "found": false,
     "used_inferred_fallback": false,
@@ -93,5 +100,9 @@
     "max_paths": null,
     "max_quote_chars": null
   },
-  "truncated": null
+  "truncated": null,
+  "quotes": {
+    "mode": "all",
+    "suppressed": 0
+  }
 }

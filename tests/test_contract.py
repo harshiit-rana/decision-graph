@@ -153,12 +153,18 @@ def closure(kind: str, last_word: bool = True) -> Closure:
     return Closure("issue #5900", kind, T, said)
 
 
-def doc_for(c, answer, facts=None, *, as_of=None, clo=None, others=()) -> dict:
+# Who wrote each fixture node, as the database would report it. The decision (928) is None:
+# its title is copied from the issue, and GitHub records no association for it.
+ASSOC = {ISSUE: "MEMBER", PR: "CONTRIBUTOR"}
+
+
+def doc_for(c, answer, facts=None, *, as_of=None, clo=None, others=(), quotes="all") -> dict:
     result = contract.result_doc(c, answer, facts or contract.Facts(), as_of=as_of, closure=clo)
-    return contract.answer_document(
+    doc = contract.answer_document(
         query="#5895", mode=answer.mode.value, as_of=as_of, max_depth=3,
         results=[result], other_candidates=list(others),
     )
+    return contract.finish(doc, ASSOC, quotes)
 
 
 CASES = {
@@ -191,6 +197,8 @@ V1_FIELDS = frozenset({
     # Added within v1 by #138 (kind "context").
     "why", "impact", "gaps", "detail", "refusal_kind", "budget", "max_paths", "max_quote_chars",
     "truncated", "paths_omitted", "quote_chars_cut",
+    # Added within v1 by #177: who wrote each quoted field, and what `--quotes` did.
+    "author_association", "untrusted", "suppressed", "quotes", "mode",
 })
 
 
