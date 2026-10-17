@@ -387,7 +387,13 @@ def finish(doc: dict, associations: dict[int, str | None], quotes: str = "all") 
 
 def finish_from_db(conn, doc: dict, quotes: str = "all", *, request: dict | None = None) -> dict:
     """Label authors, apply the quote mode, and record provenance (issues #177, #176)."""
+    from . import coverage
+
     finish(doc, read_associations(conn, node_ids_in(doc)), quotes)
+    starts = [r["start"]["node_id"] for r in doc.get("results", [])]
+    if not starts and isinstance(doc.get("start"), dict):  # a context pack
+        starts = [doc["start"]["node_id"]]
+    doc["coverage"] = coverage.compute(conn, start_node_ids=starts)
     doc["provenance"] = provenance(conn, doc, request or {})
     return doc
 

@@ -167,9 +167,29 @@ FIXTURE_ENGINE = {
 }
 
 
+FIXTURE_REPOSITORY = {
+    "name": "pallets/flask", "window_floor": "2025-10-22T00:00:00+00:00",
+    "ingested_through": "2026-10-16T00:00:00+00:00", "last_ingested_at": "2026-10-16T12:00:00+00:00",
+    "last_run_status": "succeeded", "last_run_note": None,
+    "resources": {"issues": {"phase": None, "window_floor": "2025-10-22T00:00:00+00:00",
+                             "through": "2026-10-16T00:00:00+00:00"}},
+}
+
+
+def fixture_coverage(subjects=("node:620",)) -> dict:
+    """What `coverage.compute` returns for a fully ingested repository, as fixed data."""
+    from decision_graph import coverage
+
+    status, detail = coverage.REASONS["ingestion_complete"]
+    return {"repository": FIXTURE_REPOSITORY,
+            "checks": [{"subject": s, "status": status, "reason": "ingestion_complete",
+                        "detail": detail} for s in subjects]}
+
+
 def finished(doc, assoc, quotes="all", request=None):
-    """finish() plus a fixture provenance block: everything `finish_from_db` does, no database."""
+    """finish() plus fixture provenance and coverage: what `finish_from_db` does, no database."""
     contract.finish(doc, assoc, quotes)
+    doc["coverage"] = fixture_coverage()
     return contract.attach_provenance(doc, request or {"command": "fixture"}, FIXTURE_ENGINE, [])
 
 
@@ -182,6 +202,15 @@ def doc_for(c, answer, facts=None, *, as_of=None, clo=None, others=(), quotes="a
     return finished(doc, ASSOC, quotes)
 
 
+def _no_match_coverage() -> dict:
+    from decision_graph import coverage
+
+    status, detail = coverage.REASONS["not_in_graph"]
+    return {"repository": FIXTURE_REPOSITORY,
+            "checks": [{"subject": "query", "status": status, "reason": "not_in_graph",
+                        "detail": detail}]}
+
+
 CASES = {
     "answer_explicit": lambda: doc_for(candidate(), explicit_answer(), explicit_facts(),
                                        others=[candidate(PR, "fuzzy")]),
@@ -192,7 +221,8 @@ CASES = {
     "refusal_no_rationale": lambda: doc_for(candidate(), refused(fallback=True)),
     "refusal_nothing_downstream": lambda: doc_for(candidate(), refused(Mode.IMPACT)),
     "refusal_as_of": lambda: doc_for(candidate(), refused(), as_of=datetime(2025, 6, 1)),
-    "no_match": lambda: contract.no_match_document("nonexistent thing"),
+    "no_match": lambda: {**contract.no_match_document("nonexistent thing"),
+                         "coverage": _no_match_coverage()},
     "error": lambda: contract.error_document("--depth 0 cannot reach anything. Use 1 or more."),
 }
 
@@ -217,6 +247,10 @@ V1_FIELDS = frozenset({
     # Added within v1 by #176: what was asked, which engine answered, and what it read.
     "provenance", "request", "engine", "used", "package_version", "migrations", "applied",
     "last", "last_checksum", "ledger_sha256", "edges", "observed_at", "valid_from", "created_at",
+    # Added within v1 by #174: what the ingested window could and could not have contained.
+    "coverage", "repository", "checks", "subject", "reason", "resources", "phase", "window_floor",
+    "through", "ingested_through", "last_ingested_at", "last_run_status", "last_run_note",
+    "resource", "lowest_number_in_window", "name",
 })
 
 

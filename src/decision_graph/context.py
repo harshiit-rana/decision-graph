@@ -143,7 +143,12 @@ def build(conn, query: str, *, repo_node_id: int | None = None,
           max_quote_chars: int | None = None, quotes: str = "all") -> dict:
     candidates = retrieval.find_candidates(conn, query, repo_node_id=repo_node_id, limit=1)
     if not candidates:
-        return contract.no_match_document(query)
+        from . import coverage
+
+        doc = contract.no_match_document(query)
+        doc["coverage"] = coverage.compute(conn, start_node_ids=[], query=query, matched=False,
+                                           repo_node_id=repo_node_id)
+        return doc
     c = candidates[0]
     url = contract.node_urls(conn, [c.node_id]).get(c.node_id)
 

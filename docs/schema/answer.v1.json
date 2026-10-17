@@ -608,7 +608,8 @@
         "results",
         "other_candidates",
         "quotes",
-        "provenance"
+        "provenance",
+        "coverage"
       ],
       "properties": {
         "schema_version": {
@@ -657,6 +658,9 @@
         },
         "provenance": {
           "$ref": "#/$defs/provenance"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
         }
       }
     },
@@ -667,7 +671,8 @@
         "schema_version",
         "kind",
         "query",
-        "message"
+        "message",
+        "coverage"
       ],
       "properties": {
         "schema_version": {
@@ -681,6 +686,9 @@
         },
         "message": {
           "type": "string"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
         }
       }
     },
@@ -840,7 +848,8 @@
         "attempts",
         "caveats",
         "quotes",
-        "provenance"
+        "provenance",
+        "coverage"
       ],
       "properties": {
         "schema_version": {
@@ -875,6 +884,9 @@
         },
         "provenance": {
           "$ref": "#/$defs/provenance"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
         }
       }
     },
@@ -925,7 +937,8 @@
         "budget",
         "truncated",
         "quotes",
-        "provenance"
+        "provenance",
+        "coverage"
       ],
       "properties": {
         "schema_version": {
@@ -1017,6 +1030,9 @@
         },
         "provenance": {
           "$ref": "#/$defs/provenance"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
         }
       }
     },
@@ -1163,6 +1179,168 @@
                     "description": "ISO 8601, or null."
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "checks"
+      ],
+      "description": "What the ingested window could and could not have contained (issue #174). Mechanical, from the ingestion cursors and the latest ingestion run. There is no numeric score. `unknown` means the fact isn't recorded, never a guess.",
+      "properties": {
+        "repository": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "window_floor",
+                "ingested_through",
+                "last_ingested_at",
+                "last_run_status",
+                "last_run_note",
+                "resources"
+              ],
+              "properties": {
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "window_floor": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "ISO 8601, or null."
+                },
+                "ingested_through": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The older of the issues and pulls steady watermarks. Null until a first pass finished."
+                },
+                "last_ingested_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "When the latest successful run finished."
+                },
+                "last_run_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "running",
+                    "succeeded",
+                    "failed",
+                    null
+                  ]
+                },
+                "last_run_note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "`stopped early...` and `interrupted...` are stored with status succeeded; they mean the run didn't finish."
+                },
+                "resources": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "phase",
+                      "window_floor",
+                      "through"
+                    ],
+                    "properties": {
+                      "phase": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "window_floor": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "ISO 8601, or null."
+                      },
+                      "through": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "ISO 8601, or null."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subject",
+              "status",
+              "reason",
+              "detail"
+            ],
+            "properties": {
+              "subject": {
+                "type": "string",
+                "description": "node:<id>, query, or repository."
+              },
+              "status": {
+                "enum": [
+                  "complete",
+                  "partial",
+                  "outside_window",
+                  "unknown"
+                ]
+              },
+              "reason": {
+                "enum": [
+                  "ingestion_complete",
+                  "backfill_incomplete",
+                  "last_run_failed",
+                  "last_run_stopped_early",
+                  "older_than_window",
+                  "no_ingestion_record",
+                  "no_repository",
+                  "not_in_graph"
+                ]
+              },
+              "detail": {
+                "type": "string",
+                "description": "Fixed system text for the reason."
+              },
+              "resource": {
+                "type": "string"
+              },
+              "lowest_number_in_window": {
+                "type": "integer"
               }
             }
           }

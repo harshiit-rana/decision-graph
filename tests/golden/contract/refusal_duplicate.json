@@ -47,6 +47,31 @@
     "mode": "all",
     "suppressed": 0
   },
+  "coverage": {
+    "repository": {
+      "name": "pallets/flask",
+      "window_floor": "2025-10-22T00:00:00+00:00",
+      "ingested_through": "2026-10-16T00:00:00+00:00",
+      "last_ingested_at": "2026-10-16T12:00:00+00:00",
+      "last_run_status": "succeeded",
+      "last_run_note": null,
+      "resources": {
+        "issues": {
+          "phase": null,
+          "window_floor": "2025-10-22T00:00:00+00:00",
+          "through": "2026-10-16T00:00:00+00:00"
+        }
+      }
+    },
+    "checks": [
+      {
+        "subject": "node:620",
+        "status": "complete",
+        "reason": "ingestion_complete",
+        "detail": "The cursors that pulled this have reached their steady state and the last ingestion run finished. This says nothing about activity since that run."
+      }
+    ]
+  },
   "provenance": {
     "request": {
       "command": "fixture"

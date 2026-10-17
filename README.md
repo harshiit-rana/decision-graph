@@ -372,6 +372,26 @@ the fields named by `repository_text_fields` (`title`, `excerpt`, `body`), and n
 a sentence this system wrote. A consumer handing the document to a model can fence exactly
 those fields.
 
+**And it says what the window could have contained (#174).** A refusal can be misread as
+"nothing happened" when the evidence was simply outside what was ingested. Every document
+carries `coverage`: the repository's pinned window (`window_floor`, `ingested_through`,
+`last_ingested_at`, and the last run's status), and a `checks` list with one entry per start
+node, or one for the query when nothing matched. Each check has a `status` and a fixed
+`reason`:
+
+| status | reasons |
+|---|---|
+| `complete` | `ingestion_complete`: the cursors that pulled it are in steady state and the last run finished |
+| `partial` | `backfill_incomplete`, `last_run_failed`, `last_run_stopped_early` (the rate-limit stop and the interrupt are stored as `succeeded` with a note, and are read from it) |
+| `outside_window` | `older_than_window`: the query names a number lower than every issue or PR created inside the window |
+| `unknown` | `no_ingestion_record`, `no_repository`, `not_in_graph`. The fact isn't recorded, so it is never guessed |
+
+There is **no numeric completeness score**: nothing could calibrate one (ADR 0002). `complete`
+says the cursors reached steady state, not that GitHub holds nothing more, and nothing about
+activity since the last run. The window is **360 days** for `BACKFILL_MONTHS=12`, because the
+floor is pinned as `now - 30 x months` days at first contact. A text refusal prints one line
+with the same facts, ending "No record is not the same as nothing happened."
+
 **And it can be replayed (#176).** Every document carries `provenance`:
 - `request`: the query's own arguments (command, query, mode, `as_of`, depth, limits, quotes);
 - `engine`: the package version, the schema version, and the migration ledger (how many are

@@ -2,5 +2,30 @@
   "schema_version": 1,
   "kind": "no_match",
   "query": "nonexistent thing",
-  "message": "Nothing in the graph matches. Retrieval tries exact title, then identifier, then prefix, then fuzzy, so a miss means no artifact in the ingested window resembles this."
+  "message": "Nothing in the graph matches. Retrieval tries exact title, then identifier, then prefix, then fuzzy, so a miss means no artifact in the ingested window resembles this.",
+  "coverage": {
+    "repository": {
+      "name": "pallets/flask",
+      "window_floor": "2025-10-22T00:00:00+00:00",
+      "ingested_through": "2026-10-16T00:00:00+00:00",
+      "last_ingested_at": "2026-10-16T12:00:00+00:00",
+      "last_run_status": "succeeded",
+      "last_run_note": null,
+      "resources": {
+        "issues": {
+          "phase": null,
+          "window_floor": "2025-10-22T00:00:00+00:00",
+          "through": "2026-10-16T00:00:00+00:00"
+        }
+      }
+    },
+    "checks": [
+      {
+        "subject": "query",
+        "status": "unknown",
+        "reason": "not_in_graph",
+        "detail": "Nothing in the graph matches. It may not exist, may be newer than the last ingestion, or retrieval may have missed it."
+      }
+    ]
+  }
 }

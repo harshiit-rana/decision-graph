@@ -274,7 +274,12 @@ def main(argv: list[str] | None = None) -> int:
         conn, args.query, repo_node_id=repo_node_id, limit=args.limit
     )
     if not candidates and as_json:
-        print(contract.dumps(contract.no_match_document(args.query)))
+        from . import coverage
+
+        doc = contract.no_match_document(args.query)
+        doc["coverage"] = coverage.compute(conn, start_node_ids=[], query=args.query,
+                                           matched=False, repo_node_id=repo_node_id)
+        print(contract.dumps(doc))
         conn.close()
         return 1
     if not candidates:
@@ -341,7 +346,15 @@ def main(argv: list[str] | None = None) -> int:
             bodies=bodies, reviewers=reviewers, as_of=as_of, closure=closure,
             verbose=args.verbose,
         )
+        if not answer.found:
+            # A refusal can be misread as "nothing happened" when the evidence was outside what
+            # was ingested, so say what the window covered (#174).
+            from . import coverage
 
+            said = coverage.line(coverage.compute(conn, start_node_ids=[c.node_id]))
+            if said:
+                print(render.dim("  " + said))
+                print()
 
     skipped = len(candidates) - len(chosen)
     if skipped and not graphical:
