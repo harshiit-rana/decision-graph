@@ -842,6 +842,12 @@ running the **same** extractors on a delivery — nothing here is a second inges
 GITHUB_WEBHOOK_SECRET=... DATABASE_URL=... GITHUB_TOKEN=... dg-webhook --port 8000
 ```
 
+It listens on `127.0.0.1` by default (#191): it is an authenticated write path into the graph, served
+over plain HTTP, so it is reachable from this machine only unless you choose otherwise. Put a
+TLS-terminating reverse proxy on the same machine in front of it. `--host 0.0.0.0` exposes it to the
+network and logs a warning saying there is no TLS. A `Content-Length` over 25 MB (GitHub's delivery
+limit) is refused with a 413 before the body is read.
+
 It **refuses to start without a secret**, because a receiver with verification off is an
 unauthenticated write endpoint into the graph, and the way that happens in practice is an unset
 variable rather than a decision. Signatures are checked with `hmac.compare_digest` against the

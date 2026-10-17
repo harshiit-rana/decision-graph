@@ -62,7 +62,7 @@ Nothing else makes a network call. `dg query`, `dg context`, `dg report`, `dg st
 | Listener | Bound to | Notes | Code |
 |---|---|---|---|
 | PostgreSQL (published port) | `127.0.0.1:55434` by default | `DG_DB_BIND=0.0.0.0` exposes it deliberately. `dg` itself never uses this port; it talks to `db:5432` on the compose network. **The app still connects as the `postgres` superuser**: least-privilege roles are #172 | `docker-compose.yml` |
-| `dg-webhook` | **`0.0.0.0:8000` by default** | Refuses to start without `GITHUB_WEBHOOK_SECRET`. Verifies the HMAC-SHA256 signature with `hmac.compare_digest` before parsing anything. Every bad signature gets the same 401. It is `http.server`: single-threaded, **no TLS**, and not a production server. Run it behind a TLS-terminating reverse proxy. Duplicate deliveries aren't yet de-duplicated (#164). Its all-interfaces default is tracked in #191 | `webhook.py` |
+| `dg-webhook` | `127.0.0.1:8000` by default | Refuses to start without `GITHUB_WEBHOOK_SECRET`. Verifies the HMAC-SHA256 signature with `hmac.compare_digest` before parsing anything. Every bad signature gets the same 401. A `Content-Length` over 25 MB (GitHub's delivery limit) is a 413 before the body is read. It is `http.server`: single-threaded, **no TLS**, and not a production server. `--host 0.0.0.0` exposes it to the network and logs a warning saying so. Run it behind a TLS-terminating reverse proxy on the same machine. Duplicate deliveries aren't yet de-duplicated (#164) | `webhook.py` (`DEFAULT_HOST`, `MAX_BODY_BYTES`) |
 
 ## Out of scope today
 

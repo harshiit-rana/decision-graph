@@ -197,6 +197,73 @@ class LiveServerTest(unittest.TestCase):
         self.assertNotIn("decision_graph", text)
 
 
+class BindingTest(unittest.TestCase):
+    """The receiver is reachable only from this machine unless someone chose otherwise (#191)."""
+
+    def test_the_function_default_is_loopback(self) -> None:
+        import inspect
+
+        self.assertEqual(inspect.signature(webhook.serve).parameters["host"].default, "127.0.0.1")
+        self.assertEqual(webhook.DEFAULT_HOST, "127.0.0.1")
+
+    def test_the_command_line_default_is_loopback(self) -> None:
+        import contextlib
+        import io
+
+        buf = io.StringIO()
+        with self.assertRaises(SystemExit), contextlib.redirect_stdout(buf):
+            webhook.main(["--help"])
+        self.assertIn("default 127.0.0.1", buf.getvalue())
+        self.assertNotIn("default 0.0.0.0", buf.getvalue())
+
+    def test_serve_binds_the_host_it_is_given_and_warns_when_that_is_not_loopback(self) -> None:
+        from unittest import mock
+
+        settings = Settings(database_url="postgresql://unused", github_token="x", target_repo=REPO)
+        for host, warns in (("127.0.0.1", False), ("0.0.0.0", True)):
+            with self.subTest(host=host):
+                with mock.patch.object(webhook, "HTTPServer") as server, \
+                     self.assertLogs("decision_graph.webhook", level="INFO") as logs:
+                    server.return_value.serve_forever.side_effect = KeyboardInterrupt
+                    with self.assertRaises(KeyboardInterrupt):
+                        webhook.serve(host, 8123, settings=settings, secret="s")
+                self.assertEqual(server.call_args[0][0], (host, 8123))
+                said = "\n".join(logs.output)
+                self.assertEqual("reachable from the network" in said, warns)
+                if warns:
+                    self.assertIn("no TLS", said)
+
+
+class BodyCapTest(unittest.TestCase):
+    """An oversized body is refused before it is read: the cap was never tested (#191)."""
+
+    def test_the_cap_is_github_s_documented_delivery_limit(self) -> None:
+        self.assertEqual(webhook.MAX_BODY_BYTES, 25 * 1024 * 1024)
+
+    def test_an_oversized_content_length_is_a_413_without_reading_the_body(self) -> None:
+        import socket
+
+        settings = Settings(database_url="postgresql://unused", github_token="x", target_repo=REPO)
+        bound = type("_Bound", (webhook._Handler,), {"secret": SECRET, "settings": settings})
+        httpd = HTTPServer(("127.0.0.1", 0), bound)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=5) as s:
+                # Declares 100 MB and sends none of it. If the server tried to read the body it
+                # would block until the timeout. A 413 comes straight back.
+                s.sendall(
+                    b"POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 104857600\r\n"
+                    b"X-GitHub-Event: issues\r\n\r\n"
+                )
+                reply = s.recv(4096).decode("latin-1")
+            self.assertIn("413", reply.split("\r\n")[0])
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 class MainArgumentTest(unittest.TestCase):
     """It takes arguments, so it parses them -- the #82 rule."""
 

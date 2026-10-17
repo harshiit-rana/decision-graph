@@ -261,7 +261,15 @@ class _Handler(BaseHTTPRequestHandler):
         log.info("%s - %s", self.address_string(), fmt % args)
 
 
-def serve(host: str = "0.0.0.0", port: int = 8000, *, settings: Settings | None = None,
+# Loopback by default (#191). The receiver is an authenticated write path into the graph, served
+# over plain HTTP by a single-threaded `http.server`, so it shouldn't be reachable from the network
+# before anyone has chosen that. A TLS-terminating reverse proxy on the same machine forwards to
+# it, and needs nothing more. Exposing it directly takes `--host 0.0.0.0`, and says so in the log.
+DEFAULT_HOST = "127.0.0.1"
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+
+def serve(host: str = DEFAULT_HOST, port: int = 8000, *, settings: Settings | None = None,
           secret: str | None = None) -> None:
     """Listen for deliveries. Refuses to start without a secret.
 
@@ -281,6 +289,11 @@ def serve(host: str = "0.0.0.0", port: int = 8000, *, settings: Settings | None 
     handler = type("_Bound", (_Handler,), {"secret": secret, "settings": settings})
     httpd = HTTPServer((host, port), handler)
     log.info("listening on %s:%s for %s", host, port, settings.target_repo)
+    if host not in _LOOPBACK:
+        log.warning(
+            "listening on %s, which is reachable from the network. There is no TLS here: put a "
+            "TLS-terminating reverse proxy in front, or bind to %s.", host, DEFAULT_HOST,
+        )
     try:
         httpd.serve_forever()
     finally:
@@ -294,7 +307,11 @@ def main(argv: list[str] | None = None) -> int:
         prog="dg-webhook",
         description="Receive GitHub webhook deliveries and ingest them (PRD Phase 5).",
     )
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument(
+        "--host", default=DEFAULT_HOST,
+        help=f"interface to listen on (default {DEFAULT_HOST}, this machine only). "
+        "0.0.0.0 exposes it to the network, with no TLS",
+    )
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
 
