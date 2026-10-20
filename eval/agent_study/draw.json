@@ -1,0 +1,143 @@
+{
+ "procedure": "every eligible item, grouped into clusters by shared precedent; the task is each cluster's earliest item. No sampling.",
+ "repos": {
+  "pallets/flask": {
+   "window": [
+    "2025-08-20",
+    "2026-08-10"
+   ],
+   "pool_size": 267,
+   "eligible_count": 2,
+   "eligible_numbers": [
+    5923,
+    6101
+   ],
+   "clusters": [
+    {
+     "task_item": 5923,
+     "also_reproposed_in": [],
+     "precedents": [
+      5912,
+      5914
+     ]
+    },
+    {
+     "task_item": 6101,
+     "also_reproposed_in": [],
+     "precedents": [
+      6095
+     ]
+    }
+   ],
+   "excluded_reasons": {
+    "linked artifacts are not earlier, in-window history": 10,
+    "maintainer comment marks it junk/spam/machine-generated": 18,
+    "no maintainer comment": 135,
+    "no maintainer comment links an artifact": 102
+   }
+  },
+  "urllib3/urllib3": {
+   "window": [
+    "2025-11-01",
+    "2026-09-30"
+   ],
+   "pool_size": 305,
+   "eligible_count": 14,
+   "eligible_numbers": [
+    3759,
+    3771,
+    4992,
+    5005,
+    5049,
+    5078,
+    5088,
+    5108,
+    5109,
+    5121,
+    5133,
+    5174,
+    5180,
+    5183
+   ],
+   "clusters": [
+    {
+     "task_item": 3759,
+     "also_reproposed_in": [],
+     "precedents": [
+      3720
+     ]
+    },
+    {
+     "task_item": 3771,
+     "also_reproposed_in": [],
+     "precedents": [
+      3726
+     ]
+    },
+    {
+     "task_item": 4992,
+     "also_reproposed_in": [
+      5005
+     ],
+     "precedents": [
+      3729
+     ]
+    },
+    {
+     "task_item": 5049,
+     "also_reproposed_in": [
+      5133,
+      5174,
+      5180,
+      5183
+     ],
+     "precedents": [
+      5044
+     ]
+    },
+    {
+     "task_item": 5078,
+     "also_reproposed_in": [],
+     "precedents": [
+      5077
+     ]
+    },
+    {
+     "task_item": 5088,
+     "also_reproposed_in": [],
+     "precedents": [
+      5071
+     ]
+    },
+    {
+     "task_item": 5108,
+     "also_reproposed_in": [],
+     "precedents": [
+      5102
+     ]
+    },
+    {
+     "task_item": 5109,
+     "also_reproposed_in": [],
+     "precedents": [
+      5107
+     ]
+    },
+    {
+     "task_item": 5121,
+     "also_reproposed_in": [],
+     "precedents": [
+      5103
+     ]
+    }
+   ],
+   "excluded_reasons": {
+    "every precedent was merged before the decision point, so it is in the checkout": 6,
+    "linked artifacts are not earlier, in-window history": 40,
+    "maintainer comment marks it junk/spam/machine-generated": 1,
+    "no maintainer comment": 190,
+    "no maintainer comment links an artifact": 54
+   }
+  }
+ }
+}

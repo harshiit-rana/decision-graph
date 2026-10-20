@@ -1104,6 +1104,14 @@ assigns one, and a label that contradicts what the runner recorded the engine re
 labels are transcribed from `eval/RESULTS.md` by the system's author, not re-judged and not
 independent (#143).
 
+**The agent study is pre-registered, not run (#140).** [`eval/agent_study/PROTOCOL.md`](eval/agent_study/PROTOCOL.md)
+fixes the question (does recorded history reduce an agent's wrong assumptions, ADR 0006's H1), nine
+tasks taken whole by a mechanical rule from flask and urllib3 history, the two conditions, the
+metrics, the blinding, the sign-test threshold and what counts as no effect, before any agent has
+been given a TraceMind tool. With nine tasks it can only find a large effect, and it says so; the
+issue asked for twelve, and the protocol records why it has nine. It says nothing about design
+rationale: five of the nine are "someone is already doing this".
+
 **Adjudicated: 18 of 18 correct, no failures — see [`eval/RESULTS.md`](eval/RESULTS.md)
 for the figure with its disclosures.** Read them before quoting the number. 8 of the 18
 correct outcomes are the system returning nothing, so a degenerate engine that always

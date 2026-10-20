@@ -1,0 +1,579 @@
+{
+ "format": 1,
+ "registered": "2026-10-20",
+ "about": "Nine precedent tasks for the agent study (#140). Each is a pull request that a maintainer closed by pointing at an earlier artifact. The text the agent sees is item.title and item.body, exactly as filed (no edit since filing, per GraphQL lastEditedAt), and nothing after as_of.",
+ "tasks": [
+  {
+   "id": "A1",
+   "repo": "pallets/flask",
+   "type": "declined_before",
+   "item": {
+    "number": 5923,
+    "kind": "pull_request",
+    "url": "https://github.com/pallets/flask/pull/5923",
+    "title": "Fix ENOTDIR handling in Config.from_file() with silent=True",
+    "body": "## Summary\n- `from_pyfile()` correctly suppresses `errno.ENOTDIR` when `silent=True`, but `from_file()` was missing it\n- This caused an `OSError` when a path component is a regular file instead of a directory (e.g. `~/.myapp` is a file and loading `~/.myapp/config.toml`)\n- One-line fix to add `errno.ENOTDIR` to the silent error tuple, matching `from_pyfile()` behavior\n\n## Test plan\n- [x] Added `test_config_enotdir_silent` — creates a file where a directory is expected and confirms `from_file(..., silent=True)` returns `False` instead of raising\n- [x] All 20 existing config tests pass",
+    "filed_at": "2026-02-18T15:51:17Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-02-18T15:54:56Z",
+    "url": "https://github.com/pallets/flask/pull/5923#issuecomment-3921626488"
+   },
+   "as_of": "2026-02-18T15:54:55Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 5923,
+     "also_reproposed_in": [],
+     "precedents": [
+      5912,
+      5914
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 5912,
+      "created": "2026-02-08",
+      "merged_at": null,
+      "closed_at": "2026-02-09T03:59:02Z",
+      "is_pr": false
+     },
+     {
+      "number": 5914,
+      "created": "2026-02-09",
+      "merged_at": null,
+      "closed_at": "2026-02-09T03:59:06Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed unmerged 11 minutes after it was opened; a maintainer asked what motivated it and pointed to the earlier identical change closed as not planned.",
+    "outcome_url": "https://github.com/pallets/flask/pull/5923#issuecomment-3921626488",
+    "history": [
+     {
+      "artifact": "pallets/flask#5912",
+      "url": "https://github.com/pallets/flask/issues/5912",
+      "state_at_as_of": "closed, not planned (2026-02-09)",
+      "records": "The same change, to add errno.ENOTDIR to Config.from_file()'s silent error codes, was proposed as an issue and closed as not planned nine days earlier."
+     },
+     {
+      "artifact": "pallets/flask#5914",
+      "url": "https://github.com/pallets/flask/pull/5914",
+      "state_at_as_of": "closed unmerged (2026-02-09)",
+      "records": "The associated pull request with the same one-line change was closed without merging."
+     }
+    ],
+    "contradicted_claims": [
+     "The ENOTDIR omission in from_file() is a new, unaddressed inconsistency that is safe to merge as a one-line fix.",
+     "Maintainers have not considered this change before."
+    ],
+    "must_cite": [
+     "pallets/flask#5912",
+     "pallets/flask#5914"
+    ],
+    "history_silent_on": [
+     "Why #5912 and #5914 were closed. Neither records a technical reason, so a plan must not state one as fact."
+    ]
+   }
+  },
+  {
+   "id": "A2",
+   "repo": "pallets/flask",
+   "type": "superseded_in_progress",
+   "item": {
+    "number": 6101,
+    "kind": "pull_request",
+    "url": "https://github.com/pallets/flask/pull/6101",
+    "title": "Fixed monkeypatch and werkzeug deprecation",
+    "body": "\r\nAdded fixes introduces in the PR #6072  and fixed the deprecation error encountered in the aforementioned PR.\r\n\r\nFixes Issue: #6071 \r\nFixes PR: #6072 \r\n\r\nTesting:\r\n\r\npypy3.11: OK ✔ in 32.09 seconds\r\ndocs: OK ✔ in 35.11 seconds\r\n  py3.14: OK (21.92=setup[12.60]+cmd[9.32] seconds)\r\n  py3.14t: OK (18.54=setup[4.81]+cmd[13.73] seconds)\r\n  py3.13: OK (16.17=setup[2.54]+cmd[13.63] seconds)\r\n  py3.12: OK (21.51=setup[12.76]+cmd[8.75] seconds)\r\n  py3.11: OK (16.17=setup[2.83]+cmd[13.34] seconds)\r\n  py3.10: OK (22.89=setup[13.22]+cmd[9.68] seconds)\r\n  py3.9: OK (22.07=setup[1.70]+cmd[20.37] seconds)\r\n  pypy3.11: OK (32.09=setup[12.34]+cmd[19.75] seconds)\r\n  tests-min: OK (28.08=setup[7.55]+cmd[7.61,12.91] seconds)\r\n  tests-dev: FAIL code 1 (28.08=setup[4.02]+cmd[10.76,13.29] seconds)\r\n\r\nBut i don't understand for the tests-dev fail, if you can run it in git action to check if it is not a local setup/dependencies problem\r\nwould be wonderful.",
+    "filed_at": "2026-07-22T00:42:59Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-07-22T02:17:37Z",
+    "url": "https://github.com/pallets/flask/pull/6101#issuecomment-5041071606"
+   },
+   "as_of": "2026-07-22T02:17:36Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 6101,
+     "also_reproposed_in": [],
+     "precedents": [
+      6095
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 6095,
+      "created": "2026-07-14",
+      "merged_at": "2026-07-30T17:05:05Z",
+      "closed_at": "2026-07-30T17:05:05Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed as a duplicate of #6095 about an hour and a half after it was opened.",
+    "outcome_url": "https://github.com/pallets/flask/pull/6101#issuecomment-5041071606",
+    "history": [
+     {
+      "artifact": "pallets/flask#6095",
+      "url": "https://github.com/pallets/flask/pull/6095",
+      "state_at_as_of": "open (opened 2026-07-14; merged 2026-07-30, after as_of)",
+      "records": "An open pull request that replaces the use of the private monkeypatch fixture API for pytest 9.1 compatibility, the same change this item makes."
+     }
+    ],
+    "contradicted_claims": [
+     "No other change addresses the monkeypatch compatibility problem.",
+     "This pull request should be reviewed or merged on its own."
+    ],
+    "must_cite": [
+     "pallets/flask#6095"
+    ],
+    "history_silent_on": []
+   }
+  },
+  {
+   "id": "A3",
+   "repo": "urllib3/urllib3",
+   "type": "superseded_in_progress",
+   "item": {
+    "number": 3759,
+    "kind": "pull_request",
+    "url": "https://github.com/urllib3/urllib3/pull/3759",
+    "title": "Remove Python 3.9 support (EOL) and modernize codebase for Python 3.10+",
+    "body": "Removes support for Python 3.9 (which reached end-of-life) and updates the minimum supported Python version to 3.10. This change allows us to clean up legacy workarounds and modernize the codebase.\r\n\r\n## Changes\r\n\r\n### Configuration & CI\r\n- Updated `pyproject.toml` to require Python >=3.10\r\n- Removed Python 3.9 classifier from package metadata\r\n- Removed Python 3.9 from CI workflow test matrix\r\n- Removed Python 3.9 specific integration test for SSL workaround\r\n- Updated `noxfile.py` to exclude Python 3.9 from test sessions\r\n\r\n### Documentation\r\n- Updated migration guide to reflect Python 3.10+ requirement\r\n- Updated contributing guide to remove Python 3.9 references\r\n- Corrected version references throughout documentation\r\n\r\n### Code Modernization\r\n- Removed Python 3.9.3 SSL hostname checking workarounds (`ssl_.py`)\r\n- Removed IPv6 scoped address workaround that was needed for Python <3.9 (`ssl_match_hostname.py`)\r\n- Adopted parenthesized context managers (Python 3.10+ feature) in tests\r\n- Cleaned up defensive code and comments for Python 3.9 limitations\r\n- Removed CPython <3.9.7 bug workaround in `response.py`\r\n\r\n## Impact\r\n\r\n- **Breaking Change**: Python 3.9 is no longer supported\r\n- Users must upgrade to Python 3.10 or later\r\n- Codebase is cleaner with fewer version-specific workarounds\r\n- Better alignment with modern Python practices",
+    "filed_at": "2026-01-17T16:39:20Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-01-19T17:31:11Z",
+    "url": "https://github.com/urllib3/urllib3/pull/3759#issuecomment-3769486019"
+   },
+   "as_of": "2026-01-19T17:31:10Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 3759,
+     "also_reproposed_in": [],
+     "precedents": [
+      3720
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 3720,
+      "created": "2025-11-20",
+      "merged_at": "2026-02-21T11:41:28Z",
+      "closed_at": "2026-02-21T11:41:28Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed; the maintainer asked the author to give feedback on #3720, existing work in progress on dropping Python 3.9.",
+    "outcome_url": "https://github.com/urllib3/urllib3/pull/3759#issuecomment-3769486019",
+    "history": [
+     {
+      "artifact": "urllib3/urllib3#3720",
+      "url": "https://github.com/urllib3/urllib3/pull/3720",
+      "state_at_as_of": "open (opened 2025-11-20; merged 2026-02-21, after as_of)",
+      "records": "An open pull request titled 'Drop Python 3.9', under active review by maintainers, covering the same removal."
+     }
+    ],
+    "contradicted_claims": [
+     "Dropping Python 3.9 has not been started and this pull request would be the one to do it."
+    ],
+    "must_cite": [
+     "urllib3/urllib3#3720"
+    ],
+    "history_silent_on": []
+   }
+  },
+  {
+   "id": "A4",
+   "repo": "urllib3/urllib3",
+   "type": "prior_attempt",
+   "item": {
+    "number": 3771,
+    "kind": "pull_request",
+    "url": "https://github.com/urllib3/urllib3/pull/3771",
+    "title": "Fix decoded buffer handling on full read",
+    "body": "## Summary\n- Ensure HTTPResponse.read() returns buffered decoded bytes when amt=None\n- Prevent data loss after a partial decoded read followed by full read\n- Add regression test covering partial read then full read with decode_content=True\n\n## Testing\n- python -m pytest test/test_response.py -k \" partial_read_then_read_all_returns_remaining\\",
+    "filed_at": "2026-02-10T19:07:04Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-02-11T21:19:42Z",
+    "url": "https://github.com/urllib3/urllib3/pull/3771#issuecomment-3887283442"
+   },
+   "as_of": "2026-02-11T21:19:41Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 3771,
+     "also_reproposed_in": [],
+     "precedents": [
+      3726
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 3726,
+      "created": "2025-12-03",
+      "merged_at": null,
+      "closed_at": "2026-04-11T19:57:27Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed; the maintainer said the bug is tracked in #3636, that #3647 and #3726 already attempt it, that it is not that simple, and that #3726 is the closest to resolving it.",
+    "outcome_url": "https://github.com/urllib3/urllib3/pull/3771#issuecomment-3887283442",
+    "history": [
+     {
+      "artifact": "urllib3/urllib3#3726",
+      "url": "https://github.com/urllib3/urllib3/pull/3726",
+      "state_at_as_of": "open (opened 2025-12-03; closed unmerged 2026-04-11, after as_of)",
+      "records": "An open pull request, opened 2025-12-03, for the same partial-then-full-read bug (#3636). The maintainer later (the outcome comment) calls it the closest to a fix."
+     },
+     {
+      "artifact": "urllib3/urllib3#3636",
+      "url": "https://github.com/urllib3/urllib3/issues/3636",
+      "state_at_as_of": "open",
+      "records": "The tracking issue for the bug. Created 2025-07-01, before the ingestion window, so TraceMind may hold it only because it was updated inside the window."
+     },
+     {
+      "artifact": "urllib3/urllib3#3647",
+      "url": "https://github.com/urllib3/urllib3/pull/3647",
+      "state_at_as_of": "open (closed unmerged 2026-04-11, after as_of)",
+      "records": "An earlier pull request for the same bug. Created before the ingestion window."
+     }
+    ],
+    "contradicted_claims": [
+     "Returning the buffered decoded bytes when amt=None is a complete and simple fix.",
+     "No existing change addresses this bug."
+    ],
+    "must_cite": [
+     "urllib3/urllib3#3726",
+     "urllib3/urllib3#3636"
+    ],
+    "history_silent_on": []
+   }
+  },
+  {
+   "id": "A5",
+   "repo": "urllib3/urllib3",
+   "type": "prior_attempt",
+   "item": {
+    "number": 4992,
+    "kind": "pull_request",
+    "url": "https://github.com/urllib3/urllib3/pull/4992",
+    "title": "Resolve connection pool queue class lazily",
+    "body": "## Summary\n- resolve the default `queue.LifoQueue` class when each connection pool is constructed instead of storing an import-time reference\n- keep `ConnectionPool.QueueCls` as an explicit override hook for subclasses\n- add regression coverage for late monkey-patching and explicit queue-class overrides\n\nCloses #3289.\n\n## Testing\n- `.venv/bin/python -m pytest test/test_queue_monkeypatch.py -q`\n- `.venv/bin/python -m pytest test/test_connectionpool.py test/test_queue_monkeypatch.py -q`\n- `.venv/bin/python -m mypy src/urllib3/connectionpool.py test/test_queue_monkeypatch.py`\n- `.venv/bin/python -m nox -rs lint`\n- `git diff --check`",
+    "filed_at": "2026-05-09T11:11:44Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-05-23T13:57:25Z",
+    "url": "https://github.com/urllib3/urllib3/pull/4992#issuecomment-4525566464"
+   },
+   "as_of": "2026-05-23T13:57:24Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 4992,
+     "also_reproposed_in": [
+      5005
+     ],
+     "precedents": [
+      3729
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 3729,
+      "created": "2025-12-05",
+      "merged_at": null,
+      "closed_at": "2026-08-10T20:45:28Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed because #3729 showed a better solution.",
+    "outcome_url": "https://github.com/urllib3/urllib3/pull/4992#issuecomment-4525566464",
+    "history": [
+     {
+      "artifact": "urllib3/urllib3#3729",
+      "url": "https://github.com/urllib3/urllib3/pull/3729",
+      "state_at_as_of": "open (opened 2025-12-05; closed unmerged 2026-08-10, after as_of)",
+      "records": "An open pull request for the same issue, #3289, that delays the queue import with a metaclass. A maintainer asked for a test on 2025-12-20 and the author added one on 2025-12-23."
+     }
+    ],
+    "contradicted_claims": [
+     "No other pull request addresses #3289.",
+     "This pull request is the proposed fix for #3289 that maintainers are reviewing."
+    ],
+    "must_cite": [
+     "urllib3/urllib3#3729"
+    ],
+    "history_silent_on": [
+     "Which approach finally merged. That is after as_of (#5057, 2026-08-10) and a plan must not claim it."
+    ]
+   }
+  },
+  {
+   "id": "A6",
+   "repo": "urllib3/urllib3",
+   "type": "compatibility_constraint",
+   "item": {
+    "number": 5049,
+    "kind": "pull_request",
+    "url": "https://github.com/urllib3/urllib3/pull/5049",
+    "title": "Treat empty retry allowed_methods as no methods",
+    "body": "## Summary\n- distinguish `allowed_methods=None` from an explicitly empty collection\n- make an empty `allowed_methods` collection retry no methods\n- add regression coverage for status retries with `allowed_methods=set()`\n\n## Verification\n- `python -m pytest test/test_retry.py::TestRetry::test_allowed_methods_with_status_forcelist -q` (failed before implementation)\n- `python -m pytest test/test_retry.py -q`\n- `python -m mypy src/urllib3/util/retry.py`\n- `python -m compileall -q src test/test_retry.py`\n- `git diff --check`\n- `python -m pytest test -q` reached 1977 passed / 304 skipped / 4 xfailed, with one unrelated `TestHTTPSProxyVerification::test_https_proxy_ipv4_san` unclosed-socket ResourceWarning on Python 3.14.5; rerunning that test alone passed.\n\nFixes #5044.\n\nAI-assisted: yes. I used AI assistance to prepare this patch and reviewed/tested the resulting code locally.",
+    "filed_at": "2026-05-22T20:38:00Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-09-05T15:00:48Z",
+    "url": "https://github.com/urllib3/urllib3/pull/5049#issuecomment-5552662498"
+   },
+   "as_of": "2026-09-05T15:00:47Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 5049,
+     "also_reproposed_in": [
+      5133,
+      5174,
+      5180,
+      5183
+     ],
+     "precedents": [
+      5044
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 5044,
+      "created": "2026-05-21",
+      "merged_at": null,
+      "closed_at": null,
+      "is_pr": false
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed with a pointer to the #5044 comment saying the change breaks compatibility. Later in that thread (2026-09-05T18:56:42Z) the maintainer proposed a FutureWarning first and deferring the behaviour change to v3.0.",
+    "outcome_url": "https://github.com/urllib3/urllib3/pull/5049#issuecomment-5552662498",
+    "history": [
+     {
+      "artifact": "urllib3/urllib3#5044",
+      "url": "https://github.com/urllib3/urllib3/issues/5044",
+      "state_at_as_of": "open",
+      "records": "At as_of the thread holds a maintainer comment (2026-09-05T14:59:35Z) that treating an empty collection as allowing no methods seems reasonable, but urllib3 1.26.x documented that allowed_methods=False retries on any verb, so that must keep working, with tests for both. A second maintainer comment (2026-09-05T18:56:42Z) about real code that relies on allowed_methods=[] retrying all methods is AFTER as_of."
+     }
+    ],
+    "contradicted_claims": [
+     "Changing how falsy allowed_methods values behave is compatible with existing users, including those who pass False."
+    ],
+    "must_cite": [
+     "urllib3/urllib3#5044"
+    ],
+    "history_silent_on": [
+     "Whether any real code relies on allowed_methods=[] retrying everything. That evidence is posted after as_of."
+    ]
+   }
+  },
+  {
+   "id": "A7",
+   "repo": "urllib3/urllib3",
+   "type": "superseded_in_progress",
+   "item": {
+    "number": 5088,
+    "kind": "pull_request",
+    "url": "https://github.com/urllib3/urllib3/pull/5088",
+    "title": "Include explicit port 0 in Url.netloc and Url.authority",
+    "body": "## Problem\n\n`Url.netloc` (and `Url.authority`, which builds on it) silently drops an explicit\nport `0`, because it uses a truthiness check:\n\n```python\n# src/urllib3/util/url.py\nif self.port:\n    return f\"{self.host}:{self.port}\"\nreturn self.host\n```\n\n`0` is falsy, so a parsed `:0` is omitted. This contradicts:\n\n- the sibling `url` property, which uses `if port is not None:` and explicitly\n  documents the intent — *\"We use 'is not None' [because] we want things to\n  happen with empty strings (or 0 port)\"*; and\n- the stdlib-parity contract asserted by the existing\n  `test_authority_matches_urllib_netloc`, since `urlparse(\"http://h:0/\").netloc`\n  keeps `\"h:0\"`.\n\n`parse_url` already accepts `:0` (`_HOST_PORT_RE` matches it and sets\n`.port == 0`), so this is reachable:\n\n```python\n>>> parse_url(\"http://example.com:0/path\").url\n'http://example.com:0/path'\n>>> parse_url(\"http://example.com:0/path\").netloc\n'example.com'                     # bug: expected 'example.com:0'\n>>> parse_url(\"http://u:p@example.com:0/path\").authority\n'u:p@example.com'                 # bug: expected 'u:p@example.com:0'\n```\n\n## Fix\n\nUse `if self.port is not None:` in `netloc`, matching the `url` property and\nstdlib behaviour.\n\n## Tests\n\nAdded `:0` cases to the existing `url_authority_map` and `url_netloc_map`\nparametrizations in `test/test_util.py`. They fail on `main`\n(`test_netloc`/`test_authority` return the port-less form) and pass with the\nfix; `test_authority_matches_urllib_netloc` confirms the expected values match\n`urlparse().netloc`. `black`/`isort` clean.\n",
+    "filed_at": "2026-06-16T22:28:44Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-06-17T20:29:36Z",
+    "url": "https://github.com/urllib3/urllib3/pull/5088#issuecomment-4735017702"
+   },
+   "as_of": "2026-06-17T20:29:35Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 5088,
+     "also_reproposed_in": [],
+     "precedents": [
+      5071
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 5071,
+      "created": "2026-06-01",
+      "merged_at": "2026-06-18T09:18:52Z",
+      "closed_at": "2026-06-18T09:18:52Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed; the maintainer said it is being addressed more comprehensively in #5071.",
+    "outcome_url": "https://github.com/urllib3/urllib3/pull/5088#issuecomment-4735017702",
+    "history": [
+     {
+      "artifact": "urllib3/urllib3#5071",
+      "url": "https://github.com/urllib3/urllib3/pull/5071",
+      "state_at_as_of": "open (opened 2026-06-01; merged 2026-06-18, after as_of)",
+      "records": "An open pull request that preserves port 0 as a distinct port in URL parsing, pool selection and proxy configuration. A maintainer comment at 2026-06-17T20:27 states the goal: an explicit port 0 must not fall back to 80 or 443."
+     }
+    ],
+    "contradicted_claims": [
+     "Fixing Url.netloc and Url.authority alone is the whole port-0 problem.",
+     "No other change deals with explicit port 0."
+    ],
+    "must_cite": [
+     "urllib3/urllib3#5071"
+    ],
+    "history_silent_on": []
+   }
+  },
+  {
+   "id": "A8",
+   "repo": "urllib3/urllib3",
+   "type": "superseded_in_progress",
+   "item": {
+    "number": 5108,
+    "kind": "pull_request",
+    "url": "https://github.com/urllib3/urllib3/pull/5108",
+    "title": "[Bug] Add assert_hostname and assert_fingerprint to SSL_KEYWORDS",
+    "body": "## Summary\n`assert_hostname` and `assert_fingerprint` are SSL-only keyword arguments declared as parameters on `HTTPSConnection.__init__` but missing from the `SSL_KEYWORDS` allowlist in `PoolManager`. When a caller sets either on `PoolManager.connection_pool_kw` and then issues a plain-HTTP request, the kwarg leaks past the filter into `HTTPConnection.__init__`, where it is rejected.\n\n## Related Issue\nCloses #5077\n\n## Changes\nAdd `\"assert_hostname\"` and `\"assert_fingerprint\"` to the `SSL_KEYWORDS` tuple in `poolmanager.py`.\n\n## Type of Change\n- [x] Bug fix (non-breaking change)\n- [ ] New feature\n\n## Checklist\n- [ ] I have read the contributing guidelines.\n- [x] My code follows the existing style.\n- [ ] CI is green (passing all checks).",
+    "filed_at": "2026-07-08T02:15:12Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-07-12T16:00:23Z",
+    "url": "https://github.com/urllib3/urllib3/pull/5108#issuecomment-4951829600"
+   },
+   "as_of": "2026-07-12T16:00:22Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 5108,
+     "also_reproposed_in": [],
+     "precedents": [
+      5102
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 5102,
+      "created": "2026-07-06",
+      "merged_at": "2026-07-12T16:10:14Z",
+      "closed_at": "2026-07-12T16:10:14Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed; the maintainer said #5102 was the first pull request and contained a test, so it will be preferred.",
+    "outcome_url": "https://github.com/urllib3/urllib3/pull/5108#issuecomment-4951829600",
+    "history": [
+     {
+      "artifact": "urllib3/urllib3#5102",
+      "url": "https://github.com/urllib3/urllib3/pull/5102",
+      "state_at_as_of": "open (opened 2026-07-06; merged 2026-07-12T16:10:14Z, ten minutes after as_of)",
+      "records": "An earlier pull request making the identical change to SSL_KEYWORDS, with a test."
+     },
+     {
+      "artifact": "urllib3/urllib3#5077",
+      "url": "https://github.com/urllib3/urllib3/issues/5077",
+      "state_at_as_of": "open",
+      "records": "The issue both pull requests close."
+     }
+    ],
+    "contradicted_claims": [
+     "This is the only pull request for #5077.",
+     "This pull request should be merged on its own."
+    ],
+    "must_cite": [
+     "urllib3/urllib3#5102"
+    ],
+    "history_silent_on": []
+   }
+  },
+  {
+   "id": "A9",
+   "repo": "urllib3/urllib3",
+   "type": "compatibility_constraint",
+   "item": {
+    "number": 5121,
+    "kind": "pull_request",
+    "url": "https://github.com/urllib3/urllib3/pull/5121",
+    "title": "Replace deprecated OpenSSL.crypto.X509.get_subject() with cryptography's X.509 API",
+    "body": "Fixes #5099\n\n## Problem\n\nWith pyOpenSSL 26.3.0+, running urllib3's test suite (or any code using the `urllib3.contrib.pyopenssl` TLS backend) emits:\n\n```\nDeprecationWarning: X509.get_subject is deprecated. You should use cryptography's X.509 APIs instead.\n```\n\n## Root cause\n\n`WrappedSocket.getpeercert()` in `src/urllib3/contrib/pyopenssl.py` was the only remaining caller of `OpenSSL.crypto.X509.get_subject()` in this module — it used `x509.get_subject().CN` to pull the peer certificate's commonName for the returned dict. pyOpenSSL 26.3.0 deprecated `get_subject()` (and the `X509Name` object it returns) in favor of `cryptography`'s own `x509` API.\n\n`get_subj_alt_name()`, right above `getpeercert()` in the same file, already handles this correctly for the same certificate by calling `peer_cert.to_cryptography()` and working with `cryptography.x509` objects instead of pyOpenSSL's legacy `X509Name`.\n\n## Fix\n\nAdded a `_common_name()` helper that mirrors `get_subj_alt_name()`'s approach: convert the pyOpenSSL certificate via `.to_cryptography()`, then pull the commonName via `subject.get_attributes_for_oid(NameOID.COMMON_NAME)`. `getpeercert()` now calls this instead of `x509.get_subject().CN`. Returns `None` when there's no commonName, matching the previous `X509Name.CN` behavior (`get_subject().CN` returns `None`, not an error, when unset).\n\n## Tests\n\nAdded `test_common_name` / `test_common_name_missing` to `test/contrib/test_pyopenssl.py`, building minimal in-memory self-signed certs (with and without a commonName) via `cryptography`'s `CertificateBuilder` to exercise `_common_name()` directly, without needing a live TLS handshake.\n\n## Changelog\n\nAdded `changelog/5099.bugfix.rst` per the towncrier convention used in this repo.",
+    "filed_at": "2026-07-16T16:50:51Z",
+    "edited_since_filing": false
+   },
+   "decision_point": {
+    "at": "2026-07-18T11:23:51Z",
+    "url": "https://github.com/urllib3/urllib3/pull/5121#issuecomment-5011069064"
+   },
+   "as_of": "2026-07-18T11:23:50Z",
+   "selection": {
+    "census_cluster": {
+     "task_item": 5121,
+     "also_reproposed_in": [],
+     "precedents": [
+      5103
+     ]
+    },
+    "mechanical": true,
+    "precedents": [
+     {
+      "number": 5103,
+      "created": "2026-07-06",
+      "merged_at": "2026-07-18T11:25:42Z",
+      "closed_at": "2026-07-18T11:25:42Z",
+      "is_pr": true
+     }
+    ]
+   },
+   "ground_truth": {
+    "outcome": "Closed in favour of #5103.",
+    "outcome_url": "https://github.com/urllib3/urllib3/pull/5121#issuecomment-5011069064",
+    "history": [
+     {
+      "artifact": "urllib3/urllib3#5103",
+      "url": "https://github.com/urllib3/urllib3/pull/5103",
+      "state_at_as_of": "open (opened 2026-07-06; merged 2026-07-18T11:25:42Z, after as_of)",
+      "records": "An earlier pull request for the same deprecation (#5099). On 2026-07-06 a maintainer recorded that test_min_pyopenssl (added in #3777) fails with the change, so the minimum supported version may need bumping, and then that compatibility with pyOpenSSL releases from before 24.3.0 was kept because breaking them would be too breaking."
+     },
+     {
+      "artifact": "urllib3/urllib3#3777",
+      "url": "https://github.com/urllib3/urllib3/pull/3777",
+      "state_at_as_of": "merged (2026-02-26)",
+      "records": "Bumped the minimum supported pyOpenSSL version to 19.0.0 and added test_min_pyopenssl."
+     }
+    ],
+    "contradicted_claims": [
+     "No other pull request addresses #5099."
+    ],
+    "must_cite": [
+     "urllib3/urllib3#5103"
+    ],
+    "history_silent_on": []
+   }
+  }
+ ]
+}
