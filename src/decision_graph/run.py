@@ -71,53 +71,7 @@ def ingest(
             log.info("--- %s ---", resource)
             _ingest_resource(ctx, resource, run_id, max_pages)
 
-        # Drain queued forward references before inference (issue #3). Order matters:
-        # these are explicit edges, and §5.3 only lets inference bridge gaps that
-        # explicit extraction could not fill. Draining afterwards would let inference
-        # propose an edge for a pair the queue was about to link explicitly.
-        log.info("--- pending references ---")
-        extractors.drain_pending_references(ctx)
-        conn.commit()
-
-        if synthesize:
-            log.info("--- decision synthesis ---")
-            # Retract first: a rule change or invalidated evidence must be able to
-            # WITHDRAW a Decision, not merely fail to create new ones (issue #17).
-            synthesis.retract_unsupported(conn)
-            conn.commit()
-            outcome = synthesis.synthesize(conn, repo_node_id)
-            conn.commit()
-            # Runs after promotion so a Decision created this run can be upgraded in the
-            # same pass rather than waiting for the next one.
-            upgraded = synthesis.upgrade_explicit(conn, repo_node_id)
-            conn.commit()
-            log.info(
-                "decisions: %s created, %s refreshed, %s refused, %s upgraded to explicit",
-                outcome.created,
-                outcome.refreshed,
-                outcome.refused,
-                upgraded,
-            )
-            for refusal in outcome.refusals:
-                log.warning("  refused %s", refusal)
-
-        # Evidence Ranking (§5.4). Runs after synthesis so this run's new edges are
-        # scored, and before inference so tier assignment never sees a speculative edge.
-        # Idempotent and reversible: it withdraws the tier from threads whose supporting
-        # evidence was invalidated, as well as granting it.
-        tiers = conn.execute("SELECT * FROM apply_corroboration()").fetchone()
-        conn.commit()
-        if tiers and (tiers["upgraded"] or tiers["downgraded"]):
-            log.info(
-                "evidence tiers: %s upgraded to corroborated, %s withdrawn",
-                tiers["upgraded"],
-                tiers["downgraded"],
-            )
-
-        # Gated inference runs last: it may only bridge gaps that explicit extraction
-        # left behind, so it must not run before extraction has had its say (§5.1).
-        inference.persist(conn, inference.propose(conn, repo_node_id))
-        conn.commit()
+        postprocess(ctx, synthesize=synthesize)
 
     except RateLimitExhausted as exc:
         conn.commit()  # cursors are already consistent; keep the progress
@@ -141,6 +95,63 @@ def ingest(
     _report(ctx, client)
     conn.close()
     return 0 if status == "succeeded" else 1
+
+
+def postprocess(ctx: Context, *, synthesize: bool = True) -> None:
+    """Turn what extraction wrote into answers: queued references, Decisions, evidence tiers.
+
+    The one implementation, called by `dg ingest` after it polls and by the webhook receiver
+    after a delivery (#162). Two copies would drift, and a delivery would leave the graph in a
+    state a poll never does: new explicit edges with no Decision and no corroboration pass.
+    """
+    conn = ctx.conn
+    # Drain queued forward references before inference (issue #3). Order matters:
+    # these are explicit edges, and §5.3 only lets inference bridge gaps that
+    # explicit extraction could not fill. Draining afterwards would let inference
+    # propose an edge for a pair the queue was about to link explicitly.
+    log.info("--- pending references ---")
+    extractors.drain_pending_references(ctx)
+    conn.commit()
+
+    if synthesize:
+        log.info("--- decision synthesis ---")
+        # Retract first: a rule change or invalidated evidence must be able to
+        # WITHDRAW a Decision, not merely fail to create new ones (issue #17).
+        synthesis.retract_unsupported(conn)
+        conn.commit()
+        outcome = synthesis.synthesize(conn, ctx.repo_node_id)
+        conn.commit()
+        # Runs after promotion so a Decision created this run can be upgraded in the
+        # same pass rather than waiting for the next one.
+        upgraded = synthesis.upgrade_explicit(conn, ctx.repo_node_id)
+        conn.commit()
+        log.info(
+            "decisions: %s created, %s refreshed, %s refused, %s upgraded to explicit",
+            outcome.created,
+            outcome.refreshed,
+            outcome.refused,
+            upgraded,
+        )
+        for refusal in outcome.refusals:
+            log.warning("  refused %s", refusal)
+
+    # Evidence Ranking (§5.4). Runs after synthesis so this run's new edges are
+    # scored, and before inference so tier assignment never sees a speculative edge.
+    # Idempotent and reversible: it withdraws the tier from threads whose supporting
+    # evidence was invalidated, as well as granting it.
+    tiers = conn.execute("SELECT * FROM apply_corroboration()").fetchone()
+    conn.commit()
+    if tiers and (tiers["upgraded"] or tiers["downgraded"]):
+        log.info(
+            "evidence tiers: %s upgraded to corroborated, %s withdrawn",
+            tiers["upgraded"],
+            tiers["downgraded"],
+        )
+
+    # Gated inference runs last: it may only bridge gaps that explicit extraction
+    # left behind, so it must not run before extraction has had its say (§5.1).
+    inference.persist(conn, inference.propose(conn, ctx.repo_node_id))
+    conn.commit()
 
 
 def _ingest_resource(ctx: Context, resource: str, run_id: int, max_pages: int | None) -> None:

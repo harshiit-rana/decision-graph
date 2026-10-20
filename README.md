@@ -886,6 +886,25 @@ on `star` would eventually switch off the deliveries that matter. **`push` is de
 handled**: its commit objects are a different shape from the commits API, so `extract_commit`
 would write subtly wrong nodes rather than fail.
 
+**After a delivery (#162).** Extraction alone would leave new explicit edges with no Decision and
+no corroboration pass, a state `dg ingest` never leaves the graph in. So after a handled delivery
+is answered, the receiver runs the same `run.postprocess` the poller calls: queued references,
+Decision synthesis, evidence tiers. A merged pull request that satisfies the rubric therefore
+becomes a Decision without a poll, within about 30 seconds (the debounce window, so a burst of
+deliveries is one pass, not one each) plus the pass itself. It runs on the server's one thread
+between requests, so it never overlaps a write from this process, and a slow pass cannot hold up
+the `200` GitHub is waiting for. Two limits: the work is held in memory, so a crash between a
+delivery and its pass loses the request and the next `dg ingest` makes it up; and extraction still
+happens before the reply, so a slow GitHub API is still the receiver's latency (that part is not
+changed). `dg status` does not show a pending pass. Nothing else writes while it runs only if
+`dg ingest` is not running at the same time: the single-writer lock is #163.
+
+**Where each signal comes from (#190).** A pull request's commit list, which corroboration's
+STRUCTURAL signal reads, is always fetched through the REST API, never taken from the delivery,
+and a test fails if the receiver starts reading one (GitHub trimmed commit summaries from Events
+API payloads in October 2025; whether webhook payloads are affected is unverified, so nothing
+here depends on it). Reviews and comments are re-read the same way.
+
 It advances **no cursor**. A delivery says one thing changed; it cannot say nothing else did,
 and writing a watermark from one would claim a completeness no webhook can offer. `dg ingest`
 remains the thing that guarantees the window. It is also not a production server —

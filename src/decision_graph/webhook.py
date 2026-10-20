@@ -16,6 +16,18 @@ else did, and writing a watermark from one would claim a completeness no webhook
 -- the same over-claim #93 removed from `dg status`. `dg ingest` stays the thing that
 guarantees the window.
 
+AFTER A DELIVERY (#162)
+
+Extraction alone leaves new explicit edges with no Decision and no corroboration pass, a state
+`dg ingest` never leaves the graph in. So a handled delivery is answered first and then the same
+`run.postprocess` the poller calls runs: queued references, Decision synthesis, evidence tiers.
+It is debounced (`PostProcessor`), because synthesis on every delivery of a busy repository is
+real work, and it runs from the server loop rather than a thread, so it never overlaps a write.
+What that costs is latency, up to `POSTPROCESS_SECONDS` plus the run, and nothing is durable: a
+crash between a delivery and its post-processing loses the request, and the next `dg ingest`
+makes it up. The commit lists that corroboration's STRUCTURAL signal reads are re-fetched from
+the REST API, never taken from the delivery (#190).
+
 It does not handle `push`. That payload's commit objects are a different shape from the
 commits API -- no `commit.committer.date` nesting, no `files` -- so `extract_commit` would
 write subtly wrong nodes rather than fail. Refusing an event the system cannot read
@@ -30,10 +42,11 @@ import json
 import logging
 import os
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Callable
 
-from . import db, extractors
+from . import db, extractors, run
 from .config import Settings
 from .github import GitHubClient
 
@@ -45,6 +58,84 @@ EVENT_HEADER = "X-GitHub-Event"
 # GitHub caps a delivery at 25MB. Read no more than that, so a lying Content-Length cannot
 # ask this process to allocate arbitrary memory before the signature has been checked.
 MAX_BODY_BYTES = 25 * 1024 * 1024
+
+
+# Post-processing runs at most this often. A burst of deliveries (a maintainer closing twenty
+# issues) is then one synthesis pass, not twenty.
+POSTPROCESS_SECONDS = 30.0
+
+
+class PostProcessor:
+    """Debounced `run.postprocess` for the receiver.
+
+    `request` records that a delivery changed the graph; `run_if_due` is called from the server
+    loop and does the work once the debounce window has passed. Everything runs on the server's
+    one thread, so it can never overlap an ingestion write from this process.
+    """
+
+    def __init__(self, settings: Settings, *, interval: float = POSTPROCESS_SECONDS,
+                 clock: Callable[[], float] = time.monotonic,
+                 runner: Callable[[Settings, int], None] | None = None) -> None:
+        self.settings = settings
+        self.interval = interval
+        self.clock = clock
+        self.runner = runner or _postprocess_once
+        self.repo_node_id: int | None = None
+        self.pending = False
+        self.last_run: float | None = None
+        self.runs = 0
+
+    def request(self, repo_node_id: int) -> None:
+        self.repo_node_id = repo_node_id
+        self.pending = True
+
+    def run_if_due(self) -> bool:
+        if not self.pending or self.repo_node_id is None:
+            return False
+        now = self.clock()
+        if self.last_run is not None and now - self.last_run < self.interval:
+            return False
+        self.pending = False
+        self.last_run = now
+        try:
+            self.runner(self.settings, self.repo_node_id)
+        except Exception:
+            # Logged, not raised: the server must keep answering. It stays pending so the
+            # next window tries again, and `dg ingest` does it regardless.
+            log.exception("post-processing after a webhook delivery failed; will retry")
+            self.pending = True
+            return False
+        self.runs += 1
+        return True
+
+
+def _postprocess_once(settings: Settings, repo_node_id: int) -> None:
+    conn = db.connect(settings.database_url)
+    client = GitHubClient(token=settings.github_token, user_agent=settings.user_agent)
+    try:
+        ctx = extractors.Context(
+            conn=conn, client=client, settings=settings, repo_node_id=repo_node_id
+        )
+        run.postprocess(ctx)
+        log.info("post-processed after webhook delivery")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        client.close()
+        conn.close()
+
+
+class _Server(HTTPServer):
+    """An HTTPServer that does its deferred work between requests, after replies are sent."""
+
+    post: PostProcessor | None = None
+
+    def service_actions(self) -> None:
+        # Called by serve_forever on every pass of its loop, after the previous request has been
+        # fully answered and its socket closed.
+        if self.post is not None:
+            self.post.run_if_due()
 
 
 class WebhookError(Exception):
@@ -164,6 +255,7 @@ class _Handler(BaseHTTPRequestHandler):
     # Injected by `serve`; instances are created per request.
     secret: str = ""
     settings: Settings | None = None
+    post: PostProcessor | None = None
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's spelling
         try:
@@ -239,6 +331,8 @@ class _Handler(BaseHTTPRequestHandler):
                 conn.rollback()
                 return f"{event}: not handled"
             conn.commit()
+            if self.post is not None:
+                self.post.request(repo_node_id)
             log.info("webhook %s -> %s", event, summary)
             return f"{event}: {summary}"
         except Exception:
@@ -286,8 +380,10 @@ def serve(host: str = DEFAULT_HOST, port: int = 8000, *, settings: Settings | No
             "here and in the repository's webhook settings."
         )
 
-    handler = type("_Bound", (_Handler,), {"secret": secret, "settings": settings})
-    httpd = HTTPServer((host, port), handler)
+    post = PostProcessor(settings)
+    handler = type("_Bound", (_Handler,), {"secret": secret, "settings": settings, "post": post})
+    httpd = _Server((host, port), handler)
+    httpd.post = post
     log.info("listening on %s:%s for %s", host, port, settings.target_repo)
     if host not in _LOOPBACK:
         log.warning(
