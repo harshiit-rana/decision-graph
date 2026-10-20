@@ -29,6 +29,34 @@ can write it. It is treated as data wherever it goes.
 
 The adversarial bodies used by these tests are in `tests/fixtures/adversarial_bodies.json`.
 
+## Database roles (#172)
+
+A bug in `dg`, or a prompt-injected agent tool, should not be able to rewrite the evidence. Three
+roles split the rights (`roles.py`):
+
+| Role | Can | Used by |
+|---|---|---|
+| `dg_owner` (cannot log in) | Owns every object in `public`; migrations run as it | `dg init`, via `SET ROLE` |
+| `dg_app` | SELECT, INSERT, UPDATE, DELETE and sequence USAGE. **Cannot** ALTER or DROP a table, trigger, constraint or the rubric function, TRUNCATE, create anything, or run a program through `COPY` | `dg ingest` |
+| `dg_reader` | SELECT only | `dg query`, `context`, `report`, `status`, `ask`, `snapshot export` |
+
+None of them is a superuser. Every migration applies from an empty database as `dg_owner`, which
+CI checks, and CI also runs the whole test suite as `dg_app` and shows `dg_reader` refused a write.
+
+- **A fresh install** gets the roles from `dg init`. **An existing install is never switched
+  silently:** `dg init` prints `dg roles setup`, which saves a snapshot, moves ownership of the
+  existing objects to `dg_owner` (no row changes) and writes `DG_APP_PASSWORD` and
+  `DG_READER_PASSWORD` into `.env`. To undo it, delete those two lines: the superuser can do
+  everything it could before. `dg doctor` shows who each surface connects as and warns while it is
+  still a superuser.
+- **What this does not do.** It limits what the connection `dg` opens can do. It does not hide the
+  superuser from a process that can read the container's environment: `DATABASE_URL` there still
+  names `postgres` (kept as `DG_ADMIN_URL`), because `dg init` and `dg snapshot import` need it. A
+  tool that must not hold it, such as the MCP server (#139), has to be started with only the
+  reader's DSN. A role can still read the whole graph, which is public repository content.
+- **`dg snapshot import` and `dg init` stay on the superuser**: restoring needs
+  `session_replication_role`, which only a superuser may set.
+
 ## What leaves your machine
 
 | Destination | When | What is sent | Code |
@@ -62,7 +90,7 @@ Nothing else makes a network call. `dg query`, `dg context`, `dg report`, `dg st
 
 | Listener | Bound to | Notes | Code |
 |---|---|---|---|
-| PostgreSQL (published port) | `127.0.0.1:55434` by default | `DG_DB_BIND=0.0.0.0` exposes it deliberately. `dg` itself never uses this port; it talks to `db:5432` on the compose network. **The app still connects as the `postgres` superuser**: least-privilege roles are #172 | `docker-compose.yml` |
+| PostgreSQL (published port) | `127.0.0.1:55434` by default | `DG_DB_BIND=0.0.0.0` exposes it deliberately. `dg` itself never uses this port; it talks to `db:5432` on the compose network. Commands connect as least-privilege roles once `dg roles setup` has run (see "Database roles" below) | `docker-compose.yml`, `roles.py` |
 | `dg-webhook` | `127.0.0.1:8000` by default | Refuses to start without `GITHUB_WEBHOOK_SECRET`. Verifies the HMAC-SHA256 signature with `hmac.compare_digest` before parsing anything. Every bad signature gets the same 401. A `Content-Length` over 25 MB (GitHub's delivery limit) is a 413 before the body is read. It is `http.server`: single-threaded, **no TLS**, and not a production server. `--host 0.0.0.0` exposes it to the network and logs a warning saying so. Run it behind a TLS-terminating reverse proxy on the same machine. Duplicate deliveries aren't yet de-duplicated (#164) | `webhook.py` (`DEFAULT_HOST`, `MAX_BODY_BYTES`) |
 
 ## Out of scope today

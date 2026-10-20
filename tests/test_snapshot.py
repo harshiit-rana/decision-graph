@@ -22,6 +22,8 @@ from decision_graph import migrate, snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "db" / "migrations"
+from tests.superuser import requires_superuser  # noqa: E402
+
 DSN = os.environ.get("DATABASE_URL")
 
 
@@ -79,6 +81,7 @@ def _dsn_for(database: str) -> str:
 
 
 @unittest.skipUnless(DSN, "DATABASE_URL not set")
+@requires_superuser
 class RoundTripTest(unittest.TestCase):
     SRC, DST = "dg_snapshot_test_src", "dg_snapshot_test_dst"
 

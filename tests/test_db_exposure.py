@@ -16,6 +16,8 @@ from tempfile import TemporaryDirectory
 from decision_graph import cli
 
 COMPOSE = Path(__file__).resolve().parents[1] / "docker-compose.yml"
+from tests.superuser import requires_superuser  # noqa: E402
+
 DSN = os.environ.get("DATABASE_URL")
 
 
@@ -176,6 +178,7 @@ class AuthFailureAdviceTest(unittest.TestCase):
 
 
 @unittest.skipUnless(DSN, "DATABASE_URL not set")
+@requires_superuser
 class RotationAgainstPostgresTest(unittest.TestCase):
     """The SQL really changes a password. Run on a throwaway role, never the one in DSN."""
 

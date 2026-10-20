@@ -31,6 +31,8 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from tests.superuser import requires_superuser  # noqa: E402
+
 DSN = os.environ.get("DATABASE_URL")
 ROOT = Path(__file__).resolve().parents[1]
 UTC = timezone.utc
@@ -487,6 +489,7 @@ class ExtractorTest(unittest.TestCase):
 
 
 @unittest.skipUnless(DSN, "DATABASE_URL not set")
+@requires_superuser
 class UpgradeTest(unittest.TestCase):
     """A populated database at schema 0015 keeps every row through 0016."""
 

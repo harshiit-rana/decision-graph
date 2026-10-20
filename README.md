@@ -546,8 +546,8 @@ doesn't migrate if the snapshot fails (`--skip-snapshot` overrides that, for whe
 a backup). `snapshots/` is git-ignored: a snapshot is a full copy of the ingested
 repository's content. Adjudicated snapshots are published deliberately, as GitHub release
 assets, and linked from `eval/RESULTS.md`. Export refuses if the configured `GITHUB_TOKEN`
-appears anywhere in the data. Import uses `session_replication_role`, so it needs the
-superuser that `dg` connects as today (see #172).
+appears anywhere in the data. Import uses `session_replication_role`, so it always runs as
+the database superuser, even after `dg roles setup` (see below).
 
 ### Running the internals directly
 
@@ -1150,6 +1150,21 @@ failure of the two — it made a stale label and a stale edge indistinguishable 
 and telling those apart is the whole job during adjudication. Traces now carry the current
 `implemented_by` target and its merge date, every one of them if there is more than one,
 with an unmerged or absent implementer flagged rather than omitted (issue #19).
+
+### Least-privilege database roles (`dg roles`)
+
+Until you opt in, every command connects as the database superuser. `dg roles setup` creates
+three roles, `dg_owner` (owns the schema, cannot log in), `dg_app` (reads and writes rows, for
+`dg ingest`) and `dg_reader` (SELECT only, for `query`, `context`, `report`, `status`, `ask` and
+`snapshot export`), and from then on each command connects as the one it needs. `dg_app` cannot
+alter a table, drop a trigger or constraint or the rubric function, or truncate anything, so a bug
+in ingestion cannot rewrite the rules that decide what counts as a Decision. A fresh install gets
+this from `dg init`. An existing install is never switched silently: `dg init` tells you to run
+`dg roles setup`, which saves a snapshot, changes the owner of the existing objects without
+touching a row, and writes `DG_APP_PASSWORD` and `DG_READER_PASSWORD` to `.env`. To go back,
+delete those two lines. `dg doctor` shows who each surface connects as. What this protects and
+what it does not (a process that can read the container's environment still sees the superuser
+URL) is in [`SECURITY.md`](SECURITY.md).
 
 ## Security
 

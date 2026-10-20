@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import psycopg
+from psycopg import sql as pgsql
 
 log = logging.getLogger(__name__)
 
@@ -144,8 +145,14 @@ def pending(conn: psycopg.Connection, directory: Path | None = None) -> list[str
 
 
 def apply_all(conn: psycopg.Connection, directory: Path | None = None,
-              only: set[str] | None = None) -> MigrationResult:
+              only: set[str] | None = None, role: str | None = None) -> MigrationResult:
     """Bring the database up to date. Safe to run repeatedly.
+
+    `role` runs the whole thing as that role (`SET ROLE`), which is how migrations become the
+    owner's work and not the superuser's (#172). Everything they create is then owned by it and
+    carries the default privileges set up for it, and a migration that needs superuser rights
+    fails here instead of passing unnoticed. The ledger table is created under the same role,
+    or the reader could not read it.
 
     `only` limits the run to those filenames. `snapshot.import_` uses it to rebuild exactly
     the schema a snapshot was taken at, so its rows load into the columns they came from.
@@ -155,6 +162,9 @@ def apply_all(conn: psycopg.Connection, directory: Path | None = None,
     result = MigrationResult()
 
     was_autocommit = conn.autocommit
+    if role:
+        conn.execute(pgsql.SQL("SET ROLE {}").format(pgsql.Identifier(role)))
+        conn.commit()
     conn.execute(LEDGER_DDL)
     conn.commit()
     # Each migration file opens and closes its own transaction, so the connection must not
@@ -204,6 +214,21 @@ def apply_all(conn: psycopg.Connection, directory: Path | None = None,
             )
             result.applied.append(path.name)
     finally:
+        # A migration that fails after its own BEGIN leaves the connection in an aborted
+        # transaction, and psycopg refuses to change `autocommit` in one. That ProgrammingError
+        # used to replace the migration's real error, so clear the transaction first.
+        try:
+            conn.rollback()
+        except Exception:
+            log.warning("could not roll back after a failed migration; close this connection")
         conn.autocommit = was_autocommit
+        if role:
+            # Give the connection its own rights back, and never let this mask the migration's
+            # own error.
+            try:
+                conn.execute("RESET ROLE")
+                conn.commit()
+            except Exception:
+                log.warning("could not RESET ROLE after migrating as %s; close this connection", role)
 
     return result

@@ -108,6 +108,32 @@ jobs:
         # nothing here should be skipped, and a skip is worth noticing in the log.
         run: python -m unittest discover -s tests -t . -v
 
+      - name: Least-privilege roles (#172)
+        # Migrations apply from empty as dg_owner, a role with no superuser rights; the same
+        # suite then runs as dg_app, which can write rows but cannot alter the schema rules;
+        # and dg_reader is shown to be refused a write. Tests that create databases or roles
+        # skip on the dg_app run (tests/superuser.py), so nothing here fails for lack of rights.
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS dg_least" -c "CREATE DATABASE dg_least"
+          python - <<'PY'
+          from decision_graph import db, migrate, roles
+
+          conn = db.connect("postgresql://postgres:dg@localhost:5432/dg_least")
+          roles.setup(conn, app_password="ci-app", reader_password="ci-reader")
+          conn.commit()
+          result = migrate.apply_all(conn, "db/migrations", role=roles.OWNER)
+          roles.grant_existing(conn)
+          conn.commit()
+          print(f"applied {len(result.applied)} migrations as {roles.OWNER}")
+          PY
+          DATABASE_URL=postgresql://dg_app:ci-app@localhost:5432/dg_least python -m unittest discover -s tests -t .
+          if PGPASSWORD=ci-reader psql -h localhost -U dg_reader -d dg_least -v ON_ERROR_STOP=1 \
+               -c "INSERT INTO node (node_type, external_id, title) VALUES ('issue', 'x', 't')"; then
+            echo "dg_reader was allowed to write"; exit 1
+          fi
+          echo "dg_reader was refused the write, as required"
+
       - name: Snapshot round trip through the command (#122)
         # The command path end to end: export the migrated database, import it into a fresh
         # one, and require eval/figures.sql to print byte-identical output from both. That is

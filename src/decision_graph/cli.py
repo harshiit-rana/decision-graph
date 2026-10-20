@@ -143,6 +143,47 @@ def write_env(values: dict[str, str]) -> None:
 # ---------------------------------------------------------------------------
 
 
+def admin_dsn() -> str:
+    """The superuser DSN compose injected, however `DATABASE_URL` has been rewritten since.
+
+    Each command's `DATABASE_URL` is replaced by the least-privilege role it needs (#172), so
+    the original is kept in `DG_ADMIN_URL`. A command that needs the superuser (setup, restore)
+    reads it here.
+    """
+    from . import roles
+
+    return os.environ.get(roles.ADMIN_ENV) or os.environ.get("DATABASE_URL", "")
+
+
+def use_role_dsn(command: str | None, action: str | None = None) -> None:
+    """Point `DATABASE_URL` at the role `command` needs, when the roles are set up.
+
+    With no role passwords in `.env` this changes nothing, so an existing install keeps
+    connecting exactly as it did until its owner runs `dg roles setup`.
+    """
+    from . import roles
+
+    admin = admin_dsn()
+    if not admin:
+        return
+    os.environ[roles.ADMIN_ENV] = admin
+    os.environ["DATABASE_URL"] = roles.dsn_for(admin, roles.role_for(command, action), dict(os.environ))
+
+
+def _env_writer(values: dict[str, str]):
+    """Write `values` to .env and return a function that puts the old file back."""
+    previous = ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.exists() else None
+    write_env(values)
+
+    def undo() -> None:
+        if previous is None:
+            ENV_FILE.unlink(missing_ok=True)
+        else:
+            ENV_FILE.write_text(previous, encoding="utf-8")
+
+    return undo
+
+
 def _connect(dsn: str | None = None):
     from . import db
 
@@ -271,6 +312,91 @@ def _prompt(label: str, *, default: str = "", secret: bool = False) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _prepare_roles(conn, *, populated: bool) -> str | None:
+    """Make sure the least-privilege roles exist where they safely can, and say which role the
+    migrations should run as (None: as the connected superuser, exactly as before).
+
+    - A database with no graph yet, or a graph with no data in it, gets the roles now: there is
+      nothing to lose by giving the schema an owner.
+    - A populated database that predates the roles is never switched here. Moving its objects to
+      another owner is the change #172 says the owner confirms, so init prints the command and
+      carries on as it always did.
+    """
+    from . import roles
+
+    if not roles.is_superuser(conn):
+        print(dim("        connected as a non-superuser; leaving database roles alone"))
+        return None
+    env = read_env()
+    state = roles.schema_owner_state(conn)
+    if not (roles.configured(env) and roles.roles_exist(conn)):
+        if populated:
+            print(yellow("        the graph still connects as the database superuser"))
+            print(f"        {yellow('→')} run `dg roles setup` to switch to least-privilege roles "
+                  "(it saves a snapshot first)")
+            return None
+        roles.provision(conn, _env_writer, existing_env=env)
+        print("        created least-privilege roles dg_owner, dg_app, dg_reader")
+        print(dim("        their passwords are in .env as DG_APP_PASSWORD and DG_READER_PASSWORD"))
+        if state == "legacy":
+            roles.adopt(conn)
+            conn.commit()
+        return roles.OWNER
+    if state == "legacy":
+        # The roles exist but the schema was built before them (or `dg roles setup` stopped
+        # half way). Migrating as the owner would fail on tables it doesn't own.
+        print(yellow("        schema objects are still owned by the superuser"))
+        print(f"        {yellow('→')} run `dg roles setup` to finish switching")
+        return None
+    return roles.OWNER
+
+
+def cmd_roles(args: argparse.Namespace) -> int:
+    """`dg roles setup | status`: least-privilege database roles (#172)."""
+    from . import roles, snapshot
+
+    conn = _connect(admin_dsn())
+    if not roles.is_superuser(conn):
+        print(red("error: `dg roles` needs the database superuser, which this connection is not"),
+              file=sys.stderr)
+        return 2
+
+    if args.action == "status":
+        state = roles.schema_owner_state(conn)
+        env = read_env()
+        print(f"roles in the database : {'yes' if roles.roles_exist(conn) else 'no'}")
+        print(f"passwords in .env     : {'yes' if roles.configured(env) else 'no'}")
+        print(f"schema ownership      : {state}")
+        return 0
+
+    populated = snapshot.is_populated(conn)
+    if populated and not args.skip_snapshot:
+        path = snapshot.default_path(PROJECT_DIR, "pre-roles")
+        print(f"saving a snapshot first: {cyan(str(path))}")
+        try:
+            snapshot.export(conn, path, project_dir=PROJECT_DIR)
+        except Exception as exc:
+            print(red(f"could not snapshot the database: {exc}"), file=sys.stderr)
+            print(f"{yellow('→')} nothing was changed. Fix the cause, or re-run with --skip-snapshot "
+                  "if you have a backup", file=sys.stderr)
+            return 1
+    try:
+        roles.provision(conn, _env_writer, existing_env=read_env())
+        moved = roles.adopt(conn)
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        print(red(f"could not set up the roles: {exc}"), file=sys.stderr)
+        return 1
+    print(green("least-privilege roles are set up"))
+    print(f"  moved to dg_owner: {moved['relations']} tables/views/sequences, "
+          f"{moved['functions']} functions, {moved['types']} types")
+    print("  ingest now connects as dg_app; query, report, status, context and ask as dg_reader")
+    print(dim("  to undo: delete DG_APP_PASSWORD and DG_READER_PASSWORD from .env. The superuser"))
+    print(dim("  can do everything it could before, and no data was changed."))
+    return 0
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     total = 4
     print(bold("\ndecision-graph setup"))
@@ -280,7 +406,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     # --- 1. database -------------------------------------------------------
     step(1, total, "Database")
-    dsn = os.environ.get("DATABASE_URL", "")
+    dsn = admin_dsn()
     try:
         conn = _connect(dsn)
         server = conn.execute("SELECT version() AS v").fetchone()["v"].split(",")[0]
@@ -373,7 +499,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     # --- 4. migrations -----------------------------------------------------
     step(4, total, "Schema")
-    from . import migrate, snapshot
+    from . import migrate, roles, snapshot
 
     # A migration over real data is the one step here that changes the graph, so the graph
     # is saved first (#122). If the snapshot fails, the migration doesn't run.
@@ -391,8 +517,13 @@ def cmd_init(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        result = migrate.apply_all(conn)
+        migrate_role = _prepare_roles(conn, populated=snapshot.is_populated(conn))
+        result = migrate.apply_all(conn, role=migrate_role)
+        if migrate_role:
+            roles.grant_existing(conn)
+            conn.commit()
     except Exception as exc:
+        conn.rollback()
         print(red(f"        migration failed: {exc}"))
         return 1
 
@@ -567,7 +698,23 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     elif urlsplit(dsn).hostname == "db":
         states.append(check(PASS, "database password is not the published default"))
 
-    from . import migrate
+    from . import migrate, roles
+
+    env = dict(os.environ)
+    for row in roles.surface_report(dsn, env, _connect):
+        label = f"{row['surface']} connects as {row['user'] or '?'}"
+        if row["error"]:
+            states.append(check(FAIL, f"{label}: cannot connect", row["error"], "run `dg roles setup`"))
+        elif row["superuser"] and roles.configured(env):
+            states.append(check(
+                FAIL, f"{label}, a superuser, although the roles are set up",
+                "DATABASE_URL or the role passwords are overridden", "unset the override, or re-run `dg roles setup`"))
+        elif row["superuser"]:
+            states.append(check(
+                WARN, f"{label}, a superuser",
+                "a bug here could rewrite the evidence or drop the rubric", "run `dg roles setup`"))
+        else:
+            states.append(check(PASS, f"{label}, not a superuser"))
 
     try:
         outstanding = migrate.pending(conn)
@@ -1133,6 +1280,16 @@ def build_parser() -> argparse.ArgumentParser:
     sn.add_argument("file", nargs="?")
     sn.set_defaults(fn=cmd_snapshot)
 
+    ro = sub.add_parser(
+        "roles",
+        help="least-privilege database roles: owner for migrations, app for ingest, reader for queries",
+        epilog="dg roles setup | status. Setup saves a snapshot first and never deletes data.",
+    )
+    ro.add_argument("action", choices=["setup", "status"])
+    ro.add_argument("--skip-snapshot", action="store_true",
+                    help="set up the roles on a populated database without a snapshot (only with a backup)")
+    ro.set_defaults(fn=cmd_roles)
+
     m = sub.add_parser("menu", help="interactive launcher (also shown when you run dg with no command)")
     m.set_defaults(fn=cmd_menu)
 
@@ -1200,6 +1357,7 @@ def main(argv: list[str] | None = None) -> int:
     if extra and not getattr(args, "passthrough", False):
         parser.error(f"unrecognised arguments: {' '.join(extra)}")
 
+    use_role_dsn(args.command, getattr(args, "action", None))
     try:
         if getattr(args, "passthrough", False):
             return args.fn(args, extra)
