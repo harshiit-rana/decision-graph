@@ -551,7 +551,8 @@ class UpgradeTest(unittest.TestCase):
         nodes_before = conn.execute("SELECT count(*) AS n FROM node").fetchone()["n"]
 
         result = migrate.apply_all(conn, migrations)
-        self.assertEqual(result.applied, ["0016_edge_retraction.sql"])
+        # Later migrations apply over the same data too, so this is "0016 is applied, first".
+        self.assertEqual(result.applied[0], "0016_edge_retraction.sql")
         self.assertEqual(conn.execute("SELECT count(*) AS n FROM edge").fetchone()["n"], edges_before)
         self.assertEqual(conn.execute("SELECT count(*) AS n FROM node").fetchone()["n"], nodes_before)
         row = conn.execute("SELECT valid_to, valid_to_recorded_at, retracted_at FROM edge WHERE id = %s",

@@ -896,8 +896,36 @@ between requests, so it never overlaps a write from this process, and a slow pas
 the `200` GitHub is waiting for. Two limits: the work is held in memory, so a crash between a
 delivery and its pass loses the request and the next `dg ingest` makes it up; and extraction still
 happens before the reply, so a slow GitHub API is still the receiver's latency (that part is not
-changed). `dg status` does not show a pending pass. Nothing else writes while it runs only if
-`dg ingest` is not running at the same time: the single-writer lock is #163.
+changed). `dg status` does not show a pending pass. The pass takes the repository's writer lock
+(below); if a poll holds it, the pass waits for the next window.
+
+**One writer at a time (#163).** `dg ingest` and the receiver's post-processing each take a Postgres
+advisory lock for the repository, and never wait for it. A second `dg ingest` logs that another run
+is in progress, writes nothing and exits with code 3; the receiver defers its pass. The lock belongs
+to the database connection, so a process that is killed frees it, with nothing to clean up. It
+covers the poll and the post-processing pass, not webhook extraction: those writes are per artifact
+and ordered by `updated_at` (#120), which is what makes them safe beside a poll.
+
+**Polling on a schedule.** `dg ingest --every 1h` polls repeatedly (`3600`, `30m`, `1h`; at least a
+minute). Every round is the ordinary resume path, so a rate-limit stop is picked up where it left
+off; a round that finds another writer is skipped, and a failed round is logged and followed by the
+next. There is also an opt-in compose service, `docker compose --profile scheduled up -d scheduler`
+(interval from `DG_POLL_INTERVAL` in `.env`, default `1h`), which is its own process and not part
+of the receiver. That service has **not been run**: Docker is not available in the environment this
+was written in, and only `docker compose config` was used to check it parses. `dg status` shows the
+last run, its outcome, its GitHub request count (from migration 0017 on) and how long ago the last
+success was, and `dg doctor` warns when the latest run failed. A scheduled poll is what recovers
+anything a webhook missed: polling is the completeness guarantee, and the receiver advances no cursor.
+
+**A delivery is applied once (#164).** The receiver records each delivery's `X-GitHub-Delivery` id
+and the SHA-256 of its body in `webhook_delivery`, in the same transaction as the extraction. GitHub's
+retry or a maintainer's redelivery is then acknowledged with `200 already processed` and not applied
+again; a delivery that fails half way is rolled back with its row, so its retry is applied. The key
+includes the body hash because the signature covers the body and not the header: keyed by id alone,
+a captured signed body replayed under a future delivery's id would make the real one look like a
+duplicate. The table holds no payloads and is pruned after 30 days. A delivery with no id header is
+processed every time, and a database that has not run migration 0017 yet processes deliveries
+without de-duplication and logs that `dg init` is needed.
 
 **Where each signal comes from (#190).** A pull request's commit list, which corroboration's
 STRUCTURAL signal reads, is always fetched through the REST API, never taken from the delivery,

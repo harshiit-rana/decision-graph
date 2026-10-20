@@ -233,13 +233,29 @@ def finish_run(
     nodes: int,
     edges: int,
     error: str | None = None,
+    requests: int | None = None,
 ) -> None:
-    conn.execute(
-        """
-        UPDATE ingestion_run
-        SET finished_at = now(), status = %s, nodes_upserted = %s,
-            edges_upserted = %s, error = %s
-        WHERE id = %s
-        """,
-        (status, nodes, edges, error, run_id),
-    )
+    try:
+        with conn.transaction():  # a SAVEPOINT: a missing column must not abort the run's own record
+            conn.execute(
+                """
+                UPDATE ingestion_run
+                SET finished_at = now(), status = %s, nodes_upserted = %s,
+                    edges_upserted = %s, error = %s, requests = %s
+                WHERE id = %s
+                """,
+                (status, nodes, edges, error, requests, run_id),
+            )
+    except psycopg.errors.UndefinedColumn:
+        # The database predates migration 0017 and has no `requests` column. Record the run
+        # without it rather than losing the outcome after a whole poll; `dg doctor` reports the
+        # pending migration.
+        conn.execute(
+            """
+            UPDATE ingestion_run
+            SET finished_at = now(), status = %s, nodes_upserted = %s,
+                edges_upserted = %s, error = %s
+            WHERE id = %s
+            """,
+            (status, nodes, edges, error, run_id),
+        )

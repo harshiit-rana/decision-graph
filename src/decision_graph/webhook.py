@@ -46,7 +46,9 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Callable
 
-from . import db, extractors, run
+import psycopg
+
+from . import db, extractors, locking, run
 from .config import Settings
 from .github import GitHubClient
 
@@ -54,6 +56,11 @@ log = logging.getLogger(__name__)
 
 SIGNATURE_HEADER = "X-Hub-Signature-256"
 EVENT_HEADER = "X-GitHub-Event"
+DELIVERY_HEADER = "X-GitHub-Delivery"
+
+# Delivery ids are kept this long. GitHub lets a past delivery be redelivered for only a few days,
+# so a month is generous; the table holds ids and hashes, never payloads.
+DELIVERY_RETENTION_DAYS = 30
 
 # GitHub caps a delivery at 25MB. Read no more than that, so a lying Content-Length cannot
 # ask this process to allocate arbitrary memory before the signature has been checked.
@@ -99,6 +106,10 @@ class PostProcessor:
         self.last_run = now
         try:
             self.runner(self.settings, self.repo_node_id)
+        except WriterBusy:
+            log.info("post-processing deferred: a poll holds the writer lock; trying next window")
+            self.pending = True
+            return False
         except Exception:
             # Logged, not raised: the server must keep answering. It stays pending so the
             # next window tries again, and `dg ingest` does it regardless.
@@ -113,6 +124,8 @@ def _postprocess_once(settings: Settings, repo_node_id: int) -> None:
     conn = db.connect(settings.database_url)
     client = GitHubClient(token=settings.github_token, user_agent=settings.user_agent)
     try:
+        if not locking.try_writer_lock(conn, settings.target_repo):
+            raise WriterBusy
         ctx = extractors.Context(
             conn=conn, client=client, settings=settings, repo_node_id=repo_node_id
         )
@@ -136,6 +149,31 @@ class _Server(HTTPServer):
         # fully answered and its socket closed.
         if self.post is not None:
             self.post.run_if_due()
+
+
+class WriterBusy(Exception):
+    """Another process holds this repository's writer lock (#163). Not a failure: try later."""
+
+
+def record_delivery(conn, delivery_id: str, payload_sha256: str, event: str) -> bool:
+    """Record this delivery in the caller's transaction. False if it was already applied (#164).
+
+    Keyed by id AND body hash, because the signature covers the body and not the header: keyed by
+    id alone, a captured signed body replayed under a future delivery's id would make that real
+    delivery look like a duplicate. A genuine retry or redelivery has both the same, so it matches.
+    The row commits or rolls back with the extraction, so a delivery that fails half way is not
+    recorded and its retry is applied.
+    """
+    conn.execute(
+        "DELETE FROM webhook_delivery WHERE received_at < now() - make_interval(days => %s)",
+        (DELIVERY_RETENTION_DAYS,),
+    )
+    row = conn.execute(
+        "INSERT INTO webhook_delivery (delivery_id, payload_sha256, event) VALUES (%s, %s, %s) "
+        "ON CONFLICT DO NOTHING RETURNING delivery_id",
+        (delivery_id, payload_sha256, event),
+    ).fetchone()
+    return row is not None
 
 
 class WebhookError(Exception):
@@ -263,7 +301,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._check_signature(body)
             event = self.headers.get(EVENT_HEADER) or ""
             payload = self._parse(body)
-            summary = self._ingest(event, payload)
+            summary = self._ingest(event, payload, self._delivery_key(body))
         except WebhookError as exc:
             self._reply(exc.status, str(exc))
             return
@@ -300,7 +338,17 @@ class _Handler(BaseHTTPRequestHandler):
             raise WebhookError(400, "payload is not an object")
         return payload
 
-    def _ingest(self, event: str, payload: dict[str, Any]) -> str:
+    def _delivery_key(self, body: bytes) -> tuple[str, str] | None:
+        """(delivery id, body hash), or None when GitHub sent no id, which means no dedupe."""
+        delivery = (self.headers.get(DELIVERY_HEADER) or "").strip()
+        if not delivery:
+            return None
+        if len(delivery) > 200:
+            raise WebhookError(400, "bad delivery id")
+        return delivery, hashlib.sha256(body).hexdigest()
+
+    def _ingest(self, event: str, payload: dict[str, Any],
+                delivery: tuple[str, str] | None = None) -> str:
         settings = self.settings
         assert settings is not None  # set by serve()
 
@@ -321,6 +369,10 @@ class _Handler(BaseHTTPRequestHandler):
 
         conn = db.connect(settings.database_url)
         try:
+            if delivery is not None and not self._first_time(conn, event, delivery):
+                conn.rollback()
+                log.info("webhook %s %s: already processed", event, delivery[0])
+                return f"{event}: already processed"
             client = GitHubClient(token=settings.github_token, user_agent=settings.user_agent)
             repo_node_id = extractors.extract_repository(conn, client, settings)
             ctx = extractors.Context(
@@ -330,6 +382,8 @@ class _Handler(BaseHTTPRequestHandler):
             if summary is None:  # pragma: no cover - guarded above, kept as a belt
                 conn.rollback()
                 return f"{event}: not handled"
+            if delivery is not None:
+                self._note_outcome(conn, delivery, summary)
             conn.commit()
             if self.post is not None:
                 self.post.request(repo_node_id)
@@ -340,6 +394,29 @@ class _Handler(BaseHTTPRequestHandler):
             raise
         finally:
             conn.close()
+
+    @staticmethod
+    def _first_time(conn, event: str, delivery: tuple[str, str]) -> bool:
+        try:
+            with conn.transaction():  # a SAVEPOINT, so a missing table leaves the connection usable
+                return record_delivery(conn, delivery[0], delivery[1], event)
+        except psycopg.errors.UndefinedTable:
+            # The database predates migration 0017. Dropping deliveries would get the hook
+            # disabled, so process without de-duplication and say so.
+            log.warning("webhook_delivery does not exist; run `dg init`. Processing without "
+                        "de-duplication.")
+            return True
+
+    @staticmethod
+    def _note_outcome(conn, delivery: tuple[str, str], summary: str) -> None:
+        try:
+            with conn.transaction():
+                conn.execute(
+                    "UPDATE webhook_delivery SET outcome = %s WHERE delivery_id = %s AND payload_sha256 = %s",
+                    (summary[:300], delivery[0], delivery[1]),
+                )
+        except psycopg.errors.UndefinedTable:
+            pass
 
     def _reply(self, status: int, text: str) -> None:
         body = text.encode("utf-8")

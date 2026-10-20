@@ -22,6 +22,7 @@ import os
 import secrets
 import shutil
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -734,6 +735,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     heading("Data")
     try:
+        latest = last_runs(conn)["latest"]
+        if latest and latest["status"] != "succeeded":
+            states.append(check(
+                WARN, "the last ingestion run failed", (latest["error"] or "")[:120],
+                "re-run `dg ingest`; it resumes from the cursor"))
+    except Exception:
+        conn.rollback()
+    try:
         nodes = conn.execute("SELECT count(*) AS n FROM node").fetchone()["n"]
         if nodes:
             states.append(check(PASS, f"{nodes:,} nodes ingested"))
@@ -746,6 +755,37 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     conn.close()
     return _verdict(states)
+
+
+def age_text(delta) -> str:
+    """`3 h 12 min ago`, for how stale the graph is."""
+    seconds = max(int(delta.total_seconds()), 0)
+    if seconds < 90:
+        return "just now"
+    minutes = seconds // 60
+    if minutes < 120:
+        return f"{minutes} min ago"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 48:
+        return f"{hours} h {minutes} min ago"
+    return f"{hours // 24} days ago"
+
+
+def last_runs(conn) -> dict:
+    """The newest ingestion run and the newest successful one, for `dg status` and `dg doctor`.
+
+    `requests` exists from migration 0017; an older database reports None for it rather than failing.
+    """
+    has_requests = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'ingestion_run' AND column_name = 'requests') AS e"
+    ).fetchone()["e"]
+    cols = "status, started_at, finished_at, error, " + ("requests" if has_requests else "NULL::int AS requests")
+    latest = conn.execute(f"SELECT {cols} FROM ingestion_run ORDER BY id DESC LIMIT 1").fetchone()
+    success = conn.execute(
+        "SELECT max(finished_at) AS t FROM ingestion_run WHERE status = 'succeeded'"
+    ).fetchone()["t"]
+    return {"latest": latest, "last_success": success}
 
 
 def _verdict(states: list[str]) -> int:
@@ -921,19 +961,20 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"  {'total':<{width}}  {sum(r['n'] for r in rows):>6,}")
 
     heading("Ingestion")
-    runs = conn.execute(
-        """
-        SELECT status, started_at, finished_at, error
-        FROM ingestion_run ORDER BY id DESC LIMIT 1
-        """
-    ).fetchall()
-    if runs:
-        r = runs[0]
+    runs = last_runs(conn)
+    if runs["latest"]:
+        r = runs["latest"]
         mark = green("succeeded") if r["status"] == "succeeded" else red(r["status"])
         when = r["finished_at"] or r["started_at"]
-        print(f"  last run   {mark} at {when:%Y-%m-%d %H:%M} UTC")
+        made = f", {r['requests']:,} API requests" if r["requests"] is not None else ""
+        print(f"  last run   {mark} at {when:%Y-%m-%d %H:%M} UTC{made}")
         if r["error"]:
             print(f"  {dim(r['error'][:100])}")
+        if runs["last_success"]:
+            now = datetime.now(timezone.utc)
+            print(f"  last success {age_text(now - runs['last_success'])}"
+                  + (dim(" (the graph is as of then; the later run did not finish)")
+                     if r["status"] != "succeeded" else ""))
     else:
         print(dim("  no runs recorded"))
 

@@ -14,17 +14,23 @@ import argparse
 import logging
 import os
 import sys
+import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 import psycopg
 
-from . import cursors, db, extractors, inference, synthesis, threads
+from . import cursors, db, extractors, inference, locking, synthesis, threads
 from .config import Settings
 from .cursors import Strategy
 from .extractors import Context
 from .github import GitHubClient, RateLimitExhausted, parse_ts
 
 log = logging.getLogger("decision_graph")
+
+# Another writer holds the lock for this repository. Distinct from 1 (failed) so a scheduler can
+# skip the round instead of reporting a failure, and from 0 so nobody mistakes it for a poll.
+EXIT_BUSY = 3
 
 
 def ingest(
@@ -35,7 +41,37 @@ def ingest(
     reconcile: bool = False,
     synthesize: bool = True,
 ) -> int:
+    """One poll, as the only writer for this repository (#163).
+
+    If another `dg ingest`, or the webhook receiver's post-processing, holds the repository's lock,
+    this exits with EXIT_BUSY and writes nothing.
+    """
     conn = db.connect(settings.database_url)
+    try:
+        if not locking.try_writer_lock(conn, settings.target_repo):
+            log.warning(
+                "another ingestion or post-processing run for %s is in progress; exiting without "
+                "writing. Try again when it finishes.", settings.target_repo,
+            )
+            return EXIT_BUSY
+        return _ingest_locked(
+            conn, settings, resources=resources, max_pages=max_pages,
+            reconcile=reconcile, synthesize=synthesize,
+        )
+    finally:
+        # Closing the connection is what releases the lock, including when a run dies.
+        conn.close()
+
+
+def _ingest_locked(
+    conn,
+    settings: Settings,
+    *,
+    resources: list[str],
+    max_pages: int | None,
+    reconcile: bool,
+    synthesize: bool,
+) -> int:
     client = GitHubClient(
         token=settings.github_token,
         user_agent=settings.user_agent,
@@ -87,7 +123,8 @@ def ingest(
         log.exception("ingestion failed")
     finally:
         db.finish_run(
-            conn, run_id, status=status, nodes=ctx.stats.nodes, edges=ctx.stats.edges, error=error
+            conn, run_id, status=status, nodes=ctx.stats.nodes, edges=ctx.stats.edges,
+            error=error, requests=client.requests_made,
         )
         conn.commit()
         client.close()
@@ -281,6 +318,54 @@ def _report(ctx: Context, client: GitHubClient) -> None:
             log.info("  %-36s %s", reason, count)
 
 
+def parse_interval(text: str) -> float:
+    """`3600`, `90s`, `30m` or `1h` as seconds. Refuses anything under a minute: a poll that
+    often spends the API budget on asking whether anything changed."""
+    t = text.strip().lower()
+    units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    try:
+        seconds = float(t[:-1]) * units[t[-1]] if t and t[-1] in units else float(t)
+    except ValueError:
+        raise ValueError(f"not an interval: {text!r} (try 3600, 30m or 1h)") from None
+    if seconds < 60:
+        raise ValueError(f"interval {text!r} is under a minute; polling that often only burns the rate limit")
+    return seconds
+
+
+def schedule_loop(
+    once: Callable[[], int],
+    interval: float,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    max_rounds: int | None = None,
+) -> int:
+    """Run `once` every `interval` seconds until interrupted (#163).
+
+    A round that finds another writer is skipped, and a failed round is logged and followed by
+    the next: a scheduler that exits on the first error is a scheduler that is down by morning.
+    Every round is the ordinary resume path, so a rate-limit stop is picked up where it left off.
+    """
+    rounds = 0
+    try:
+        while max_rounds is None or rounds < max_rounds:
+            rounds += 1
+            try:
+                code = once()
+            except Exception:  # noqa: BLE001 - logged, and the next round tries again
+                log.exception("scheduled ingestion raised; will try again next round")
+                code = 1
+            if code == EXIT_BUSY:
+                log.info("scheduled round skipped: another writer holds the lock")
+            elif code != 0:
+                log.warning("scheduled round failed (exit %s); next round in %s s", code, int(interval))
+            if max_rounds is not None and rounds >= max_rounds:
+                break
+            sleep(interval)
+    except KeyboardInterrupt:
+        log.info("scheduler stopped")
+    return 0
+
+
 DEFAULT_RESOURCES = ["issues", "commits", "releases", "codeowners", "wiki", "workflows"]
 
 
@@ -309,8 +394,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="skip promoting qualifying clusters to Decision nodes",
     )
+    parser.add_argument(
+        "--every",
+        metavar="INTERVAL",
+        help="poll repeatedly instead of once: 3600, 30m or 1h (at least a minute). Each round is "
+        "the ordinary resume path; a round that finds another writer is skipped. Run it as its own "
+        "process (the compose `scheduler` service), never inside the webhook receiver",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
+    interval = None
+    if args.every:
+        try:
+            interval = parse_interval(args.every)
+        except ValueError as exc:
+            parser.error(str(exc))
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -329,13 +427,19 @@ def main(argv: list[str] | None = None) -> int:
     log.info("target repo    : %s", settings.target_repo)
     log.info("backfill window: %s months", settings.backfill_months)
 
-    return ingest(
-        settings,
-        resources=args.resources,
-        max_pages=args.max_pages,
-        reconcile=args.reconcile,
-        synthesize=not args.no_synthesis,
-    )
+    def once() -> int:
+        return ingest(
+            settings,
+            resources=args.resources,
+            max_pages=args.max_pages,
+            reconcile=args.reconcile,
+            synthesize=not args.no_synthesis,
+        )
+
+    if interval is not None:
+        log.info("scheduled: polling every %s s", int(interval))
+        return schedule_loop(once, interval)
+    return once()
 
 
 if __name__ == "__main__":

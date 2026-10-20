@@ -1,6 +1,6 @@
 # 0008 — Storage, ingestion, caching and scalability
 
-**Status:** Proposed — awaiting owner decision
+**Status:** Accepted 2026-10-20
 
 ## Facts
 
@@ -76,4 +76,14 @@
 
 ## Decision
 
-_Pending._
+Accepted on 2026-10-20: **Storage A** and **Ingestion A**, as recommended. The owner replied "do it"
+to the offer to accept this ADR's recommended options and unblock #163 and #164.
+
+- Storage A is accepted, but its numeric triggers are **not yet written**: they need the #130
+  growth measurements and the second repository (#132), which don't exist. Until then the trigger
+  is a placeholder, and nothing here claims a latency budget.
+- Ingestion A is accepted with its prerequisites. Status: newest-wins writes (#120) and edge
+  retraction (#121) are done, webhook post-processing (#162) is partly done, and the advisory
+  lock (#163) and delivery de-duplication (#164) are implemented with this decision.
+- No queue and no event bus.
+

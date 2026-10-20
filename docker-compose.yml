@@ -53,5 +53,28 @@ services:
       - .:/work
     working_dir: /work
 
+  # Polls on an interval so the graph stays current without anyone remembering. Off by default:
+  # `docker compose --profile scheduled up -d scheduler`. It is its own process, never part of the
+  # webhook receiver, and it takes the same per-repository writer lock as `dg ingest`, so a round
+  # that finds another writer is skipped. Needs GITHUB_TOKEN (and TARGET_REPO) in .env (#163).
+  scheduler:
+    profiles: ["scheduled"]
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:${DG_DB_PASSWORD:-dg}@db:5432/dg
+      DG_PROJECT_DIR: /work
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      TARGET_REPO: ${TARGET_REPO:-pallets/flask}
+    volumes:
+      - .:/work
+    working_dir: /work
+    # The image's entrypoint is `python -m decision_graph.cli`, so this is `dg ingest --every ...`,
+    # which picks the least-privilege role for ingestion like any other `dg ingest` (#172).
+    command: ["ingest", "--every", "${DG_POLL_INTERVAL:-1h}"]
+    restart: unless-stopped
+
 volumes:
   dgdata:

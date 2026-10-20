@@ -80,6 +80,7 @@ SENTINELS: dict[str, str] = {
     "0015": "to_regclass('public.comment') IS NOT NULL",
     "0016": """EXISTS (SELECT 1 FROM information_schema.columns
                 WHERE table_name = 'edge' AND column_name = 'retracted_at')""",
+    "0017": "to_regclass('public.webhook_delivery') IS NOT NULL",
 }
 
 
