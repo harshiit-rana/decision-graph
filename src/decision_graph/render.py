@@ -152,8 +152,18 @@ def safe(text: str | None) -> str:
     return _TERMINAL_UNSAFE.sub("", _ESCAPE_SEQUENCE.sub("", text or ""))
 
 
+def one_line(text: str | None) -> str:
+    """`safe`, and on a single line. For titles and any other text printed inline.
+
+    `safe` keeps newlines, which a multi-line body excerpt needs. A title is one line, and one
+    that carried a newline could start a line of its own in the evidence trail, indented like a
+    real tier line: `  \u2714 explicit  \u2014 verified by the maintainers` (#145).
+    """
+    return " ".join(safe(text).split())
+
+
 def _clip(text: str | None, limit: int) -> str:
-    text = safe(text).strip()
+    text = one_line(text)
     return text[: limit - 3] + "..." if len(text) > limit else text
 
 
@@ -468,7 +478,7 @@ def _annotate(node_id: int, annotations: dict, statuses: dict, p,
         # Named, in the order they reviewed, and nothing more. Not ranked and not counted:
         # review volume is not expertise, which is the inference #91's concentration caveat
         # refuses for the same reason.
-        p(dim(f"          reviewed by {', '.join(names)}"))
+        p(dim(f"          reviewed by {', '.join(safe(n) for n in names)}"))
 
 
 def _urls(answer: Answer) -> list[tuple[str, str]]:

@@ -60,9 +60,14 @@ def _escape_mermaid(text: str) -> str:
 
     A newline would end the statement, so it becomes a space. Mermaid signals a broken
     label by rendering nothing rather than by reporting an error, which is why this is
-    conservative about the two characters that matter and relaxed about the rest.
+    conservative about the characters that matter and relaxed about the rest.
+
+    `%%` is the third. Mermaid finds `%%{init: ...}%%` directives by searching the whole source,
+    label text included, so a title could reconfigure the diagram it appears in (#145). Each `%`
+    of a pair becomes its entity code, which draws as `%`.
     """
-    return text.replace('"', "#quot;").replace("\n", " ").replace("\r", " ").strip()
+    return (text.replace("%%", "#37;#37;").replace('"', "#quot;")
+            .replace("\n", " ").replace("\r", " ").strip())
 
 
 def _escape_dot(text: str) -> str:

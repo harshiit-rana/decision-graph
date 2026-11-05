@@ -23,7 +23,7 @@ import html
 import json
 from datetime import datetime, timezone
 
-from . import trace
+from . import diagram, trace
 
 # The UMD build specifically: it defines a global and works from a file:// page, where
 # the ESM build cannot be imported at all. Pinned, so a future release cannot change
@@ -224,7 +224,9 @@ def _decision_mermaid(decision: dict, edges: list[dict]) -> str:
     lines.append(f'  class d{decision["node_id"]} decision;')
     for i, e in enumerate(edges):
         name = trace.ref(e["other_type"], e["other_ref"])
-        title = (e["other_title"] or "")[:40].replace('"', "#quot;")
+        # The same escape as `dg query --format mermaid`, one implementation: this used to
+        # replace only the quote, so a title with a newline could add statements (#145).
+        title = diagram._escape_mermaid((e["other_title"] or "")[:40])
         label = f'{name}<br/>{title}' if title else name
         node = f"a{decision['node_id']}_{i}"
         shape = ("([", "])") if e["other_type"] == "issue" else ("[", "]")
