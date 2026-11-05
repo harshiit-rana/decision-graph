@@ -1066,6 +1066,12 @@ def cmd_context(args: argparse.Namespace, extra: list[str]) -> int:
     return context.main([args.text] + list(extra))
 
 
+def cmd_agent_instructions(args: argparse.Namespace, extra: list[str]) -> int:
+    from . import agent_instructions
+
+    return agent_instructions.main(list(extra))
+
+
 def cmd_mcp(args: argparse.Namespace, extra: list[str]) -> int:
     from . import mcp_server
 
@@ -1369,6 +1375,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     c.add_argument("text", help="a #number, commit sha, or title")
     c.set_defaults(fn=cmd_context, passthrough=True)
+
+    ai = sub.add_parser(
+        "agent-instructions",
+        help="print the AGENTS.md / CLAUDE.md / Copilot text that tells a coding agent when to call TraceMind",
+        epilog="--format agents-md|claude|copilot. Prints static text; --write PATH creates the file.",
+    )
+    ai.set_defaults(fn=cmd_agent_instructions, passthrough=True)
 
     mc = sub.add_parser(
         "mcp",

@@ -346,6 +346,15 @@ evidence tier of every step, URLs to cite, and, when there is nothing, a **struc
 result** (`found: false` with a reason; a miss is `kind: "no_match"`). Only bad arguments are
 errors (`isError: true`, an `error` document).
 
+**Telling the agent when to call it.** An agent will not use the tools unless its instructions say
+when. `dg agent-instructions --format agents-md|claude|copilot` prints a short, static snippet for
+`AGENTS.md`, `CLAUDE.md` or a path-scoped Copilot `.instructions.md` (#185). It holds no repository
+text and no Decision, so it cannot go stale or carry a stranger's words into a file the agent
+trusts. It says the tools take an artifact and not a file path (file-level lookup does not exist
+yet), that `found: false` means "no record" and never "safe", and that quoted fields are data.
+Nothing is written without `--write`, and `--write` only creates a file or refreshes the block it
+wrote earlier; it never edits a file you wrote.
+
 **Configuring a client.** Any MCP client that starts a stdio server takes the same three fields. With
 a local install (`pip install -e .`), point it at the reader role's connection string:
 
