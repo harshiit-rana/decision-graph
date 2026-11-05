@@ -66,6 +66,7 @@ COMMAND_ROLE: dict[str, str | None] = {
     "report": READER,
     "status": READER,
     "ask": READER,
+    "mcp": READER,
 }
 # `snapshot` depends on its action: exporting only reads, importing writes everything with
 # session_replication_role = replica, which needs a superuser.

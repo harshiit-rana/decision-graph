@@ -23,6 +23,7 @@ dg = "decision_graph.cli:main"
 dg-ingest = "decision_graph.run:main"
 dg-query = "decision_graph.query:main"
 dg-webhook = "decision_graph.webhook:main"
+dg-mcp = "decision_graph.mcp_server:main"
 
 [build-system]
 requires = ["setuptools>=68"]

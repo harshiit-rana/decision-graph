@@ -280,6 +280,8 @@ CASES = {
     "refusal_no_rationale": lambda: doc_for(candidate(), refused(fallback=True)),
     "refusal_nothing_downstream": lambda: doc_for(candidate(), refused(Mode.IMPACT)),
     "refusal_as_of": lambda: doc_for(candidate(), refused(), as_of=datetime(2025, 6, 1)),
+    "lookup": lambda: finished(
+        contract.lookup_document("blueprint", [candidate(), candidate(PR, "fuzzy")]), ASSOC),
     "no_match": lambda: {**contract.no_match_document("nonexistent thing"),
                          "coverage": _no_match_coverage()},
     "error": lambda: contract.error_document("--depth 0 cannot reach anything. Use 1 or more."),
@@ -298,6 +300,8 @@ V1_FIELDS = frozenset({
     "body", "author_association", "at", "caveat", "meaning", "strength",
     # Added within v1 by #137 (kind "attempts"). Additions are compatible.
     "attempts", "ending", "landed_in", "caveats",
+    # Added within v1 by #139 (kind "lookup").
+    "candidates",
     # Added within v1 by #138 (kind "context").
     "why", "impact", "gaps", "detail", "refusal_kind", "budget", "max_paths", "max_quote_chars",
     "truncated", "paths_omitted", "quote_chars_cut",

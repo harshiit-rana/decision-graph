@@ -41,6 +41,25 @@ _FRESH = (
 )
 
 
+def storable(value: Any) -> Any:
+    """`value` with every NUL (U+0000) removed, in strings, dict keys and values, and lists.
+
+    PostgreSQL cannot hold a NUL in `text` or `jsonb`, so one in an issue title or body made the
+    INSERT raise and the whole ingestion run fail (found by the adversarial corpus, #145). Anyone
+    who can post on a tracked repository could stop `dg ingest` that way, repeatedly, because the
+    poller would meet the same payload on every run. Removed rather than rejected, because dropping
+    one artifact to avoid one byte would silently shrink the graph. This changes stored text by
+    that byte and nothing else.
+    """
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {storable(k): storable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [storable(v) for v in value]
+    return value
+
+
 def is_stale(incoming: datetime | None, stored: datetime | None) -> bool:
     """The same rule as `_FRESH`, inverted, for callers deciding whether to extract."""
     if stored is None:
@@ -90,6 +109,7 @@ def upsert_node(
     already have promoted this node into a merged thread, and a plain refresh of the
     artifact must not undo that.
     """
+    external_id, title, url, raw = storable(external_id), storable(title), storable(url), storable(raw)
     row = conn.execute(
         """
         INSERT INTO node (node_type, repo_node_id, external_id, github_node_id,
@@ -148,7 +168,7 @@ def upsert_detail(conn: psycopg.Connection, table: str, node_id: int, **columns:
     conn.execute(
         f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders}) "
         f"ON CONFLICT (node_id) DO UPDATE SET {updates}",
-        {"node_id": node_id, **columns},
+        {"node_id": node_id, **{k: storable(v) for k, v in columns.items()}},
     )
 
 

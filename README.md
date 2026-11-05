@@ -124,6 +124,7 @@ need to type one to use the tool.
 | `dg ask "..."` | the same, asked in plain English — needs an Nvidia NIM key |
 | `dg query ... --format mermaid` | the same answer as a diagram (`dot` also available) |
 | `dg query "..." --mode attempts` | has this been tried before? earlier issues and PRs that ended without landing, how each ended, and where the thread later landed |
+| `dg mcp` / `dg-mcp` | a read-only MCP server (stdio) for coding agents: `lookup`, `why`, `impact`, `prior_attempts`, `context_pack` |
 | `dg context "#N"` | one JSON document for a coding agent: why, impact, prior attempts, Decision facts, and what the graph does **not** record (`gaps`) |
 | `dg query ... --format json` | the same answer as data, for programs and coding agents: a versioned contract ([schema](docs/schema/answer.v1.json)) |
 | `dg report` | render every decision and its evidence to a browsable HTML page |
@@ -325,6 +326,71 @@ and `no_prior_attempt_found`. A refused pack, abridged:
 anything is cut. Full answered and refused examples are the goldens
 `tests/golden/contract/context_*.json`. The answered example is about 4.5 KB. Pack sizes
 on the real flask graph are not yet measured (#173).
+
+### Connecting a coding agent (`dg-mcp`)
+
+`dg-mcp` is a read-only [MCP](https://modelcontextprotocol.io) server on stdio (#139, ADR 0006). An
+agent can ask why an artifact exists, what it affects, what was tried before, and for everything the
+graph records about it at once, and it gets the same versioned JSON as `dg query --format json`.
+
+| Tool | Answers | Calls the same code as |
+|---|---|---|
+| `lookup` | which artifacts a name (`#5895`, a sha, words) could mean | `dg query --mode lookup` |
+| `why` | what led to it | `dg query --mode why` |
+| `impact` | what it affects | `dg query --mode impact` |
+| `prior_attempts` | earlier issues and PRs on it that did not land, and how each ended | `dg query --mode attempts` |
+| `context_pack` | all of the above plus `gaps`: what the graph does not record | `dg context` |
+
+The adapter has no logic of its own: each tool calls the function the CLI calls. Answers carry the
+evidence tier of every step, URLs to cite, and, when there is nothing, a **structured refusal as a
+result** (`found: false` with a reason; a miss is `kind: "no_match"`). Only bad arguments are
+errors (`isError: true`, an `error` document).
+
+**Configuring a client.** Any MCP client that starts a stdio server takes the same three fields. With
+a local install (`pip install -e .`), point it at the reader role's connection string:
+
+```json
+{
+  "mcpServers": {
+    "tracemind": {
+      "command": "dg-mcp",
+      "args": ["--quotes", "maintainers"],
+      "env": { "DG_MCP_DATABASE_URL": "postgresql://dg_reader:<DG_READER_PASSWORD>@127.0.0.1:55434/dg" }
+    }
+  }
+}
+```
+
+With Docker, `dg mcp` picks the reader role for you: `docker compose run --rm -T app mcp`
+(`-T` matters: a terminal would mangle the protocol). That Docker invocation has **not been run** in
+the environment this was written in, which had no Docker; the server itself was exercised over real
+pipes and with the official MCP SDK's client.
+
+**Read-only, three ways.** There is no tool that writes or calls GitHub (a test checks the module
+never loads the writing code or `httpx`). The server **refuses to start** on a role that is a
+superuser or can write, which is why it wants the `dg_reader` role from `dg roles setup` (#172);
+`--allow-writable-role` overrides that and is for installs that have not set roles up. And every
+connection is opened with `default_transaction_read_only`, a 15 s statement timeout and no idle
+transactions. The role is the boundary; the other two are defence in depth.
+
+**Bounded per call.** `depth` is at most 3, `max_paths` at most 100 (default 25, the rest counted in
+`truncated`), `limit` at most 10, `max_quote_chars` at most 2000. A larger request is an error, not a
+slow answer.
+
+**Repository text is data, and TraceMind cannot make the agent treat it that way.** Titles, excerpts
+and quoted comments are written by strangers and are handed to another model by design. They sit only
+in the fields named by `repository_text_fields`, each with `author_association` and `untrusted`, and
+every tool description tells the agent so. `--quotes maintainers` removes the text of anything not
+written by an OWNER, MEMBER or COLLABORATOR, and an agent cannot ask for looser than the operator
+chose. These labels are advisory: a model can still follow injected text, including a maintainer's.
+Everyone who can run the server sees every ingested repository (ADR 0007's trust domain).
+
+**No MCP SDK dependency.** The server speaks `initialize`, `ping`, `tools/list` and `tools/call`
+itself, about two hundred lines. The SDK has had a major-version change since this was designed, and
+the optional extra the issue suggested would add a moving dependency for that small surface. If a
+client needs more of the protocol, adopt the SDK then. Whether agents are better off with this at all
+is what the pre-registered agent study (#140) is for; ADR 0006 commits to building the surface, not to
+keeping it regardless of the result.
 
 ### Answers as data (`--format json`)
 

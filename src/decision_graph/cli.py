@@ -1066,6 +1066,12 @@ def cmd_context(args: argparse.Namespace, extra: list[str]) -> int:
     return context.main([args.text] + list(extra))
 
 
+def cmd_mcp(args: argparse.Namespace, extra: list[str]) -> int:
+    from . import mcp_server
+
+    return mcp_server.main(list(extra))
+
+
 def cmd_query(args: argparse.Namespace, extra: list[str]) -> int:
     from . import query
 
@@ -1363,6 +1369,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     c.add_argument("text", help="a #number, commit sha, or title")
     c.set_defaults(fn=cmd_context, passthrough=True)
+
+    mc = sub.add_parser(
+        "mcp",
+        help="read-only MCP server (stdio) for coding agents: lookup, why, impact, prior_attempts, "
+        "context_pack",
+        epilog="Start it from an MCP client's configuration. In Docker: "
+        "`docker compose run --rm -T app mcp` (-T: no terminal, the protocol needs clean pipes). "
+        "Flags such as --quotes maintainers are passed through.",
+    )
+    mc.set_defaults(fn=cmd_mcp, passthrough=True)
 
     a = sub.add_parser("ask", help="ask a natural language question about the repository")
     a.add_argument("question", help="e.g. 'Why did we change the default redirect code?'")

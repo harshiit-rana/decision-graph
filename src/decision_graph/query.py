@@ -24,6 +24,9 @@ from .reasoning import Answer, Mode
 
 # Not a reasoning.Mode: it walks no edges. It is a filtered retrieval over closure facts.
 ATTEMPTS = "attempts"
+# Nor is this: it only resolves a name to the artifacts it could mean, so an agent can pick one
+# before asking why (#139). The same retrieval `why` starts from, shown instead of walked.
+LOOKUP = "lookup"
 
 # Kept as a module attribute because it was one, and `from .query import TIER_MARK` is the
 # kind of import that exists in someone's script.
@@ -133,14 +136,75 @@ def answer_document(conn, *, query: str, mode: str, candidates, as_of, max_depth
     })
 
 
-def _print_json(conn, args, candidates, as_of, as_recorded=None) -> int:
-    doc = answer_document(
-        conn, query=args.query, mode=args.mode, candidates=candidates, as_of=as_of,
-        as_recorded=as_recorded, max_paths=args.max_paths,
-        max_depth=args.depth, answer_all=args.all, quotes=args.quotes,
-    )
-    print(contract.dumps(doc))
-    return 0
+def json_document(conn, *, query: str, mode: str, depth: int, as_of, as_recorded,
+                  max_paths: int | None, limit: int, answer_all: bool, quotes: str,
+                  repo_node_id: int | None) -> tuple[dict, int]:
+    """The whole JSON answer to one query, and the exit code `dg query` gives it.
+
+    `dg query --format json` and the MCP server (#139) both call this, so the adapter has no
+    logic of its own: a refusal is a document with code 0, no match is a document with code 1,
+    and bad arguments are the caller's to reject before getting here (`argument_error`).
+    """
+    if mode == ATTEMPTS:
+        found = attempts.find_attempts(conn, query, repo_node_id=repo_node_id, limit=limit)
+        # An empty list is a result, like a refusal: exit 0, and say what it does not mean.
+        return contract.finish_from_db(conn, attempts.document(query, found), quotes, request={
+            "command": "query", "query": query, "mode": "attempts", "limit": limit,
+            "quotes": quotes,
+        }), 0
+
+    candidates = retrieval.find_candidates(conn, query, repo_node_id=repo_node_id, limit=limit)
+    if not candidates:
+        from . import coverage
+
+        doc = contract.no_match_document(query)
+        doc["coverage"] = coverage.compute(conn, start_node_ids=[], query=query,
+                                           matched=False, repo_node_id=repo_node_id)
+        return doc, 1
+
+    if mode == LOOKUP:
+        urls = contract.node_urls(conn, (c.node_id for c in candidates))
+        return contract.finish_from_db(
+            conn, contract.lookup_document(query, candidates, urls), quotes,
+            request={"command": "query", "query": query, "mode": "lookup", "limit": limit,
+                     "quotes": quotes}), 0
+
+    return answer_document(
+        conn, query=query, mode=mode, candidates=candidates, as_of=as_of,
+        as_recorded=as_recorded, max_paths=max_paths, max_depth=depth,
+        answer_all=answer_all, quotes=quotes,
+    ), 0
+
+
+def argument_error(*, depth: int, max_paths: int | None, limit: int) -> str | None:
+    """The sentence for a number that would make the answer a lie, or None.
+
+    A zero-hop walk, a zero-path cap or a zero-candidate search returns nothing, and the
+    renderer would then say the graph holds no evidence: a false statement about the repository
+    caused by the caller's own argument (issues #77, #82, #99). So these are rejected, not
+    answered.
+    """
+    if depth < 1:
+        return f"--depth {depth} cannot reach anything. Use 1 or more."
+    if max_paths is not None and max_paths < 1:
+        return (f"--max-paths {max_paths} would keep no paths, so every answer would look like a "
+                "refusal. Use 1 or more.")
+    if limit < 1:
+        return f"--limit {limit} asks for no candidates, so nothing can match. Use 1 or more."
+    return None
+
+
+def parse_instant(name: str, text: str | None):
+    """An ISO timestamp, or None when absent. Raises ValueError with the sentence to show."""
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        raise ValueError(
+            f"{name} {text!r} is not a timestamp. Use YYYY-MM-DD, or a full ISO instant like "
+            "2026-03-01T00:00:00Z."
+        ) from None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -149,9 +213,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("query", help="entity title, #number, or sha to start from")
     parser.add_argument(
-        "--mode", choices=[*(m.value for m in Mode), ATTEMPTS], default=Mode.WHY.value,
+        "--mode", choices=[*(m.value for m in Mode), ATTEMPTS, LOOKUP], default=Mode.WHY.value,
         help="why: what led to this; impact: what it affects; attempts: earlier issues and "
-        "pull requests on this that ended without landing, and how each ended",
+        "pull requests on this that ended without landing, and how each ended; lookup: which "
+        "artifacts the query could mean, without walking from any of them",
     )
     parser.add_argument("--depth", type=int, default=reasoning.DEFAULT_MAX_DEPTH)
     parser.add_argument(
@@ -230,52 +295,27 @@ def main(argv: list[str] | None = None) -> int:
         return fail("DATABASE_URL is not set")
 
     try:
-        as_of = datetime.fromisoformat(args.as_of) if args.as_of else None
-    except ValueError:
-        # Every other bad argument here produces a sentence; this one produced a traceback
-        # out of the standard library (issue #82).
-        return fail(
-            f"--as-of {args.as_of!r} is not a timestamp. Use YYYY-MM-DD, or a full "
-            "ISO instant like 2026-03-01T00:00:00Z."
-        )
+        # Every bad argument here produces a sentence; a timestamp used to produce a
+        # traceback out of the standard library (issue #82).
+        as_of = parse_instant("--as-of", args.as_of)
+        as_recorded = parse_instant("--as-recorded", args.as_recorded)
+    except ValueError as exc:
+        return fail(str(exc))
 
-    try:
-        as_recorded = datetime.fromisoformat(args.as_recorded) if args.as_recorded else None
-    except ValueError:
-        return fail(
-            f"--as-recorded {args.as_recorded!r} is not a timestamp. Use YYYY-MM-DD, or a full "
-            "ISO instant like 2026-03-01T00:00:00Z."
-        )
-
-    # A zero-hop walk cannot reach anything, so the engine correctly returns nothing -- and
-    # the renderer then says the graph holds no evidence, which is a false statement about
-    # the repository caused by the caller's own argument. A refusal that reports your
-    # mistake as a fact is worse than an error, because it is believable (issues #77, #82).
-    if args.depth < 1:
-        return fail(f"--depth {args.depth} cannot reach anything. Use 1 or more.")
-    if args.max_paths is not None and args.max_paths < 1:
-        return fail(f"--max-paths {args.max_paths} would keep no paths, so every answer would "
-                    "look like a refusal. Use 1 or more.")
-
-    # The same defect one argument over, missed when --depth was guarded (issue #99). A
-    # zero-candidate retrieval cannot match anything, so `find_candidates` correctly
-    # returned nothing and the miss below reported it as "Nothing in the graph matches
-    # '#5895'" -- about an artifact the graph holds, with advice to go check `dg status`,
-    # which shows it present and sends the reader after a problem that does not exist.
     if args.limit is None:
         args.limit = attempts.DEFAULT_LIMIT if args.mode == ATTEMPTS else 3
-    if args.limit < 1:
-        return fail(
-            f"--limit {args.limit} asks for no candidates, so nothing can match. "
-            "Use 1 or more."
-        )
+    # A refusal that reports your mistake as a fact is worse than an error, because it is
+    # believable (issues #77, #82, #99).
+    bad = argument_error(depth=args.depth, max_paths=args.max_paths, limit=args.limit)
+    if bad:
+        return fail(bad)
 
     if args.quotes != "all" and not as_json:
         return fail("--quotes applies to --format json; the text output is for a person reading "
                     "the repository anyway")
 
-    if args.mode == ATTEMPTS and args.format not in ("text", "json"):
-        return fail(f"--mode attempts lists artifacts; it has no {args.format} diagram")
+    if args.mode in (ATTEMPTS, LOOKUP) and args.format not in ("text", "json"):
+        return fail(f"--mode {args.mode} lists artifacts; it has no {args.format} diagram")
 
     conn = db.connect(dsn)
 
@@ -285,34 +325,27 @@ def main(argv: list[str] | None = None) -> int:
         if repo_node_id is None:
             return fail(f"repo {args.repo!r} has not been ingested")
 
+    if as_json:
+        doc, code = json_document(
+            conn, query=args.query, mode=args.mode, depth=args.depth, as_of=as_of,
+            as_recorded=as_recorded, max_paths=args.max_paths, limit=args.limit,
+            answer_all=args.all, quotes=args.quotes, repo_node_id=repo_node_id,
+        )
+        print(contract.dumps(doc))
+        conn.close()
+        return code
+
     if args.mode == ATTEMPTS:
         found = attempts.find_attempts(
             conn, args.query, repo_node_id=repo_node_id, limit=args.limit
         )
-        # An empty list is a result, like a refusal: exit 0, and say what it does not mean.
-        if as_json:
-            print(contract.dumps(contract.finish_from_db(
-                conn, attempts.document(args.query, found), args.quotes, request={
-                    "command": "query", "query": args.query, "mode": "attempts",
-                    "limit": args.limit, "quotes": args.quotes,
-                })))
-        else:
-            attempts.render(args.query, found, out=sys.stdout)
+        attempts.render(args.query, found, out=sys.stdout)
         conn.close()
         return 0
 
     candidates = retrieval.find_candidates(
         conn, args.query, repo_node_id=repo_node_id, limit=args.limit
     )
-    if not candidates and as_json:
-        from . import coverage
-
-        doc = contract.no_match_document(args.query)
-        doc["coverage"] = coverage.compute(conn, start_node_ids=[], query=args.query,
-                                           matched=False, repo_node_id=repo_node_id)
-        print(contract.dumps(doc))
-        conn.close()
-        return 1
     if not candidates:
         print(f"Nothing in the graph matches {args.query!r}.", file=sys.stderr)
         print(file=sys.stderr)
@@ -321,10 +354,15 @@ def main(argv: list[str] | None = None) -> int:
         print("  Try `#5898` or a commit sha, or check `dg status` for what is ingested.", file=sys.stderr)
         return 1
 
-    if as_json:
-        code = _print_json(conn, args, candidates, as_of, as_recorded)
+    if args.mode == LOOKUP:
+        print(render.bold(f"Which artifact does {args.query!r} mean?"))
+        print()
+        for c in candidates:
+            how = _MATCH_MEANING.get(c.match, c.match)
+            print(f"  {render.bold(trace.ref(c.node_type, c.external_id))}  "
+                  f"{render.safe(c.title)[:56]}  {render.dim(how)}")
         conn.close()
-        return code
+        return 0
 
     graphical = args.format != "text"
     question = "Why did this happen?" if args.mode == Mode.WHY.value else "What does this affect?"

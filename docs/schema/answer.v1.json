@@ -14,6 +14,9 @@
       "$ref": "#/$defs/context_document"
     },
     {
+      "$ref": "#/$defs/lookup_document"
+    },
+    {
       "$ref": "#/$defs/no_match_document"
     },
     {
@@ -1547,6 +1550,60 @@
         "paths_returned": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "lookup_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "`dg query --mode lookup --format json` (issue #139): the artifacts a query could mean, from the same retrieval `why` starts from. It walks nothing and says nothing about relevance.",
+      "required": [
+        "schema_version",
+        "kind",
+        "query",
+        "repository_text_fields",
+        "candidates",
+        "caveats",
+        "quotes",
+        "provenance",
+        "coverage"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "kind": {
+          "const": "lookup"
+        },
+        "query": {
+          "type": "string"
+        },
+        "repository_text_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/candidate"
+          }
+        },
+        "caveats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "quotes": {
+          "$ref": "#/$defs/quotes"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
         }
       }
     }

@@ -289,6 +289,28 @@ def answer_document(*, query: str, mode: str, as_of, max_depth: int,
     )
 
 
+LOOKUP_CAVEAT = (
+    "These are the artifacts the query's text resembles, in the order retrieval ranks them. "
+    "A match says the words are alike, not that the artifact is relevant to anything."
+)
+
+
+def lookup_document(query: str, candidates, urls: dict[int, str] | None = None) -> dict[str, Any]:
+    """Which artifacts a query could mean (#139). Walks nothing: it is retrieval, shown."""
+    urls = urls or {}
+    return _envelope(
+        "lookup",
+        query=query,
+        repository_text_fields=list(REPOSITORY_TEXT_FIELDS),
+        candidates=[
+            {**node_doc(c.node_id, c.node_type, c.external_id, c.title, urls.get(c.node_id)),
+             "match": c.match}
+            for c in candidates
+        ],
+        caveats=[LOOKUP_CAVEAT],
+    )
+
+
 def no_match_document(query: str) -> dict[str, Any]:
     """No artifact resembles the query. Distinct from a refusal: there was no start node."""
     return _envelope(
