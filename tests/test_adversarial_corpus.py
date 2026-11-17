@@ -148,6 +148,17 @@ class TerminalTest(unittest.TestCase):
         render.render(answer_with(text), bodies={1: text}, out=out)
         self.assertNotIn("\x1b", out.getvalue())
 
+    def test_a_refusals_quoted_last_word_is_inert(self) -> None:
+        # The one place the trail quotes a comment: the last word on an artifact that closed.
+        for name, text in CORPUS:
+            with self.subTest(case=name):
+                out = io.StringIO()
+                closed = Closure("issue #5", "not_planned", T, Standing(text, "MEMBER", T))
+                render.render(Answer(Mode.WHY, 1, [], False, "no path"), closure=closed, out=out)
+                self.assertIsNone(UNSAFE.search(out.getvalue()), repr(UNSAFE.search(out.getvalue())))
+                for line in out.getvalue().splitlines():
+                    self.assertFalse(line.lstrip().startswith("✔ explicit"), line)
+
     def test_prior_attempts_print_titles_and_last_words_as_inert_text(self) -> None:
         for name, text in CORPUS:
             with self.subTest(case=name):
