@@ -788,6 +788,52 @@ def last_runs(conn) -> dict:
     return {"latest": latest, "last_success": success}
 
 
+def webhook_backlog(conn) -> list[dict] | None:
+    """Per repository: webhook deliveries applied but not yet post-processed (#162, migration 0018).
+
+    None when the database predates 0018 or no delivery has been recorded for any repository, so
+    `dg status` says nothing about a receiver nobody runs rather than claiming "none pending".
+    """
+    tracked = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'webhook_delivery' AND column_name = 'postprocessed_at') AS e"
+    ).fetchone()["e"]
+    if not tracked:
+        return None
+    rows = conn.execute(
+        """
+        SELECT r.external_id AS repo,
+               count(*) AS recorded,
+               count(*) FILTER (WHERE d.postprocessed_at IS NULL) AS pending,
+               min(d.received_at) FILTER (WHERE d.postprocessed_at IS NULL) AS oldest
+        FROM webhook_delivery d
+        JOIN node r ON r.id = d.repo_node_id
+        GROUP BY r.external_id
+        ORDER BY r.external_id
+        """
+    ).fetchall()
+    return [dict(r) for r in rows] or None
+
+
+def _webhook_lines(backlog: list[dict]) -> list[str]:
+    from .webhook import POSTPROCESS_SECONDS
+
+    lines = []
+    for b in backlog:
+        if b["pending"]:
+            since = b["oldest"].astimezone(timezone.utc)
+            lines.append(f"  {b['repo']}  {yellow(str(b['pending']))} applied, post-processing "
+                         f"pending since {since:%Y-%m-%d %H:%M} UTC")
+            lines.append(dim("    no Decision or evidence tier from them yet. The receiver runs the "
+                             f"pass about {POSTPROCESS_SECONDS:.0f}s after a delivery; any "
+                             "`dg ingest` of this repository runs it too"))
+        else:
+            recorded = b["recorded"]
+            lines.append(f"  {b['repo']}  {green('none pending')}  "
+                         + dim(f"({recorded} recorded deliveries, all post-processed)"))
+    return lines
+
+
 def _verdict(states: list[str]) -> int:
     fails = states.count(FAIL)
     warns = states.count(WARN)
@@ -990,6 +1036,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     if cursors:
         print()
         for line in _cursor_lines(cursors):
+            print(line)
+
+    backlog = webhook_backlog(conn)
+    if backlog:
+        heading("Webhook deliveries")
+        for line in _webhook_lines(backlog):
             print(line)
 
     # The reference queue, where the two things that look alike are worth telling apart:

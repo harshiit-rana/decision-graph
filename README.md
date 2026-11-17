@@ -968,11 +968,14 @@ Decision synthesis, evidence tiers. A merged pull request that satisfies the rub
 becomes a Decision without a poll, within about 30 seconds (the debounce window, so a burst of
 deliveries is one pass, not one each) plus the pass itself. It runs on the server's one thread
 between requests, so it never overlaps a write from this process, and a slow pass cannot hold up
-the `200` GitHub is waiting for. Two limits: the work is held in memory, so a crash between a
-delivery and its pass loses the request and the next `dg ingest` makes it up; and extraction still
-happens before the reply, so a slow GitHub API is still the receiver's latency (that part is not
-changed). `dg status` does not show a pending pass. The pass takes the repository's writer lock
-(below); if a poll holds it, the pass waits for the next window.
+the `200` GitHub is waiting for. Which deliveries still wait for a pass is recorded in the database
+(migration 0018, no payloads), and `dg status` lists them per repository until a pass covers them:
+the receiver's, or any `dg ingest` of that repository. The request to run the pass is held in
+memory, so after a crash the next `dg ingest` runs it. **The reply waits for extraction**, which
+calls GitHub, so a slow GitHub API is the receiver's latency; past GitHub's 10-second limit GitHub
+shows the delivery as failed although it was applied. Replying first would need a queue, which ADR
+0008 rules out, so this was deferred in #162 rather than overlooked. The pass takes the
+repository's writer lock (below); if a poll holds it, the pass waits for the next window.
 
 **One writer at a time (#163).** `dg ingest` and the receiver's post-processing each take a Postgres
 advisory lock for the repository, and never wait for it. A second `dg ingest` logs that another run

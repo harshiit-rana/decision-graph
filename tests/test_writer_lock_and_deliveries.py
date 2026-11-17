@@ -7,8 +7,10 @@ their own databases next to DATABASE_URL's, so they need a superuser and skip as
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import hmac
+import io
 import json
 import logging
 import os
@@ -20,10 +22,11 @@ import unittest
 import urllib.error
 import urllib.request
 import uuid
+from contextlib import redirect_stdout
 from datetime import timedelta
 from unittest import mock
 
-from decision_graph import cli, locking, migrate, run, webhook
+from decision_graph import cli, extractors, locking, migrate, run, webhook
 from decision_graph.config import Settings
 from tests.superuser import requires_superuser
 
@@ -385,6 +388,180 @@ class DeliveryLogTest(unittest.TestCase):
         self.assertNotIn("https://x/", row)
 
 
+# ---------------------------------------------------------------------------
+# Which deliveries still wait for post-processing (#162, migration 0018)
+# ---------------------------------------------------------------------------
+
+
+def postprocess_pass(dsn: str, repo_node_id: int, *, synthesize: bool = True) -> None:
+    """One `run.postprocess`, as either writer runs it, for one repository."""
+    from decision_graph import db
+
+    conn = db.connect(dsn)
+    try:
+        ctx = extractors.Context(conn=conn, client=CountingGitHub(),  # type: ignore[arg-type]
+                                 settings=Settings(database_url=dsn, github_token="x", target_repo=REPO),
+                                 repo_node_id=repo_node_id)
+        run.postprocess(ctx, synthesize=synthesize)
+    finally:
+        conn.close()
+
+
+def status_of(dsn: str) -> str:
+    out = io.StringIO()
+    with mock.patch.dict(os.environ, {"DATABASE_URL": dsn}), mock.patch.object(cli, "_COLOR", False), \
+            redirect_stdout(out):
+        cli.cmd_status(argparse.Namespace())
+    return out.getvalue()
+
+
+@unittest.skipUnless(DSN, "DATABASE_URL not set")
+@requires_superuser
+class PendingPostProcessingTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from tests.test_roles import ScratchDatabase
+
+        cls.scratch = ScratchDatabase()
+        conn = cls.scratch.connect()
+        migrate.apply_all(conn, "db/migrations")
+        conn.close()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.scratch.close()
+
+    def setUp(self) -> None:
+        with self.scratch.connect() as c:
+            c.execute("DELETE FROM webhook_delivery")
+            c.commit()
+        self.patch = mock.patch.object(webhook, "GitHubClient", CountingGitHub)
+        self.patch.start()
+        self.receiver = Receiver(self.scratch.dsn)
+
+    def tearDown(self) -> None:
+        self.receiver.close()
+        self.patch.stop()
+
+    def repo_id(self) -> int:
+        with self.scratch.connect() as c:
+            return c.execute("SELECT id FROM node WHERE node_type = 'repository' AND external_id = %s",
+                             (REPO,)).fetchone()["id"]
+
+    def backlog(self) -> list[dict] | None:
+        with self.scratch.connect() as c:
+            return cli.webhook_backlog(c)
+
+    def pending(self) -> dict[str, bool]:
+        with self.scratch.connect() as c:
+            rows = c.execute("SELECT delivery_id, postprocessed_at FROM webhook_delivery").fetchall()
+        return {r["delivery_id"]: r["postprocessed_at"] is None for r in rows}
+
+    def test_an_applied_delivery_waits_until_a_pass_covers_it(self) -> None:
+        self.assertEqual(self.receiver.deliver("issues", issue_payload(701), delivery="p-1")[0], 200)
+        [b] = self.backlog()
+        self.assertEqual((b["repo"], b["recorded"], b["pending"]), (REPO, 1, 1))
+        self.assertIsNotNone(b["oldest"])
+
+        postprocess_pass(self.scratch.dsn, self.repo_id())
+        [b] = self.backlog()
+        self.assertEqual((b["recorded"], b["pending"]), (1, 0))
+        self.assertEqual(self.pending(), {"p-1": False})
+
+    def test_a_poll_of_another_repository_leaves_it_waiting(self) -> None:
+        self.receiver.deliver("issues", issue_payload(702), delivery="p-2")
+        with self.scratch.connect() as c:
+            other = c.execute("INSERT INTO node (node_type, external_id) VALUES ('repository', 'zz/other') "
+                              "ON CONFLICT DO NOTHING RETURNING id").fetchone()
+            other = other["id"] if other else c.execute(
+                "SELECT id FROM node WHERE external_id = 'zz/other'").fetchone()["id"]
+            c.commit()
+        postprocess_pass(self.scratch.dsn, other)
+        self.assertEqual(self.pending(), {"p-2": True}, "a pass for zz/other cleared a flask delivery")
+
+    def test_a_pass_without_synthesis_marks_nothing(self) -> None:
+        self.receiver.deliver("issues", issue_payload(703), delivery="p-3")
+        postprocess_pass(self.scratch.dsn, self.repo_id(), synthesize=False)
+        self.assertEqual(self.pending(), {"p-3": True}, "no Decisions were synthesised for it")
+
+    def test_a_delivery_committed_during_a_pass_waits_for_the_next(self) -> None:
+        self.receiver.deliver("issues", issue_payload(704), delivery="p-4")
+        repo, dsn = self.repo_id(), self.scratch.dsn
+        real = run.inference.persist
+
+        def arrives_mid_pass(conn, proposals):
+            with self.scratch.connect() as c:  # another writer's committed delivery
+                c.execute("INSERT INTO webhook_delivery (delivery_id, payload_sha256, event, repo_node_id) "
+                          "VALUES ('p-mid', %s, 'issues', %s)", ("c" * 64, repo))
+                c.commit()
+            return real(conn, proposals)
+
+        with mock.patch.object(run.inference, "persist", arrives_mid_pass):
+            postprocess_pass(dsn, repo)
+        self.assertEqual(self.pending(), {"p-4": False, "p-mid": True})
+        postprocess_pass(dsn, repo)
+        self.assertEqual(self.pending(), {"p-4": False, "p-mid": False})
+
+    def test_a_failed_pass_marks_nothing(self) -> None:
+        self.receiver.deliver("issues", issue_payload(705), delivery="p-5")
+        with mock.patch.object(run.inference, "persist", side_effect=RuntimeError("boom")), \
+                self.assertRaises(RuntimeError):
+            postprocess_pass(self.scratch.dsn, self.repo_id())
+        self.assertEqual(self.pending(), {"p-5": True})
+
+    def test_dg_status_says_what_is_waiting_and_then_that_nothing_is(self) -> None:
+        self.receiver.deliver("issues", issue_payload(706), delivery="p-6")
+        text = status_of(self.scratch.dsn)
+        self.assertIn("Webhook deliveries", text)
+        self.assertIn("1 applied, post-processing pending since", text)
+        self.assertIn("dg ingest", text)
+
+        postprocess_pass(self.scratch.dsn, self.repo_id())
+        text = status_of(self.scratch.dsn)
+        self.assertIn("none pending", text)
+        self.assertIn("1 recorded deliveries, all post-processed", text)
+
+
+@unittest.skipUnless(DSN, "DATABASE_URL not set")
+@requires_superuser
+class BeforeMigration0018Test(unittest.TestCase):
+    """A database migrated to 0017 but not 0018 keeps working, then upgrades without inventing a backlog."""
+
+    def test_deliveries_and_passes_work_and_the_upgrade_reports_only_new_deliveries(self) -> None:
+        from tests.test_roles import ScratchDatabase
+
+        scratch = ScratchDatabase()
+        receiver = None
+        try:
+            conn = scratch.connect()
+            older = {p.name for p in migrate.discover("db/migrations") if p.name[:4] < "0018"}
+            migrate.apply_all(conn, "db/migrations", only=older)
+            conn.close()
+            with mock.patch.object(webhook, "GitHubClient", CountingGitHub):
+                receiver = Receiver(scratch.dsn)
+                self.assertEqual(receiver.deliver("issues", issue_payload(801), delivery="o-1")[0], 200)
+                with scratch.connect() as c:
+                    self.assertIn("issue #801", c.execute("SELECT outcome FROM webhook_delivery").fetchone()["outcome"])
+                    repo = c.execute("SELECT id FROM node WHERE node_type = 'repository'").fetchone()["id"]
+                    self.assertIsNone(cli.webhook_backlog(c), "nothing is tracked before 0018")
+                postprocess_pass(scratch.dsn, repo)  # must not fail on the older schema
+
+                conn = scratch.connect()
+                migrate.apply_all(conn, "db/migrations")
+                conn.close()
+                with scratch.connect() as c:
+                    self.assertIsNone(cli.webhook_backlog(c),
+                                      "a pre-0018 delivery's post-processing was never recorded; not reported")
+                self.assertEqual(receiver.deliver("issues", issue_payload(802), delivery="o-2")[0], 200)
+                with scratch.connect() as c:
+                    [b] = cli.webhook_backlog(c)
+                self.assertEqual((b["recorded"], b["pending"]), (1, 1))
+        finally:
+            if receiver is not None:
+                receiver.close()
+            scratch.close()
+
+
 @unittest.skipUnless(DSN, "DATABASE_URL not set")
 @requires_superuser
 class BeforeMigration0017Test(unittest.TestCase):
@@ -397,7 +574,7 @@ class BeforeMigration0017Test(unittest.TestCase):
 
         cls.scratch = ScratchDatabase()
         conn = cls.scratch.connect()
-        older = {p.name for p in migrate.discover("db/migrations") if not p.name.startswith("0017")}
+        older = {p.name for p in migrate.discover("db/migrations") if p.name[:4] < "0017"}
         migrate.apply_all(conn, "db/migrations", only=older)
         conn.close()
 

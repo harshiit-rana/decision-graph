@@ -140,8 +140,16 @@ def postprocess(ctx: Context, *, synthesize: bool = True) -> None:
     The one implementation, called by `dg ingest` after it polls and by the webhook receiver
     after a delivery (#162). Two copies would drift, and a delivery would leave the graph in a
     state a poll never does: new explicit edges with no Decision and no corroboration pass.
+
+    A complete pass with synthesis also marks the webhook deliveries it covered (migration 0018),
+    so `dg status` can say which are still waiting. A pass without synthesis has not produced their
+    Decisions, so it marks nothing.
     """
     conn = ctx.conn
+    # Read before anything else: a delivery committed after this point may not be seen by every
+    # step below, so it stays pending for the next pass rather than being marked done unseen.
+    covered = _deliveries_awaiting(conn, ctx.repo_node_id) if synthesize else []
+
     # Drain queued forward references before inference (issue #3). Order matters:
     # these are explicit edges, and §5.3 only lets inference bridge gaps that
     # explicit extraction could not fill. Draining afterwards would let inference
@@ -188,7 +196,38 @@ def postprocess(ctx: Context, *, synthesize: bool = True) -> None:
     # Gated inference runs last: it may only bridge gaps that explicit extraction
     # left behind, so it must not run before extraction has had its say (§5.1).
     inference.persist(conn, inference.propose(conn, ctx.repo_node_id))
+    # In the last step's transaction: a pass that fails anywhere above marks nothing.
+    _mark_postprocessed(conn, covered)
     conn.commit()
+
+
+def _deliveries_awaiting(conn, repo_node_id: int) -> list[tuple[str, str]]:
+    """This repository's applied webhook deliveries that no pass has covered yet (#162).
+
+    Per repository: a poll of one repository must not mark another's deliveries done. A database
+    before migration 0018 (or 0017) tracks none, so there is nothing to mark.
+    """
+    try:
+        with conn.transaction():  # a savepoint when a transaction is open, so a miss is harmless
+            rows = conn.execute(
+                "SELECT delivery_id, payload_sha256 FROM webhook_delivery "
+                "WHERE repo_node_id = %s AND postprocessed_at IS NULL",
+                (repo_node_id,),
+            ).fetchall()
+    except (psycopg.errors.UndefinedTable, psycopg.errors.UndefinedColumn):
+        return []
+    return [(r["delivery_id"], r["payload_sha256"]) for r in rows]
+
+
+def _mark_postprocessed(conn, keys: list[tuple[str, str]]) -> None:
+    if not keys:
+        return
+    conn.execute(
+        "UPDATE webhook_delivery d SET postprocessed_at = now() "
+        "FROM unnest(%s::text[], %s::text[]) AS k(id, sha) "
+        "WHERE d.delivery_id = k.id AND d.payload_sha256 = k.sha AND d.postprocessed_at IS NULL",
+        ([k[0] for k in keys], [k[1] for k in keys]),
+    )
 
 
 def _ingest_resource(ctx: Context, resource: str, run_id: int, max_pages: int | None) -> None:

@@ -83,7 +83,10 @@ to the offer to accept this ADR's recommended options and unblock #163 and #164.
   growth measurements and the second repository (#132), which don't exist. Until then the trigger
   is a placeholder, and nothing here claims a latency budget.
 - Ingestion A is accepted with its prerequisites. Status: newest-wins writes (#120) and edge
-  retraction (#121) are done, webhook post-processing (#162) is partly done, and the advisory
+  retraction (#121) are done, webhook post-processing (#162) is done, and the advisory
   lock (#163) and delivery de-duplication (#164) are implemented with this decision.
+- 2026-11-18: #162's "reply within GitHub's timeout even when GitHub is slow" was deferred by the
+  owner, not built. Replying before extraction needs a queue, which this decision excludes. The
+  receiver's pending post-processing is recorded per delivery instead (migration 0018).
 - No queue and no event bus.
 

@@ -492,11 +492,12 @@ class DeliveredMergeBecomesADecisionTest(unittest.TestCase):
             port = httpd.server_address[1]
             threading.Thread(target=lambda: httpd.serve_forever(poll_interval=0.05), daemon=True).start()
 
-            def deliver(event: str, payload: dict) -> int:
+            def deliver(event: str, payload: dict, delivery: str) -> int:
                 body = json.dumps(payload).encode()
                 request = urllib.request.Request(
                     f"http://127.0.0.1:{port}/", data=body,
-                    headers={webhook.EVENT_HEADER: event, webhook.SIGNATURE_HEADER: signed(SECRET, body)})
+                    headers={webhook.EVENT_HEADER: event, webhook.SIGNATURE_HEADER: signed(SECRET, body),
+                             webhook.DELIVERY_HEADER: delivery})
                 with urllib.request.urlopen(request, timeout=20) as response:
                     return response.status
 
@@ -521,14 +522,20 @@ class DeliveredMergeBecomesADecisionTest(unittest.TestCase):
                   "user": None}
 
             with mock.patch.object(webhook, "GitHubClient", FakeGitHub):
-                self.assertEqual(deliver("issues", {"repository": repo, "issue": issue}), 200)
+                self.assertEqual(deliver("issues", {"repository": repo, "issue": issue}, "e2e-1"), 200)
                 wait_for(1)
                 self.assertEqual(decisions(), 0, "an issue alone is not a decision")
 
-                self.assertEqual(deliver("pull_request", {"repository": repo, "pull_request": pr}), 200)
+                self.assertEqual(deliver("pull_request", {"repository": repo, "pull_request": pr}, "e2e-2"), 200)
                 wait_for(2)
 
             self.assertEqual(decisions(), 1, "the delivered merge produced no Decision")
+            # And the durable record agrees: both deliveries applied and post-processed (migration 0018).
+            from decision_graph import cli
+
+            with scratch.connect() as c:
+                [b] = cli.webhook_backlog(c)
+            self.assertEqual((b["recorded"], b["pending"]), (2, 0))
         finally:
             if httpd is not None:
                 httpd.shutdown()

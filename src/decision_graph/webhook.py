@@ -23,10 +23,20 @@ Extraction alone leaves new explicit edges with no Decision and no corroboration
 `run.postprocess` the poller calls runs: queued references, Decision synthesis, evidence tiers.
 It is debounced (`PostProcessor`), because synthesis on every delivery of a busy repository is
 real work, and it runs from the server loop rather than a thread, so it never overlaps a write.
-What that costs is latency, up to `POSTPROCESS_SECONDS` plus the run, and nothing is durable: a
-crash between a delivery and its post-processing loses the request, and the next `dg ingest`
-makes it up. The commit lists that corroboration's STRUCTURAL signal reads are re-fetched from
-the REST API, never taken from the delivery (#190).
+What that costs is latency, up to `POSTPROCESS_SECONDS` plus the run. The request to run it is held
+in memory, so a crash before the pass loses it and the next `dg ingest` makes it up; but which
+deliveries are still waiting is recorded (migration 0018), and `dg status` shows them until a pass,
+the receiver's or a poll's, covers them. The commit lists that corroboration's STRUCTURAL signal
+reads are re-fetched from the REST API, never taken from the delivery (#190).
+
+THE REPLY WAITS FOR EXTRACTION
+
+Extraction calls GitHub (the repository, and for a pull request its reviews, commits and comments)
+before the 200 is sent, so a slow GitHub API is this receiver's reply latency. Past GitHub's
+10-second limit GitHub records the delivery as failed although it was applied. Replying first would
+mean holding each delivery somewhere until it is processed -- a queue -- and ADR 0008 accepted none:
+polling is the completeness guarantee, webhooks only reduce latency. The owner deferred this in
+#162 (2026-11-18); it is a known limit, not an oversight.
 
 It does not handle `push`. That payload's commit objects are a different shape from the
 commits API -- no `commit.committer.date` nesting, no `files` -- so `extract_commit` would
@@ -383,7 +393,7 @@ class _Handler(BaseHTTPRequestHandler):
                 conn.rollback()
                 return f"{event}: not handled"
             if delivery is not None:
-                self._note_outcome(conn, delivery, summary)
+                self._note_outcome(conn, delivery, summary, repo_node_id)
             conn.commit()
             if self.post is not None:
                 self.post.request(repo_node_id)
@@ -408,12 +418,22 @@ class _Handler(BaseHTTPRequestHandler):
             return True
 
     @staticmethod
-    def _note_outcome(conn, delivery: tuple[str, str], summary: str) -> None:
+    def _note_outcome(conn, delivery: tuple[str, str], summary: str, repo_node_id: int) -> None:
+        """The outcome, and the repository whose post-processing this delivery now waits for."""
+        key = (delivery[0], delivery[1])
         try:
             with conn.transaction():
                 conn.execute(
+                    "UPDATE webhook_delivery SET outcome = %s, repo_node_id = %s "
+                    "WHERE delivery_id = %s AND payload_sha256 = %s",
+                    (summary[:300], repo_node_id, *key),
+                )
+        except psycopg.errors.UndefinedColumn:
+            # Before migration 0018: the outcome is recorded, the pending state is not.
+            with conn.transaction():
+                conn.execute(
                     "UPDATE webhook_delivery SET outcome = %s WHERE delivery_id = %s AND payload_sha256 = %s",
-                    (summary[:300], delivery[0], delivery[1]),
+                    (summary[:300], *key),
                 )
         except psycopg.errors.UndefinedTable:
             pass
