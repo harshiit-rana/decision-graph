@@ -267,6 +267,42 @@ class BodyCapTest(unittest.TestCase):
             httpd.server_close()
 
 
+class SilentClientTest(unittest.TestCase):
+    """One client that goes quiet can't hold the single-threaded receiver (2026-11-18 audit)."""
+
+    def test_the_handler_bounds_every_socket_call(self) -> None:
+        self.assertIsNotNone(webhook._Handler.timeout, "no timeout: a silent client holds the server")
+        self.assertLessEqual(webhook._Handler.timeout, 10, "longer than GitHub waits for a reply")
+
+    def test_a_silent_client_does_not_block_the_next_delivery(self) -> None:
+        import socket
+        import time
+
+        settings = Settings(database_url="postgresql://unused", github_token="x", target_repo=REPO)
+        # The production value is pinned above; a short one here keeps the test fast.
+        bound = type("_Bound", (webhook._Handler,), {"secret": SECRET, "settings": settings, "timeout": 0.5})
+        httpd = HTTPServer(("127.0.0.1", 0), bound)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=5) as silent:
+                silent.sendall(b"POST / HTTP/1.1\r\nHost: x\r\n")  # and never finishes the headers
+                body = json.dumps({"repository": {"full_name": REPO}}).encode()
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{port}/", data=body,
+                    headers={webhook.EVENT_HEADER: "star", webhook.SIGNATURE_HEADER: signed(SECRET, body)})
+                start = time.monotonic()
+                with self.assertLogs("decision_graph.webhook", level="INFO"), \
+                        urllib.request.urlopen(request, timeout=5) as response:
+                    status = response.status
+                waited = time.monotonic() - start
+            self.assertEqual(status, 200)
+            self.assertLess(waited, 3, "the silent client held the server")
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 class MainArgumentTest(unittest.TestCase):
     """It takes arguments, so it parses them -- the #82 rule."""
 

@@ -300,6 +300,13 @@ def _repo_of(payload: dict[str, Any]) -> str | None:
 class _Handler(BaseHTTPRequestHandler):
     server_version = "decision-graph-webhook"
 
+    # Seconds a single read or write on the socket may wait. The server has one thread, so
+    # without this a client that connects and goes silent holds it, and every delivery behind it
+    # waits until GitHub gives up (found by the 2026-11-18 audit). It bounds each socket call,
+    # not the whole request, so a slow but steady 25 MB body still arrives. GitHub's own
+    # deadline for the reply is 10 seconds.
+    timeout = 10
+
     # Injected by `serve`; instances are created per request.
     secret: str = ""
     settings: Settings | None = None
