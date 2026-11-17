@@ -42,7 +42,11 @@ from .reasoning import Answer, Mode
 # and a traceback. A hosted model id is not a constant -- it has an end-of-life date the
 # code cannot see -- so pinning one in source guarantees the same failure again, and the
 # fix should not require editing Python and rebuilding an image.
-DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
+#
+# It happened again: nvidia/nemotron-3-super-120b-a12b was found retired on 2026-11-18 (every
+# `dg ask` stopped with the diagnosis below). The replacement was checked that day against the
+# list of models NIM served to this project's key, and answered a real question correctly.
+DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 
 
 def model() -> str:

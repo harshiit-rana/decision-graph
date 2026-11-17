@@ -1040,9 +1040,9 @@ prose:
 ```
 
 It needs `NVIDIA_API_KEY` in `.env` (get one at <https://build.nvidia.com>) and calls
-`nvidia/nemotron-3-super-120b-a12b` through Nvidia NIM. **Set `DG_NLP_MODEL` in `.env` to
+`nvidia/nemotron-3-ultra-550b-a55b` through Nvidia NIM. **Set `DG_NLP_MODEL` in `.env` to
 use a different one** — a hosted model id has an end-of-life date the code cannot see, and
-the previous default was retired mid-project, so moving off a dead model must not require
+two earlier defaults were retired mid-project, so moving off a dead model must not require
 editing Python and rebuilding an image. `dg doctor` reports whether the key and the
 package are present, so you find out before typing a question rather than after.
 Everything else works without it, and no other command in this repository calls any
