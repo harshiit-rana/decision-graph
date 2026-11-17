@@ -32,6 +32,7 @@ from .cli import (
     red,
     yellow,
 )
+from .render import one_line
 
 # Rendered once with pyfiglet's "small" font and pasted, because the container image has no
 # figlet and this must not gain a dependency just to print a header. Pure ASCII; the font
@@ -276,6 +277,22 @@ def decision_rows(conn) -> list[dict]:
     return [dict(r) for r in conn.execute(DECISIONS_SQL).fetchall()]
 
 
+def decision_line(i: int, r: dict) -> str:
+    """One row of the browse list, as printed."""
+    when = f"{r['decided_at']:%Y-%m-%d}" if r["decided_at"] else " " * 10
+    ref = f"#{r['issue_ref']}" if r["issue_ref"] else "-"
+    # Both statuses are spelled out. Marking only the explicit ones would be shorter and
+    # would read as though the rest had no status at all, which is the kind of omission
+    # this codebase keeps deciding not to make.
+    status = "explicit" if r["status"] == "explicit" else "reconstructed"
+    painted = green(status) if r["status"] == "explicit" else dim(status)
+    pad = " " * (13 - len(status))
+    # A stranger's text: made inert and one line before it is cut, or an escape sequence or a
+    # newline in a title would reach the terminal (#145).
+    title = one_line(r["title"])[:44]
+    return f"  {bold(f'{i:>2}')}  {dim(when)}  {ref:<7} {painted}{pad}  {title}"
+
+
 def _pick_decision() -> str | None:
     """Show the decisions and return the query string for the one chosen.
 
@@ -305,16 +322,7 @@ def _pick_decision() -> str | None:
     print(f"  {bold(str(len(rows)))} decisions, newest first:")
     print()
     for i, r in enumerate(rows, 1):
-        when = f"{r['decided_at']:%Y-%m-%d}" if r["decided_at"] else " " * 10
-        ref = f"#{r['issue_ref']}" if r["issue_ref"] else "-"
-        # Both statuses are spelled out. Marking only the explicit ones would be shorter and
-        # would read as though the rest had no status at all, which is the kind of omission
-        # this codebase keeps deciding not to make.
-        status = "explicit" if r["status"] == "explicit" else "reconstructed"
-        painted = green(status) if r["status"] == "explicit" else dim(status)
-        pad = " " * (13 - len(status))
-        title = (r["title"] or "")[:44]
-        print(f"  {bold(f'{i:>2}')}  {dim(when)}  {ref:<7} {painted}{pad}  {title}")
+        print(decision_line(i, r))
     print()
     print(dim("  explicit       the decision is stated directly (e.g. named in a release note)"))
     print(dim("  reconstructed  rebuilt from signals: a closing issue, merged PR, and a review"))

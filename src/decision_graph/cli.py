@@ -1252,7 +1252,7 @@ def cmd_ask(args: argparse.Namespace, extra: list[str]) -> int:
         return 1
 
     c = candidates[0]
-    print(f"Found candidate: {trace.ref(c.node_type, c.external_id)} \"{render.safe(c.title)[:56]}\"\n")
+    print(f"Found candidate: {trace.ref(c.node_type, c.external_id)} \"{render.one_line(c.title)[:56]}\"\n")
     print("Traversing the graph...\n")
     answer = reasoning.reason(conn, c.node_id, reasoning.Mode(mode))
     # Read the Decision facts before closing: they are a second query against the same
