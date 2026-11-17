@@ -207,7 +207,7 @@ Five properties of the target repository and its bounded window were carried int
 - **Phase 2:** Candidate Retrieval (simple lookup); Graph Reasoning engine — backward (Why Engine) and forward (Impact Analysis) traversal, including the explicit-first / inferred-fallback traversal order.
 - **Phase 3:** Evidence Ranking engine with Explicit / Corroborated / Inferred tiering.
 - **Phase 4:** Explainability Mode; evaluation set and accuracy reporting.
-- **Phase 5 (partly shipped):** Webhook ingestion (#113), Bus Factor (#91) and Expert Finder (#111) are built. Not built: additional sources (Slack, Jira), permission modeling, Bus Factor / Architecture View / Expert Finder, ranked/embedding-based retrieval.
+- **Phase 5 (partly shipped):** Webhook ingestion (#113), Bus Factor (#91) and Expert Finder (#111) are built. Not built: additional sources (Slack, Jira), permission modeling, Architecture View, ranked/embedding-based retrieval.
 
 > **Roadmap note — rejected decisions as a first-class outcome (Phase 5+).**
 > Implementation surfaced a category the current model cannot express. A cluster where

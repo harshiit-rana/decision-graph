@@ -73,6 +73,34 @@ class DocsTruthTest(unittest.TestCase):
         meta = tomllib.loads(read("pyproject.toml"))["project"]
         self.assertNotIn("Phase 1", meta["description"])
 
+    # What each installed command is, in the words a document would use to say it doesn't exist.
+    SHIPPED_COMMANDS = {"dg-mcp": "MCP server", "dg-webhook": "webhook"}
+
+    def test_no_document_calls_a_shipped_command_unbuilt(self) -> None:
+        # The README said "no MCP server yet" for weeks after dg-mcp shipped (#139), and nothing
+        # noticed: found by the 2026-11-18 audit. A console script is proof the feature exists.
+        scripts = tomllib.loads(read("pyproject.toml"))["project"]["scripts"]
+        for command, feature in self.SHIPPED_COMMANDS.items():
+            self.assertIn(command, scripts, "a command this test vouches for is gone; update the map")
+            for doc in ("README.md", "PRD_v3.2_Organizational_Intelligence_Engine.md"):
+                with self.subTest(command=command, doc=doc):
+                    # The forms a denial takes ("no MCP server yet", "the webhook is not built"),
+                    # not every "no webhook can ..." in an explanation.
+                    name = re.escape(feature)
+                    denial = re.search(rf"(?i)\bno {name} yet\b|\b{name} (?:is|are) not (?:yet )?built\b",
+                                       read(doc))
+                    self.assertIsNone(denial, f"{doc} says '{denial and denial.group(0)}' but {command} ships")
+
+    def test_the_prd_does_not_list_a_feature_as_both_built_and_not_built(self) -> None:
+        # PRD §11 named Bus Factor and Expert Finder as built and, in the next sentence, not built.
+        line = next(l for l in read("PRD_v3.2_Organizational_Intelligence_Engine.md").splitlines()
+                    if "Phase 5 (partly shipped)" in l)
+        built, _, not_built = line.partition("Not built:")
+        for feature in ("Bus Factor", "Expert Finder", "Webhook"):
+            if feature in built:
+                with self.subTest(feature=feature):
+                    self.assertNotIn(feature, not_built)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,13 +11,14 @@ traversal engine, evidence tiering, and the §9 evaluation set — adjudicated 1
 against flask's real history, with the disclosures that number needs recorded in
 [`eval/RESULTS.md`](eval/RESULTS.md). Phase 5 items shipped so far: Bus Factor (#91),
 Expert Finder (#111), comment ingestion (#107), webhook ingestion (#113), `--format json`
-(#135), prior attempts (#137), `dg context` (#138), and snapshot tooling (#122).
+(#135), prior attempts (#137), `dg context` (#138), snapshot tooling (#122), the read-only MCP
+server `dg-mcp` (#139) and `dg agent-instructions` (#185).
 
 **What is *not* built.** The inferred-link proposer is a **stub**:
 `inference.propose()` always returns no proposals (`src/decision_graph/inference.py`). Nothing
 in this repository has ever produced an inferred edge from real data. The gate that would
 admit one is tested, and so is the traversal fallback, but only on a seeded fixture. There
-is no file-level history, no MCP server yet, and only one repository has been evaluated.
+is no file-level history, and only one repository has been evaluated.
 The roadmap is [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 - **Code repo:** this repository.
