@@ -312,14 +312,17 @@ def lookup_document(query: str, candidates, urls: dict[int, str] | None = None) 
 
 
 def no_match_document(query: str) -> dict[str, Any]:
-    """No artifact resembles the query. Distinct from a refusal: there was no start node."""
+    """No artifact's title or identifier resembles the query. Distinct from a refusal: there
+    was no start node. Bodies are not searched, so this is not a claim that nothing relevant
+    was recorded, and the message says so."""
     return _envelope(
         "no_match",
         query=query,
         message=(
-            "Nothing in the graph matches. Retrieval tries exact title, then identifier, "
-            "then prefix, then fuzzy, so a miss means no artifact in the ingested window "
-            "resembles this."
+            "Nothing in the graph matches. Retrieval compares titles and identifiers only "
+            "(exact title, identifier, prefix, then fuzzy) and never searches bodies, so a miss "
+            "means no title in the ingested window resembles this, not that nothing relevant "
+            "was recorded."
         ),
     )
 

@@ -349,9 +349,14 @@ def main(argv: list[str] | None = None) -> int:
     if not candidates:
         print(f"Nothing in the graph matches {args.query!r}.", file=sys.stderr)
         print(file=sys.stderr)
-        print("  Retrieval tries exact title, then identifier, then prefix, then fuzzy —", file=sys.stderr)
-        print("  so a miss means no artifact in the ingested window resembles this.", file=sys.stderr)
-        print("  Try `#5898` or a commit sha, or check `dg status` for what is ingested.", file=sys.stderr)
+        # Only titles and identifiers are compared, never bodies, so a miss says no TITLE resembles
+        # the query. It used to say no artifact did, which overclaims an absence: the 2026-11-18
+        # audit's plain-language questions missed artifacts that exist and answer them.
+        print("  Retrieval compares titles and identifiers only (exact title, identifier, prefix,", file=sys.stderr)
+        print("  then fuzzy) and never searches bodies. So a miss means no title in the ingested", file=sys.stderr)
+        print("  window resembles this, not that nothing relevant was recorded.", file=sys.stderr)
+        print("  Try words from the issue's title, `#5898` or a commit sha, `dg ask` for a question", file=sys.stderr)
+        print("  in plain words, or `dg status` for what is ingested.", file=sys.stderr)
         return 1
 
     if args.mode == LOOKUP:

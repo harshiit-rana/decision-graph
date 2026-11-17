@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "no_match",
   "query": "nonexistent thing",
-  "message": "Nothing in the graph matches. Retrieval tries exact title, then identifier, then prefix, then fuzzy, so a miss means no artifact in the ingested window resembles this.",
+  "message": "Nothing in the graph matches. Retrieval compares titles and identifiers only (exact title, identifier, prefix, then fuzzy) and never searches bodies, so a miss means no title in the ingested window resembles this, not that nothing relevant was recorded.",
   "coverage": {
     "repository": {
       "name": "pallets/flask",
